@@ -1,10 +1,20 @@
 # VICTORY LAP
 
 **An open-town roguelike RPG about never leaving.** Top-down, browser, single-player.
+
+### ▶ Play: https://kylefriesmarketing.github.io/victory-lap/
+
 Design pitch: `~/Downloads/victory-lap-design.md`. Visual constitution: `ART_BIBLE.md`
 (read it before touching any rendering — the QC rule is binding).
 
 **This README is the milestone authority for this repo.**
+
+## Deploy
+
+Pages serves **master, root** — so deploying is just `git push origin master`. There is
+no build step and no separate deploy repo; `index.html` + `js/` are the site.
+
+⚠️ M-rated content in a public repo. Kyle authorised publishing on 2026-08-05.
 
 ## Run it
 
