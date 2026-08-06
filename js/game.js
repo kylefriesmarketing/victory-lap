@@ -3,22 +3,13 @@
 // All sim randomness goes through this.rng (seeded LCG). View code may use Math.random.
 
 import {
-  TUNING as T, WORLD, BUILDINGS, ALLEY_GAPS, STRIP_Y, EXTERIOR_PROPS, GARAGE,
+  TUNING as T, WEAPONS, WORLD, BUILDINGS, ALLEY_GAPS, STRIP_Y, EXTERIOR_PROPS, GARAGE,
   WEAPON_SPAWNS, INTERIORS, ARCHETYPES, OUTFITS, NAMED, POPULATION, SPOTS,
   BARKS, SCHEME, ENDINGS, BLOCK_NAMES, DAY_NAMES, WEATHER_KINDS, MENU, RIP,
 } from './data.js';
 
-export { T, WORLD, BUILDINGS, ALLEY_GAPS, STRIP_Y, EXTERIOR_PROPS, GARAGE, INTERIORS,
+export { T, WEAPONS, WORLD, BUILDINGS, ALLEY_GAPS, STRIP_Y, EXTERIOR_PROPS, GARAGE, INTERIORS,
          ARCHETYPES, OUTFITS, NAMED, BARKS, SCHEME, ENDINGS, BLOCK_NAMES, DAY_NAMES, MENU, RIP };
-
-const WEAPONS = {
-  fist:   { dmg: T.punchDmg, range: 34, dur: Infinity, kb: 130, label: 'fists' },
-  bottle: { dmg: [12, 17], range: 38, dur: 2, kb: 170, throwable: true, label: 'a bottle' },
-  chair:  { dmg: [15, 22], range: 46, dur: 5, kb: 240, label: 'a folding chair' },
-  cue:    { dmg: [13, 19], range: 56, dur: 4, kb: 190, label: 'a pool cue' },
-  sign:   { dmg: [11, 16], range: 44, dur: 6, kb: 200, label: 'a DAYBREAK COMMONS sign' },
-  crowbar:{ dmg: [16, 22], range: 42, dur: 30, kb: 210, label: 'the crowbar' },
-};
 
 let _eid = 1;
 
@@ -40,6 +31,7 @@ export class Game {
     this.player = {
       x: 420, y: 1120, vx: 0, vy: 0, facing: 0, hp: T.hpMax, hpMax: T.hpMax,
       stamina: T.staminaMax, held: null, carryCrate: false, atkT: 0, hitT: 0, hitDir: 0,
+      windT: 0, windDir: 0,
       cash: T.startCash, inv: { rip: 0, jerky: 0, crowbar: false, wings: 0 },
       ripToday: 0, ripUses: 0, shakeAmp: 0, sleptAt: null, fired: false, strikes: 0,
       stolenPending: null, debt: 0, debtDue: -1, blackEye: false, cuffedT: 0,
@@ -622,20 +614,34 @@ export class Game {
   // ---- combat -------------------------------------------------------------
   weaponOf(e) { return e.held ? WEAPONS[e.held.kind] : WEAPONS.fist; }
 
+  // A swing is now TWO beats: wind up (telegraph, direction locked), then resolve.
+  // The old one-frame hit meant nothing could ever be dodged, by you or by them.
   attack() {
     const p = this.player;
-    if (p.atkT > 0 || p.carryCrate || this.over) return;
+    if (p.atkT > 0 || p.windT > 0 || p.carryCrate || this.over) return;
+    if (p.stamina < T.swingStamina) {
+      this.say(null, 'You have nothing left in the arm.', p.x, p.y);
+      return;
+    }
+    p.stamina -= T.swingStamina;
+    p.windT = T.windUp;
+    p.windDir = p.facing;              // committed on the wind-up; you can't steer a punch
+    this.sfx('swing', p.x, p.y);
+  }
+
+  _resolveSwing() {
+    const p = this.player;
     const w = this.weaponOf(p);
     p.atkT = T.punchCooldown;
+    p.strikeT = 0.18;                 // view: the arm is OUT for this long
     this.stats.punches++;
-    this.sfx('swing', p.x, p.y);
     let hitAny = false;
     for (const n of this.npcs) {
       if (n.ko || n.room !== this.room) continue;
       const dx = n.x - p.x, dy = n.y - p.y, d = Math.hypot(dx, dy);
       if (d > w.range + 12) continue;
       const ang = Math.atan2(dy, dx);
-      let da = Math.abs(ang - p.facing); if (da > Math.PI) da = 2 * Math.PI - da;
+      let da = Math.abs(ang - p.windDir); if (da > Math.PI) da = 2 * Math.PI - da;
       if (da > 1.15) continue;
       hitAny = true;
       this.hitNpc(n, this.ri(w.dmg[0], w.dmg[1]), ang, w.kb);
@@ -643,9 +649,41 @@ export class Game {
         this.fx('break', n.x, n.y, { kind: p.held.kind });
         this.alert(`${WEAPONS[p.held.kind].label[0].toUpperCase() + WEAPONS[p.held.kind].label.slice(1)} gives its life for the cause.`, 'ok');
         p.held = null;
+        break;   // a weapon that shattered can't hit the next guy too
       }
     }
     if (hitAny) this.sfx('thud', p.x, p.y);
+    else this.fx('whiff', p.x + Math.cos(p.windDir) * 26, p.y + Math.sin(p.windDir) * 26, { ang: p.windDir });
+  }
+
+  // Shove: no damage, all consequence. The bible's stumbling drunk, and the reason
+  // T.shoveForce existed for a day without a single caller.
+  shove() {
+    const p = this.player;
+    if (p.atkT > 0 || p.windT > 0 || this.over) return { ok: false };
+    if (p.stamina < T.shoveStamina) return { ok: false, msg: 'No hands left for that.' };
+    p.stamina -= T.shoveStamina;
+    p.atkT = T.punchCooldown * 0.7;
+    this.sfx('whoosh', p.x, p.y);
+    for (const n of this.npcs) {
+      if (n.ko || n.room !== this.room) continue;
+      const dx = n.x - p.x, dy = n.y - p.y, d = Math.hypot(dx, dy);
+      if (d > T.shoveRange) continue;
+      const ang = Math.atan2(dy, dx);
+      let da = Math.abs(ang - p.facing); if (da > Math.PI) da = 2 * Math.PI - da;
+      if (da > 1.3) continue;
+      n.vx += Math.cos(ang) * T.shoveForce; n.vy += Math.sin(ang) * T.shoveForce;
+      n.stunT = 0.5;
+      this.fx('impact', n.x, n.y, { ang });
+      this.sfx('thud', n.x, n.y);
+      if (n.cop) { this.addHeat(18, 1, 'shoving an officer'); n.state = 'chase'; }
+      else {
+        this.addHeat(T.heatCrime.assault * 0.4, 0, 'shoving somebody');
+        if (!n.brawler && this.chance(0.5)) { n.state = 'aggro'; }
+      }
+      return { ok: true };
+    }
+    return { ok: true, msg: 'You shove a volume of night air. It takes it well.' };
   }
 
   hitNpc(n, dmg, ang, kb) {
@@ -792,6 +830,7 @@ export class Game {
       grabCrate: () => this.grabCrate(), stashCrate: () => this.stashCrate(),
       fence: () => this.fenceHaul(!!arg), hold: () => this.holdForBuyer(), sundayBuyer: () => this.sundayBuyer(),
       walkOut: () => this.walkOut(), talkPeanut: () => this.talkPeanut(),
+      shove: () => this.shove(),
       shiftAuto: () => this.doShiftAuto(arg || 0), endBlock: () => { this.endBlock(arg || 'waited'); return { ok: true }; },
       brawlAuto: () => this.brawlAuto(arg || 2), heistTripAuto: () => this.heistTripAuto(),
       exitShopCheck: () => { this.exitShopCheck(); return { ok: true }; },
@@ -883,6 +922,8 @@ export class Game {
     // knockback decay
     p.x += p.vx * dt; p.y += p.vy * dt;
     p.vx *= Math.pow(0.001, dt); p.vy *= Math.pow(0.001, dt);
+    if (p.windT > 0) { p.windT -= dt; if (p.windT <= 0) { p.windT = 0; this._resolveSwing(); } }
+    p.strikeT = Math.max(0, (p.strikeT || 0) - dt);
     p.atkT = Math.max(0, p.atkT - dt);
     p.hitT = Math.max(0, p.hitT - dt);
     this.collide(p, 14);
@@ -927,6 +968,7 @@ export class Game {
     const p = this.player;
     n.atkT = Math.max(0, n.atkT - dt);
     n.hitT = Math.max(0, n.hitT - dt);
+    n.strikeT = Math.max(0, (n.strikeT || 0) - dt);
     if (n.stunT) { n.stunT = Math.max(0, n.stunT - dt); return; }
     n.x += n.vx * dt; n.y += n.vy * dt;
     n.vx *= Math.pow(0.001, dt); n.vy *= Math.pow(0.001, dt);
@@ -937,6 +979,23 @@ export class Game {
 
     switch (n.state) {
       case 'idle': {
+        // ⚠️ Measured over 20 passive runs: NOTHING in Hopewell ever touched the player
+        // first. In a town the design calls mean, that's a hole. Loiter next to a drunk
+        // in the lot after dark and he will eventually decide he knows you from somewhere.
+        if (n.drunk && this.isLate && dToP < 95 && !n.fuseSpent) {
+          n.fuse = (n.fuse || 0) + dt;
+          if (n.fuse > T.drunkFuseS) {
+            n.fuseSpent = true;
+            if (this.chance(0.55)) {
+              n.state = 'aggro';
+              this.say(n.name || 'Drunk', 'Hey. HEY. I know you. I know your whole DEAL.', n.x, n.y);
+            } else {
+              n.fuse = 0;
+              this.say(n.name || 'Drunk', this.pick(BARKS.drunk), n.x, n.y);
+            }
+            break;
+          }
+        } else if (n.fuse) n.fuse = Math.max(0, n.fuse - dt * 0.6);
         n.stateT -= dt;
         if (n.stateT <= 0) {
           n.stateT = this.rr(2, 6);
@@ -981,12 +1040,18 @@ export class Game {
       case 'aggro': {
         const ang = Math.atan2(p.y - n.y, p.x - n.x);
         n.facing = ang;
-        if (dToP > 34) { n.x += Math.cos(ang) * 118 * dt; n.y += Math.sin(ang) * 118 * dt; }
-        else if (n.atkT <= 0) {
-          n.atkT = this.rr(...T.npcAtkCooldown);
-          this.sfx('swing', n.x, n.y);
-          if (this.chance(0.75)) this.hitPlayer(this.ri(...T.npcDmg), ang, n);
-        }
+        const sp = n.brawler ? T.brawlerSpeed : T.npcAggroSpeed;
+        if (n.windT > 0) {
+          // committed — they're planted, winding up. This is your window.
+          n.windT -= dt;
+          if (n.windT <= 0) {
+            n.windT = 0; n.atkT = this.rr(...T.npcAtkCooldown); n.strikeT = 0.18;
+            const now = Math.hypot(p.x - n.x, p.y - n.y);
+            if (now < 44) this.hitPlayer(this.ri(...T.npcDmg), Math.atan2(p.y - n.y, p.x - n.x), n);
+            else this.sfx('whoosh', n.x, n.y);   // you stepped out of it
+          }
+        } else if (dToP > 34) { n.x += Math.cos(ang) * sp * dt; n.y += Math.sin(ang) * sp * dt; }
+        else if (n.atkT <= 0) { n.windT = T.npcWindUp; this.sfx('swing', n.x, n.y); }
         if (dToP > 520) n.state = 'idle';
         break;
       }
@@ -1001,7 +1066,7 @@ export class Game {
     if (n.state === 'chase') {
       const ang = Math.atan2(p.y - n.y, p.x - n.x);
       n.facing = ang;
-      const sp = 205; // between walk and sprint — stamina decides the race
+      const sp = T.copChaseSpeed; // between walk and sprint — stamina decides the race
       n.x += Math.cos(ang) * sp * dt; n.y += Math.sin(ang) * sp * dt;
       n.barkT -= dt;
       if (n.barkT <= 0) { n.barkT = this.rr(4, 8); this.say(n.name, this.pick(BARKS.cop_wanted), n.x, n.y); }

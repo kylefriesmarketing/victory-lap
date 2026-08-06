@@ -2,7 +2,7 @@
 // Canvas 2D view layer. Every choice here answers to ART_BIBLE.md.
 // View-only: free to use Math.random. Never touches sim state.
 
-import { WORLD, BUILDINGS, ALLEY_GAPS, STRIP_Y, EXTERIOR_PROPS, GARAGE, INTERIORS,
+import { T, WORLD, BUILDINGS, ALLEY_GAPS, STRIP_Y, EXTERIOR_PROPS, GARAGE, INTERIORS,
          ARCHETYPES, NAMED } from './game.js';
 
 const PAL = {
@@ -62,6 +62,10 @@ export class Renderer {
     if (kind === 'shatter') add(13, () => ({ x, y: y - 8, vx: rr(-150, 150), vy: rr(-190, -30), g: 420, r: rr(1, 2.6), c: 'rgba(190,220,215,0.9)', t: 0, dur: rr(0.3, 0.7) }));
     if (kind === 'break') add(10, () => ({ x, y: y - 18, vx: rr(-120, 120), vy: rr(-170, -30), g: 380, r: rr(1.5, 3.2), c: '#8a5a33', t: 0, dur: rr(0.3, 0.65) }));
     if (kind === 'ko') add(9, () => ({ x, y: y - 10, vx: rr(-60, 60), vy: rr(-60, -10), g: 120, r: rr(1, 2.4), c: 'rgba(160,150,140,0.7)', t: 0, dur: rr(0.5, 0.9) }));
+    // a miss has to READ as a miss, or players can't tell range from bad luck
+    if (kind === 'whiff') add(4, (i) => ({ x: x + rr(-6, 6), y: y - 24 + rr(-4, 4),
+      vx: Math.cos(d.ang || 0) * rr(40, 90), vy: Math.sin(d.ang || 0) * rr(40, 90) - 20,
+      g: 40, r: rr(0.8, 1.6), c: 'rgba(232,220,195,0.35)', t: 0, dur: rr(0.16, 0.28) }));
     if (kind === 'impact' || kind === 'ko') this.cam.shake = Math.min(6, this.cam.shake + (kind === 'ko' ? 4 : 2));
   }
 
@@ -866,15 +870,29 @@ export class Renderer {
     const armY = ty + 5;
     const hand = (hxp, hyp) => { c.fillStyle = skin; c.beginPath(); c.arc(hxp, hyp, 2.1, 0, 7); c.fill(); c.fillStyle = shirt; };
     const swing = moving ? Math.sin(phase * 2) * 6 : breathe;
-    const atk = isPlayer && this.g.player.atkT > 0.2;
-    if (e.state === 'film') {
+    // Wind-up must be VISIBLE or the telegraph doesn't exist. Arm cocks back during
+    // windT, snaps out during strikeT. This is the whole readability of a fight.
+    const windT = isPlayer ? (g.player.windT || 0) : (e.windT || 0);
+    const windMax = isPlayer ? T.windUp : T.npcWindUp;
+    const striking = (isPlayer ? (g.player.strikeT || 0) : (e.strikeT || 0)) > 0;
+    const atk = striking;
+    if (windT > 0) {
+      const k = 1 - windT / windMax;                       // 0 → 1 across the wind-up
+      const fdx = Math.cos(e.facing || 0), fdy = Math.sin(e.facing || 0);
+      c.beginPath(); c.moveTo(0, armY);
+      c.lineTo(-fdx * (7 + k * 7), armY - fdy * (4 + k * 4) - 3 - k * 3); c.stroke();
+      hand(-fdx * (7 + k * 7), armY - fdy * (4 + k * 4) - 3 - k * 3);
+      c.beginPath(); c.moveTo(-flipX * tw * 0.42, armY); c.lineTo(-flipX * (tw * 0.42 + 3), armY + 9); c.stroke();
+      if (isPlayer && g.player.held) this._drawHeldWeapon(c, g.player.held.kind, -fdx * 0.8, -fdy * 0.8, armY - 4);
+    } else if (e.state === 'film') {
       c.beginPath(); c.moveTo(flipX * tw * 0.4, armY); c.lineTo(flipX * (tw * 0.4 + 7), armY - 10); c.stroke();
       c.fillStyle = '#1a1e26'; c.fillRect(flipX * (tw * 0.4 + 4), armY - 17, 6, 10);
       c.fillStyle = 'rgba(180,220,255,0.8)'; c.fillRect(flipX * (tw * 0.4 + 5), armY - 16, 4, 7);
       c.beginPath(); c.moveTo(-flipX * tw * 0.4, armY); c.lineTo(-flipX * (tw * 0.4 + 3), armY + 8); c.stroke();
-    } else if (atk || (!isPlayer && e.atkT > (e._cd || 0.5) * 0.6)) {
+    } else if (atk) {
       const fdx = Math.cos(e.facing || 0), fdy = Math.sin(e.facing || 0);
-      c.beginPath(); c.moveTo(0, armY); c.lineTo(fdx * 16, armY + fdy * 10); c.stroke();
+      c.beginPath(); c.moveTo(0, armY); c.lineTo(fdx * 18, armY + fdy * 11); c.stroke();
+      hand(fdx * 18, armY + fdy * 11);
       c.beginPath(); c.moveTo(-flipX * tw * 0.42, armY); c.lineTo(-flipX * (tw * 0.42 + 2), armY + 7); c.stroke();
       if (isPlayer && g.player.held) this._drawHeldWeapon(c, g.player.held.kind, fdx, fdy, armY);
     } else if (isPlayer && g.player.carryCrate) {

@@ -526,6 +526,7 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   if (e.code === 'Space' || e.code === 'KeyJ') { game.attack(); e.preventDefault(); }
+  if (e.code === 'KeyF') result(game.shove());
   if (e.code === 'KeyQ' || e.code === 'KeyK') result(game.throwHeld());
   if (e.code === 'KeyE') {
     const it = findNearest(); // computed on demand — the cached one is stale in hidden tabs

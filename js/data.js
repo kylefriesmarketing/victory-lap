@@ -17,9 +17,22 @@ export const TUNING = {
   punchDmg: [8, 12],
   punchRange: 34,
   punchCooldown: 0.38,
+  // ⚠️ Every swing in the game telegraphs. Damage used to land the instant the key went
+  // down, with the arm pose drawn AFTER — so there was nothing to dodge and nothing to
+  // read. windUp is the anticipation frame the art bible asks for ("a swung chair has
+  // wind-up") and it's what makes a fight legible.
+  windUp: 0.13,               // player anticipation before the hit resolves
+  npcWindUp: 0.26,            // theirs is slower — that gap IS the dodge window
+  swingStamina: 13,           // swinging costs; kiting forever no longer free
   shoveForce: 240,
+  shoveStamina: 9,
+  shoveRange: 42,
   npcDmg: [9, 16],
   npcAtkCooldown: [0.7, 1.15],
+  npcAggroSpeed: 138,         // slower than your walk (165): you can disengage…
+  brawlerSpeed: 174,          // …but a brawler runs you down unless you spend stamina
+  copChaseSpeed: 205,
+  drunkFuseS: 5.5,            // LATE-block drunks you loiter near start something
   limpBelowHp: 30,
   // heat
   heatStage: { noticed: 15, named: 40, wanted: 70 },
@@ -70,6 +83,17 @@ export const TUNING = {
 // World: 2200 x 1500. North: the strip + back alley. Center: parking + THE LOT.
 // South: the street, the bus shelter, and the first sliver of the Flats (Bev's).
 // ---------------------------------------------------------------------------
+
+// Every improvised weapon in Hopewell. Lives HERE, not in game.js — these are the
+// numbers a balance pass most wants to touch, and the README says tuning lives in data.
+export const WEAPONS = {
+  fist:   { dmg: [8, 12],  range: 34, dur: Infinity, kb: 130, label: 'fists' },
+  bottle: { dmg: [12, 17], range: 38, dur: 2,  kb: 170, throwable: true, label: 'a bottle' },
+  chair:  { dmg: [15, 22], range: 46, dur: 5,  kb: 240, label: 'a folding chair' },
+  cue:    { dmg: [13, 19], range: 56, dur: 4,  kb: 190, label: 'a pool cue' },
+  sign:   { dmg: [11, 16], range: 44, dur: 6,  kb: 200, label: 'a DAYBREAK COMMONS sign' },
+  crowbar:{ dmg: [16, 22], range: 42, dur: 30, kb: 210, label: 'the crowbar' },
+};
 
 export const WORLD = { w: 2200, h: 1500 };
 
