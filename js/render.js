@@ -52,8 +52,13 @@ export class Renderer {
   resize(w, h) { this.cv.width = w; this.cv.height = h; this.light.width = w; this.light.height = h; }
 
   bark(who, text, x, y) {
-    this.barks.push({ who, text, x, y, t: 0, dur: 2.6 + text.length * 0.045 });
-    if (this.barks.length > 7) this.barks.shift();
+    // stack barks that land on top of each other instead of overprinting them into mush
+    let lift = 0;
+    for (const b of this.barks) {
+      if (Math.abs(b.x - x) < 150 && Math.abs((b.y - b.lift) - y) < 60) lift = Math.max(lift, b.lift + 34);
+    }
+    this.barks.push({ who, text, x, y: y - lift, lift, t: 0, dur: 2.6 + text.length * 0.045 });
+    if (this.barks.length > 5) this.barks.shift();
   }
 
   fx(kind, x, y, d = {}) {
@@ -183,6 +188,40 @@ export class Renderer {
     c.globalAlpha = 1; c.lineCap = 'butt';
     // driveway
     c.fillStyle = '#5a564f'; c.fillRect(360, 1086, 110, 64);
+    // ⚠️ THE ALLEY MOUTHS. These two 60px gaps are the ONLY route to the back alley,
+    // which is the entire heist — and they were painted as nothing at all: bare asphalt
+    // between two identical facades. The game's most important piece of map knowledge
+    // has to be visible from the lot.
+    for (const gp of ALLEY_GAPS) {
+      const gx = (gp.x1 + gp.x2) / 2, gw = gp.x2 - gp.x1;
+      // the mouth floor is dirtier than the lot — nobody sweeps a service gap
+      c.fillStyle = 'rgba(24,22,20,0.30)';
+      c.fillRect(gp.x1, STRIP_Y.roofTop, gw, STRIP_Y.base - STRIP_Y.roofTop);
+      scatter(20, gx, (rnd) => {
+        c.fillStyle = `rgba(18,16,14,${0.15 + rnd() * 0.25})`;
+        c.fillRect(gp.x1 + rnd() * gw, STRIP_Y.roofTop + rnd() * 280, 4 + rnd() * 14, 2 + rnd() * 5);
+      });
+      // bollards either side, one knocked crooked years ago
+      for (const [bx, tilt] of [[gp.x1 + 7, 0], [gp.x2 - 7, 0.22]]) {
+        c.save(); c.translate(bx, STRIP_Y.base + 4); c.rotate(tilt);
+        c.fillStyle = '#6a6258'; c.fillRect(-4, -26, 8, 26);
+        c.fillStyle = '#c9a227'; c.fillRect(-4, -22, 8, 5);
+        c.fillStyle = 'rgba(0,0,0,0.3)'; c.fillRect(-6, -1, 12, 3);
+        c.restore();
+      }
+      // a chained gate that stopped closing a long time ago
+      c.strokeStyle = 'rgba(150,152,158,0.55)'; c.lineWidth = 2;
+      c.beginPath(); c.moveTo(gp.x1 + 6, STRIP_Y.base - 2); c.lineTo(gp.x1 + 26, STRIP_Y.base - 16); c.stroke();
+      for (let i = 0; i < 4; i++) {
+        c.beginPath(); c.moveTo(gp.x1 + 8 + i * 5, STRIP_Y.base - 3 - i * 0.5); c.lineTo(gp.x1 + 12 + i * 5, STRIP_Y.base - 15); c.stroke();
+      }
+      c.lineWidth = 1;
+      // scuffed arrows of traffic: everybody cuts this corner
+      c.strokeStyle = 'rgba(30,26,22,0.16)'; c.lineWidth = 18; c.lineCap = 'round';
+      c.beginPath(); c.moveTo(gx, STRIP_Y.base + 40); c.lineTo(gx, STRIP_Y.roofTop + 20); c.stroke();
+      c.lineCap = 'butt'; c.lineWidth = 1;
+    }
+
     // buildings: roofs + facades + their whole biography
     for (const b of BUILDINGS) this._paintBuilding(c, b);
     this._paintGarage(c);
@@ -214,7 +253,8 @@ export class Renderer {
   }
 
   _paintBuilding(c, b) {
-    const yT = STRIP_Y.roofTop, yF = STRIP_Y.facadeTop, yB = STRIP_Y.base;
+    const f = b.face || { parapet: 0, doorAt: 0.5, win: 'pair', recess: 0 };
+    const yT = STRIP_Y.roofTop, yF = STRIP_Y.facadeTop - (f.parapet || 0), yB = STRIP_Y.base;
     // roof: tar and gravel, HVAC box, mystery stains
     c.fillStyle = b.key === 'dead' ? '#3d4045' : (['qwikstop', 'wingbarn'].includes(b.key) ? PAL.roofC : PAL.roofA);
     c.fillRect(b.x, yT, b.w, yF - yT);
@@ -233,10 +273,20 @@ export class Renderer {
     c.strokeStyle = 'rgba(0,0,0,0.35)'; c.strokeRect(b.x + b.w * 0.55, yT + 26, 44, 30);
     c.fillStyle = 'rgba(0,0,0,0.28)'; c.beginPath(); c.arc(b.x + b.w * 0.55 + 58, yT + 40, 5, 0, 7); c.fill(); // vent
     c.fillStyle = 'rgba(0,0,0,0.18)'; c.beginPath(); c.ellipse(b.x + b.w * 0.55 + 22, yT + 60, 26, 7, 0, 0, 7); c.fill(); // HVAC shadow
-    // facade
+    // facade — parapet/gable give each storefront its own roofline silhouette
     const fc = { qwikstop: '#8a4a3a', hardware: '#6e6455', tattoo: '#3a3d4a', buffet: '#8a3d34',
                  wingbarn: '#7a5a3a', gamebarn: '#4a5568', dead: '#e8e4dc', cashking: '#5a4a2a' }[b.key] || PAL.facade;
-    c.fillStyle = fc; c.fillRect(b.x, yF, b.w, yB - yF);
+    c.fillStyle = fc;
+    if (f.gable) {   // the Barn actually has a barn roof
+      c.beginPath();
+      c.moveTo(b.x, yB); c.lineTo(b.x, yF + 14);
+      c.lineTo(b.x + b.w / 2, yF - 10); c.lineTo(b.x + b.w, yF + 14); c.lineTo(b.x + b.w, yB);
+      c.closePath(); c.fill();
+    } else c.fillRect(b.x, yF, b.w, yB - yF);
+    if (f.parapet > 6) {   // capstone on a raised parapet
+      c.fillStyle = shade(fc, 0.22);
+      c.fillRect(b.x - 2, yF - (f.gable ? 10 : 0), b.w + 4, f.gable ? 3 : 5);
+    }
     // brick/wear texture on the facade — a texture, not a wound
     if (b.key !== 'dead') scatter(20, b.x + 7, (rnd) => {
       c.fillStyle = `rgba(0,0,0,${0.04 + rnd() * 0.07})`;
@@ -247,17 +297,72 @@ export class Renderer {
     const gg = c.createLinearGradient(0, yB - 18, 0, yB);
     gg.addColorStop(0, 'rgba(30,26,20,0)'); gg.addColorStop(1, 'rgba(30,26,20,0.4)');
     c.fillStyle = gg; c.fillRect(b.x, yB - 18, b.w, 18);
-    // windows + door
-    const doorX = b.x + b.w / 2 - 16;
-    c.fillStyle = 'rgba(24,30,38,0.9)'; c.fillRect(doorX, yF + 34, 32, yB - yF - 34);
-    c.strokeStyle = 'rgba(200,190,170,0.4)'; c.strokeRect(doorX, yF + 34, 32, yB - yF - 34);
-    for (const wx of [b.x + 18, b.x + b.w - 58]) {
-      c.fillStyle = 'rgba(30,40,52,0.85)'; c.fillRect(wx, yF + 30, 40, 34);
-      c.strokeStyle = 'rgba(0,0,0,0.4)'; c.strokeRect(wx, yF + 30, 40, 34);
-      c.fillStyle = 'rgba(255,255,255,0.07)'; c.beginPath();
-      c.moveTo(wx, yF + 64); c.lineTo(wx + 16, yF + 30); c.lineTo(wx + 26, yF + 30); c.lineTo(wx + 6, yF + 64); c.fill();
+    // door — position varies per storefront, and a recess reads as real depth
+    const doorX = b.x + b.w * (f.doorAt ?? 0.5) - 16;
+    const dTop = yF + (f.parapet || 0) + 34;
+    if (f.recess) {
+      c.fillStyle = shade(fc, -0.35);
+      c.fillRect(doorX - f.recess, dTop - 8, 32 + f.recess * 2, yB - dTop + 8);
+      c.fillStyle = 'rgba(0,0,0,0.25)'; c.fillRect(doorX - f.recess, dTop - 8, 32 + f.recess * 2, 6);
     }
-    // per-building storytelling
+    c.fillStyle = 'rgba(24,30,38,0.9)'; c.fillRect(doorX, dTop, 32, yB - dTop);
+    c.strokeStyle = 'rgba(200,190,170,0.4)'; c.strokeRect(doorX, dTop, 32, yB - dTop);
+    c.fillStyle = 'rgba(210,200,180,0.55)'; c.fillRect(doorX + (f.doorAt > 0.5 ? 4 : 25), dTop + 16, 3, 7); // handle
+
+    // glazing — each shop's relationship with the street, in one detail
+    const wy = yF + (f.parapet || 0) + 30;
+    const glass = (wx, ww, wh) => {
+      c.fillStyle = 'rgba(30,40,52,0.85)'; c.fillRect(wx, wy, ww, wh);
+      c.strokeStyle = 'rgba(0,0,0,0.4)'; c.strokeRect(wx, wy, ww, wh);
+      c.fillStyle = 'rgba(255,255,255,0.07)'; c.beginPath();
+      c.moveTo(wx, wy + wh); c.lineTo(wx + ww * 0.4, wy); c.lineTo(wx + ww * 0.62, wy);
+      c.lineTo(wx + ww * 0.14, wy + wh); c.fill();
+    };
+    const kind = f.win || 'pair';
+    if (kind === 'wide') {                       // gas station: all glass, nothing hidden
+      glass(b.x + 14, doorX - b.x - 24, 40);
+      glass(doorX + 42, b.x + b.w - doorX - 56, 40);
+    } else if (kind === 'pair') {
+      glass(b.x + 18, 40, 34); glass(b.x + b.w - 58, 40, 34);
+    } else if (kind === 'single') {              // narrow shop, one window
+      glass(b.x + 22, 46, 38);
+    } else if (kind === 'grid') {                // muntin bars — an older building
+      for (const gx of [b.x + 16, b.x + b.w - 62]) {
+        glass(gx, 46, 36);
+        c.strokeStyle = 'rgba(0,0,0,0.3)';
+        c.beginPath(); c.moveTo(gx + 23, wy); c.lineTo(gx + 23, wy + 36);
+        c.moveTo(gx, wy + 18); c.lineTo(gx + 46, wy + 18); c.stroke();
+      }
+    } else if (kind === 'slot') {                // Ca$h Kingdom: a blind wall and one slit
+      c.fillStyle = shade(fc, -0.2); c.fillRect(b.x + 14, wy, b.w - 28, 40);
+      glass(b.x + b.w * 0.34, 34, 16);
+      c.strokeStyle = 'rgba(210,200,180,0.5)'; c.lineWidth = 2;
+      for (let i = 1; i < 4; i++) { c.beginPath(); c.moveTo(b.x + b.w * 0.34 + i * 8, wy); c.lineTo(b.x + b.w * 0.34 + i * 8, wy + 16); c.stroke(); }
+      c.lineWidth = 1;
+    } else if (kind === 'papered') {             // Fairview: brown paper, nothing to see yet
+      for (const gx of [b.x + 16, b.x + b.w - 62]) {
+        c.fillStyle = '#c8b494'; c.fillRect(gx, wy, 46, 36);
+        c.strokeStyle = 'rgba(255,255,255,0.5)'; c.lineWidth = 2;
+        c.beginPath(); c.moveTo(gx, wy); c.lineTo(gx + 46, wy + 36); c.moveTo(gx + 46, wy); c.lineTo(gx, wy + 36); c.stroke();
+        c.lineWidth = 1;
+      }
+    }
+    if (f.awning) {   // striped cloth, scalloped hem, sagging in the middle like real ones
+      const ax = b.x + 14, aw = b.w - 28, ay = wy - 9;
+      c.save();
+      c.beginPath(); c.moveTo(ax, ay); c.lineTo(ax + aw, ay);
+      c.quadraticCurveTo(ax + aw / 2, ay + 15, ax, ay); c.clip();
+      c.fillStyle = f.awning; c.fillRect(ax, ay, aw, 16);
+      c.fillStyle = 'rgba(240,232,214,0.5)';
+      for (let sx = ax; sx < ax + aw; sx += 22) c.fillRect(sx, ay, 11, 16);
+      c.restore();
+      c.strokeStyle = 'rgba(0,0,0,0.3)';
+      c.beginPath(); c.moveTo(ax, ay); c.lineTo(ax + aw, ay); c.stroke();
+      c.fillStyle = 'rgba(0,0,0,0.18)'; c.fillRect(ax, wy, aw, 4);   // shadow it throws
+    }
+    // per-building storytelling. ⚠️ anchored to yG (the TRUE facade line), not yF —
+    // yF now varies with the parapet, which would fling these onto the roof.
+    const yG = STRIP_Y.facadeTop;
     if (b.key === 'qwikstop') { // ice machine + propane cage
       c.fillStyle = '#c8c4bc'; c.fillRect(b.x + 8, yB - 34, 30, 34);
       c.fillStyle = '#3a6ea8'; c.fillRect(b.x + 8, yB - 34, 30, 10);
@@ -265,36 +370,43 @@ export class Renderer {
       c.strokeStyle = '#6a7078'; for (let i = 0; i < 4; i++) { c.beginPath(); c.moveTo(b.x + b.w - 40 + i * 8, yB - 30); c.lineTo(b.x + b.w - 40 + i * 8, yB); c.stroke(); }
     }
     if (b.key === 'hardware') { // the eternal banner
-      c.save(); c.translate(b.x + b.w / 2, yF + 14); c.rotate(-0.02);
+      c.save(); c.translate(b.x + b.w / 2, yG + 14); c.rotate(-0.02);
       c.fillStyle = 'rgba(214,80,60,0.75)'; c.fillRect(-b.w / 2 + 10, -8, b.w - 20, 18);
       c.fillStyle = 'rgba(255,244,230,0.85)'; c.font = 'bold 11px Arial'; c.textAlign = 'center';
       c.fillText('EVERYTHING MUST GO', 0, 5); c.restore();
     }
     if (b.key === 'buffet') { // ghost names under the current sign
       c.fillStyle = 'rgba(232,220,195,0.14)'; c.font = 'bold 9px Georgia'; c.textAlign = 'center';
-      c.fillText('LUCKY DRAGON PALACE', b.x + b.w / 2, yF + 26);
-      c.fillStyle = 'rgba(232,220,195,0.08)'; c.fillText('JADE GARDEN EXPRESS', b.x + b.w / 2 + 3, yF + 30);
+      c.fillText('LUCKY DRAGON PALACE', b.x + b.w / 2, yG + 24);
+      c.fillStyle = 'rgba(232,220,195,0.08)'; c.fillText('JADE GARDEN EXPRESS', b.x + b.w / 2 + 3, yG + 28);
     }
     if (b.key === 'dead') { // Fairview: the only clean thing on the street
-      c.fillStyle = '#f6f3ee'; c.fillRect(b.x + 12, yF + 8, b.w - 24, 54);
-      c.strokeStyle = '#d8d2c8'; c.strokeRect(b.x + 12, yF + 8, b.w - 24, 54);
+      // ⚠️ keep every string inside b.w (180) — these used to spill onto the neighbours
+      c.fillStyle = 'rgba(0,0,0,0.10)'; c.fillRect(b.x + 15, yF + 9, b.w - 24, 52);
+      c.fillStyle = '#fdfcfa'; c.fillRect(b.x + 12, yF + 6, b.w - 24, 52);
+      c.strokeStyle = '#cfc9be'; c.strokeRect(b.x + 12, yF + 6, b.w - 24, 52);
       c.fillStyle = '#2a2e33'; c.font = '600 13px "Segoe UI", Arial'; c.textAlign = 'center';
-      c.fillText('DAYBREAK', b.x + b.w / 2, yF + 30);
-      c.fillText('COMMONS', b.x + b.w / 2, yF + 46);
-      c.fillStyle = '#8a9096'; c.font = '400 7px "Segoe UI", Arial';
-      c.fillText('LIVE • WORK • SIP — A FAIRVIEW PARTNERS COMMUNITY', b.x + b.w / 2, yF + 57);
-      c.fillStyle = 'rgba(30,30,34,0.5)'; c.font = 'bold 8px Arial';
-      c.fillText('(COMING SOON — something good, probably)', b.x + b.w / 2, yB - 8);
-    }
-    if (b.key === 'gamebarn') { // taped flyer + the back window is painted in the alley below
-      c.fillStyle = 'rgba(240,232,210,0.8)'; c.fillRect(doorX + 40, yF + 40, 26, 30);
-      c.fillStyle = 'rgba(40,40,40,0.7)'; c.font = '5px Arial'; c.textAlign = 'left';
-      c.fillText('WE BUY', doorX + 43, yF + 50); c.fillText('OLD GAMES', doorX + 43, yF + 57); c.fillText('(GOOD ONES)', doorX + 43, yF + 64);
-    }
-    if (b.key === 'cashking') { // bars on every window
-      c.strokeStyle = 'rgba(210,200,180,0.5)'; c.lineWidth = 2;
-      for (const wx of [b.x + 18, b.x + b.w - 58]) for (let i = 1; i < 4; i++) { c.beginPath(); c.moveTo(wx + i * 10, yF + 30); c.lineTo(wx + i * 10, yF + 64); c.stroke(); }
+      c.fillText('DAYBREAK', b.x + b.w / 2, yF + 26);
+      c.fillText('COMMONS', b.x + b.w / 2, yF + 41);
+      c.strokeStyle = '#c9a227'; c.lineWidth = 1.5;
+      c.beginPath(); c.moveTo(b.x + b.w / 2 - 26, yF + 46); c.lineTo(b.x + b.w / 2 + 26, yF + 46); c.stroke();
       c.lineWidth = 1;
+      c.fillStyle = '#8a9096'; c.font = '400 6px "Segoe UI", Arial';
+      c.fillText('LIVE · WORK · SIP', b.x + b.w / 2, yF + 55);
+      // permit taped in the corner — off the door's centre line, where it won't collide
+      c.save(); c.translate(b.x + 20, yB - 30); c.rotate(-0.04);
+      c.fillStyle = 'rgba(255,255,255,0.9)'; c.fillRect(0, 0, 30, 22);
+      c.strokeStyle = 'rgba(60,60,66,0.4)'; c.strokeRect(0, 0, 30, 22);
+      c.fillStyle = 'rgba(30,30,34,0.6)'; c.font = 'bold 5px Arial'; c.textAlign = 'left';
+      c.fillText('PERMIT', 3, 8); c.fillText('PENDING', 3, 15); c.fillText('#4417-B', 3, 21);
+      c.restore();
+    }
+    if (b.key === 'gamebarn') { // taped flyer, curling at one corner
+      c.save(); c.translate(doorX + 46, yG + 44); c.rotate(0.05);
+      c.fillStyle = 'rgba(240,232,210,0.85)'; c.fillRect(0, 0, 26, 30);
+      c.fillStyle = 'rgba(40,40,40,0.7)'; c.font = '5px Arial'; c.textAlign = 'left';
+      c.fillText('WE BUY', 3, 10); c.fillText('OLD GAMES', 3, 17); c.fillText('(GOOD ONES)', 3, 24);
+      c.restore();
     }
     // alley back doors + the milk-crate window behind Game Barn
     c.fillStyle = '#2e2c2a'; c.fillRect(b.x + b.w / 2 - 14, yT, 28, 8);
@@ -537,11 +649,34 @@ export class Renderer {
     const blockIdx = Math.min(g.block, 4);
     const late = blockIdx >= 3;
 
-    // puddles when raining (under everything that moves)
+    // Puddles, and the thing the art bible singles out: "rain doubles every light source
+    // as a smeared vertical reflection in the puddles — worth more than any shader."
     if (g.weather === 'rain' && room === 'ext') {
+      const lights = [];
+      if (blockIdx >= 2) {
+        for (const pr of EXTERIOR_PROPS) if (pr.kind === 'lampPost' && !pr.dead) lights.push([pr.x, pr.y, 'rgba(255,214,150,']);
+        lights.push([1290, STRIP_Y.base, 'rgba(255,170,80,'], [1960, STRIP_Y.base, 'rgba(255,214,62,'],
+                    [760, STRIP_Y.base, 'rgba(130,170,255,'], [250, 620, 'rgba(220,235,255,']);
+      }
       for (const pd of this.puddles) {
         c.fillStyle = 'rgba(60,80,110,0.35)';
         c.beginPath(); c.ellipse(pd.x, pd.y, pd.rx, pd.ry, 0, 0, 7); c.fill();
+        c.fillStyle = 'rgba(150,175,210,0.12)';   // sky sheen on the standing water
+        c.beginPath(); c.ellipse(pd.x - pd.rx * 0.2, pd.y - pd.ry * 0.25, pd.rx * 0.55, pd.ry * 0.4, 0, 0, 7); c.fill();
+        for (const [lx, ly, col] of lights) {
+          const d = Math.hypot(lx - pd.x, ly - pd.y);
+          if (d > 220) continue;
+          const a = (1 - d / 220) * 0.42;
+          c.save();
+          c.beginPath(); c.ellipse(pd.x, pd.y, pd.rx, pd.ry, 0, 0, 7); c.clip();  // stays IN the water
+          c.globalCompositeOperation = 'lighter';
+          const gr = c.createLinearGradient(0, pd.y - pd.ry, 0, pd.y + pd.ry);
+          gr.addColorStop(0, col + a + ')'); gr.addColorStop(0.55, col + a * 0.5 + ')'); gr.addColorStop(1, col + '0)');
+          c.fillStyle = gr;
+          const rw = 5 + (1 - d / 220) * 5;
+          c.fillRect(lx - rw / 2 + (pd.x - lx) * 0.86, pd.y - pd.ry, rw, pd.ry * 2);  // smeared toward the light
+          c.restore();
+        }
       }
     }
 
@@ -668,7 +803,8 @@ export class Renderer {
   _signs(c, blockIdx) {
     const neonOn = blockIdx >= 2;
     for (const b of BUILDINGS) {
-      const sx = b.x + b.w / 2, sy = STRIP_Y.facadeTop + 16;
+      // signs ride the parapet, so a raised roofline lifts its own signage with it
+      const sx = b.x + b.w / 2, sy = STRIP_Y.facadeTop - ((b.face && b.face.parapet) || 0) + 16;
       c.textAlign = 'center';
       if (b.key === 'wingbarn') {
         c.font = 'bold 15px Impact, Arial';
@@ -764,6 +900,13 @@ export class Renderer {
         // Bev's porch bulb — always on for you
         pool(GARAGE.door.x + 20, GARAGE.y - 6, 110, 0.85);
         glow(GARAGE.door.x + 20, GARAGE.y - 12, 36, 'rgba(255,220,150,A)', 0.5);
+        // one sodium bulb over each alley mouth: the route has to be findable at night,
+        // and a lit doorway you're not supposed to use is its own invitation
+        for (const gp of ALLEY_GAPS) {
+          const gx = (gp.x1 + gp.x2) / 2;
+          pool(gx, STRIP_Y.base - 20, 95, 0.8);
+          glow(gx, STRIP_Y.base - 34, 34, 'rgba(255,196,120,A)', 0.34);
+        }
         // rain doubles the lights in the wet
         if (g.weather === 'rain') {
           glow(1290, 560, 50, 'rgba(255,170,80,A)', 0.16);

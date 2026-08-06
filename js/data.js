@@ -99,22 +99,35 @@ export const WORLD = { w: 2200, h: 1500 };
 
 export const STRIP_Y = { roofTop: 190, facadeTop: 400, base: 480 }; // buildings occupy y 190..480
 
+// ⚠️ `face` exists because the strip was ONE BUILDING PAINTED EIGHT TIMES: same
+// roofline, door dead-centre, windows at identical offsets. That's two entries off the
+// art bible's forbidden list ("flat empty modular rooms", "identical bodies") applied to
+// the one row of geometry the player stares at all game. parapet raises the roofline,
+// doorAt slides the entrance, recess insets it, win picks the glazing.
 export const BUILDINGS = [
   { key: 'qwikstop',  label: 'QwikStop',              x: 120,  w: 260, sign: 'QwikStop', signC: '#d94f2a',
+    face: { parapet: 0, doorAt: 0.5, win: 'wide', recess: 0 },
     desc: 'Gas, Rip, jerky, and the town’s entire information economy at 1 a.m.' },
   { key: 'hardware',  label: 'Mile Hardware',          x: 440,  w: 220, sign: 'MILE HARDWARE', signC: '#c9b28a',
+    face: { parapet: 9, doorAt: 0.31, win: 'grid', recess: 0, awning: '#7a3a2e' },
     desc: 'EVERYTHING MUST GO. The banner predates two presidents.' },
   { key: 'tattoo',    label: 'Stick City Tattoo',      x: 660,  w: 200, sign: 'STICK CITY', signC: '#7e93c4',
+    face: { parapet: 24, doorAt: 0.62, win: 'single', recess: 0 },
     desc: 'Walk-ins welcome. Spelling not guaranteed.' },
   { key: 'buffet',    label: 'Golden Lucky Wok III',   x: 860,  w: 240, sign: 'GOLDEN LUCKY WOK III', signC: '#e0b84a',
+    face: { parapet: 12, doorAt: 0.5, win: 'pair', recess: 16, awning: '#8a3d34' },
     desc: 'Fourth name, second grease fire, same steam table.' },
   { key: 'wingbarn',  label: 'Wing Barn',              x: 1160, w: 260, sign: 'WING BARN', signC: '#e8dcc3',
+    face: { parapet: 30, gable: true, doorAt: 0.42, win: 'pair', recess: 6 },
     desc: 'Home of the Barnstormer 20-piece. You work here, technically.' },
   { key: 'gamebarn',  label: 'Game Barn',              x: 1420, w: 240, sign: 'GAME BARN', signC: '#5b7291',
+    face: { parapet: 6, doorAt: 0.58, win: 'grid', recess: 0 },
     desc: 'Buy • Sell • Trade. Gary priced everything for a 1998 that never came back.' },
   { key: 'dead',      label: 'Future Home of DAYBREAK COMMONS', x: 1660, w: 180, sign: 'DAYBREAK COMMONS', signC: '#f4f1ea',
+    face: { parapet: 34, doorAt: 0.5, win: 'papered', recess: 0 },
     desc: 'Artisanal mixed-use lifestyle concept. The only clean thing on the street.' },
   { key: 'cashking',  label: 'Ca$h Kingdom',           x: 1840, w: 240, sign: 'CA$H KINGDOM', signC: '#ffd23e',
+    face: { parapet: 3, doorAt: 0.72, win: 'slot', recess: 0 },
     desc: 'Checks cashed. Loans made. Window 2 buys "used goods." Bulletproof glass throughout.' },
 ];
 // walkable gaps to the back alley: between qwikstop/hardware (380..440) and buffet/wingbarn (1100..1160)
