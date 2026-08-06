@@ -106,8 +106,10 @@ function onDay() {
 function ambience() {
   if (!game) return;
   const kinds = ['morning', 'afternoon', 'evening', 'late', 'late'];
-  sfx.startAmbience(kinds[Math.min(game.block, 4)], game.weather);
+  const kind = game.room === 'ext' ? kinds[Math.min(game.block, 4)] : `in:${game.room}`;
+  sfx.startAmbience(kind, game.weather);
 }
+let lastRoom = 'ext';
 
 // ---------------------------------------------------------------------------
 // FEED / TOAST / CHOICE
@@ -538,7 +540,11 @@ setInterval(() => {
   if (cuff) cuffTick(0.1);
 }, 100);
 
-setInterval(() => { if (game && !game.over) updateHud(); }, 200);
+setInterval(() => {
+  if (!game || game.over) return;
+  updateHud();
+  if (game.room !== lastRoom) { lastRoom = game.room; ambience(); } // doors change the room tone
+}, 200);
 
 function resize() {
   const w = Math.min(window.innerWidth, 1500), h = window.innerHeight;
@@ -575,6 +581,7 @@ window.__vlShot = async (name = 'shot', port = 8446) => {
     return 'posted ' + name + ' -> ' + (await r.text());
   } catch (e) { return 'receiver down: ' + e.message; }
 };
+window.__vlR = () => renderer;   // view handle: zoom/cam pokes for visual QA
 window.__vlState = () => game && ({ day: game.day, block: game.block, room: game.room, cash: game.player.cash,
   hp: game.player.hp, heat: Math.round(game.heat), stage: game.heatStage(), scheme: { ...game.scheme },
   npcs: game.npcs.length, over: game.over, ending: game.ending });

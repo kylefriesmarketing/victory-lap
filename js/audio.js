@@ -108,7 +108,41 @@ export class Sfx {
       const t = setInterval(tick, msLo + Math.random() * (msHi - msLo));
       this.ambTimers.push(t);
     };
-    if (weather === 'rain') hiss(0.05, 900);
+    if (weather === 'rain' && !kind.startsWith('in:')) hiss(0.05, 900);
+    // ---- interiors: every room in Hopewell has its own machine noise ----
+    if (kind === 'in:wingbarn') {
+      hiss(0.045, 2600);                                  // the fryer, always
+      bed(120, 'sawtooth', 0.008, 0.7, 0.004);            // ballast buzz
+      every(5000, 11000, () => this.tone(2400, 0.05, 'square', 0.012)); // a timer nobody answers
+      return;
+    }
+    if (kind === 'in:qwikstop') {
+      bed(112, 'triangle', 0.016, 0.25, 0.006);           // the cooler wall
+      hiss(0.012, 400);
+      every(7000, 15000, () => { this.tone(1180, 0.1, 'sine', 0.03); this.tone(940, 0.13, 'sine', 0.025, 0, 0.09); });
+      return;
+    }
+    if (kind === 'in:buffet') {
+      hiss(0.03, 700);                                    // steam table
+      bed(96, 'triangle', 0.01, 0.4, 0.005);
+      every(4000, 9000, () => this.noise(0.25, 0.02, 1500, 1.5)); // a lid, a ladle
+      return;
+    }
+    if (kind === 'in:cashking') {
+      bed(60, 'triangle', 0.014, 0.15, 0.005);            // fluorescent + bulletproof hush
+      every(9000, 20000, () => this.tone(70, 0.6, 'sine', 0.014, 10));
+      return;
+    }
+    if (kind === 'in:hardware' || kind === 'in:gamebarn') {
+      bed(118, 'triangle', 0.009, 0.5, 0.004);
+      every(11000, 24000, () => this.noise(0.4, 0.014, 300, 1));
+      return;
+    }
+    if (kind === 'in:garage') {
+      bed(52, 'triangle', 0.012, 0.2, 0.004);             // the beer fridge, the whole house asleep
+      every(6000, 13000, () => this.tone(1600, 0.03, 'sine', 0.008)); // a clock somewhere
+      return;
+    }
     if (kind === 'morning') {
       hiss(0.018, 600);
       every(2400, 6000, () => { const f = 1800 + Math.random() * 1400; this.tone(f, 0.12, 'sine', 0.03, 300); this.tone(f * 1.2, 0.1, 'sine', 0.025, -200, 0.15); });

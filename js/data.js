@@ -163,12 +163,14 @@ export const ARCHETYPES = {
   tall:     { tw: 15, belly: 0,  sh: 1,  h: 62, slouch: 4 },
 };
 
+// ⚠️ Pants must never land within ~10 values of the asphalt (#4a4745) or the legs
+// disappear and the toy reads as a floating torso. Caught on the zoomed QA pass.
 export const OUTFITS = { // [shirt, pants, skin, hat?]  — palette from the art bible
   denim:   { shirt: '#5b7291', pants: '#3d4c63', skins: ['#c99b74','#8a5a33','#e0b490','#6e4a2f'] },
-  hivis:   { shirt: '#c9a227', pants: '#4a4a42', skins: ['#c99b74','#8a5a33','#e0b490'] },
-  camo:    { shirt: '#4c5741', pants: '#6b5d43', skins: ['#c99b74','#e0b490','#8a5a33'] },
-  flannel: { shirt: '#9c3d2e', pants: '#2e3138', skins: ['#e0b490','#c99b74','#6e4a2f'] },
-  greasy:  { shirt: '#7a7468', pants: '#3a3a36', skins: ['#c99b74','#8a5a33'] },
+  hivis:   { shirt: '#c9a227', pants: '#5f6a78', skins: ['#c99b74','#8a5a33','#e0b490'] },
+  camo:    { shirt: '#4c5741', pants: '#7b6a4d', skins: ['#c99b74','#e0b490','#8a5a33'] },
+  flannel: { shirt: '#9c3d2e', pants: '#39414f', skins: ['#e0b490','#c99b74','#6e4a2f'] },
+  greasy:  { shirt: '#7a7468', pants: '#57503f', skins: ['#c99b74','#8a5a33'] },
   tourist: { shirt: '#e8a8b8', pants: '#d9d2c0', skins: ['#f0c8a8','#e0b490'] }, // pastel = wrong on purpose
   tourist2:{ shirt: '#9fd0c8', pants: '#f0ead8', skins: ['#f0c8a8'] },
 };

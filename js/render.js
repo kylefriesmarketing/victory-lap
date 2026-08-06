@@ -17,6 +17,14 @@ const PAL = {
 function rr(a, b) { return a + Math.random() * (b - a); }
 function ri(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
 
+// Sleeves must never be the same value as the torso or every gesture disappears
+// into the body — at 54px the arm IS the acting.
+function shade(hex, amt) {
+  const n = parseInt(hex.slice(1), 16);
+  const f = (v) => Math.max(0, Math.min(255, Math.round(v * (1 + amt))));
+  return `rgb(${f((n >> 16) & 255)},${f((n >> 8) & 255)},${f(n & 255)})`;
+}
+
 // deterministic-ish scatter so the grime doesn't crawl between repaints
 function scatter(n, seed, fn) {
   let s = seed >>> 0;
@@ -207,9 +215,20 @@ export class Renderer {
     c.fillStyle = b.key === 'dead' ? '#3d4045' : (['qwikstop', 'wingbarn'].includes(b.key) ? PAL.roofC : PAL.roofA);
     c.fillRect(b.x, yT, b.w, yF - yT);
     c.fillStyle = 'rgba(0,0,0,0.22)'; c.fillRect(b.x, yT, b.w, 8);
-    scatter(10, b.x, (rnd) => { c.fillStyle = `rgba(30,28,26,${0.15 + rnd() * 0.2})`; c.fillRect(b.x + rnd() * (b.w - 30), yT + 12 + rnd() * (yF - yT - 40), 14 + rnd() * 40, 8 + rnd() * 24); });
+    // organized roof, not clutter: parapet inset, tar seams, ponding stains
+    c.strokeStyle = 'rgba(255,255,255,0.05)'; c.strokeRect(b.x + 6, yT + 10, b.w - 12, yF - yT - 16);
+    c.strokeStyle = 'rgba(0,0,0,0.12)';
+    for (let sx = b.x + 52; sx < b.x + b.w - 24; sx += 68) { c.beginPath(); c.moveTo(sx, yT + 12); c.lineTo(sx + 3, yF - 10); c.stroke(); }
+    scatter(3, b.x, (rnd) => {
+      const px = b.x + 24 + rnd() * (b.w - 60), py = yT + 34 + rnd() * (yF - yT - 76), pr = 14 + rnd() * 20;
+      const g2 = c.createRadialGradient(px, py, 2, px, py, pr);
+      g2.addColorStop(0, 'rgba(16,16,20,0.15)'); g2.addColorStop(1, 'rgba(16,16,20,0)');
+      c.fillStyle = g2; c.beginPath(); c.ellipse(px, py, pr, pr * 0.55, 0, 0, 7); c.fill();
+    });
     c.fillStyle = PAL.roofB; c.fillRect(b.x + b.w * 0.55, yT + 26, 44, 30); // HVAC
     c.strokeStyle = 'rgba(0,0,0,0.35)'; c.strokeRect(b.x + b.w * 0.55, yT + 26, 44, 30);
+    c.fillStyle = 'rgba(0,0,0,0.28)'; c.beginPath(); c.arc(b.x + b.w * 0.55 + 58, yT + 40, 5, 0, 7); c.fill(); // vent
+    c.fillStyle = 'rgba(0,0,0,0.18)'; c.beginPath(); c.ellipse(b.x + b.w * 0.55 + 22, yT + 60, 26, 7, 0, 0, 7); c.fill(); // HVAC shadow
     // facade
     const fc = { qwikstop: '#8a4a3a', hardware: '#6e6455', tattoo: '#3a3d4a', buffet: '#8a3d34',
                  wingbarn: '#7a5a3a', gamebarn: '#4a5568', dead: '#e8e4dc', cashking: '#5a4a2a' }[b.key] || PAL.facade;
@@ -580,6 +599,21 @@ export class Renderer {
     this.barks = this.barks.filter(b => b.t < b.dur);
     c.restore();
 
+    // per-block color grade — the room's lamp, not an Instagram filter
+    const GRADES = [
+      'rgba(255,186,100,0.13)',  // morning gold
+      null,                      // afternoon: honest
+      'rgba(255,120,80,0.11)',   // evening ember
+      'rgba(80,110,200,0.10)',   // late cool
+      'rgba(80,110,200,0.12)',
+    ];
+    const grade = room === 'ext' ? GRADES[blockIdx] : (g.gameBarnDark ? null : 'rgba(255,200,140,0.07)');
+    if (grade) {
+      c.save(); c.globalCompositeOperation = 'overlay';
+      c.fillStyle = grade; c.fillRect(0, 0, cv.width, cv.height);
+      c.restore();
+    }
+
     // vignette + weather grade
     const vg = c.createRadialGradient(cv.width / 2, cv.height / 2, cv.height / 3, cv.width / 2, cv.height / 2, cv.height * 0.85);
     vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(6,6,10,0.26)');
@@ -757,7 +791,10 @@ export class Renderer {
     const sway = e.drunk ? Math.sin(t * 2.2 + (e.id || 0)) * 3.4 : 0;
     const breathe = Math.sin(t * 1.6 + (e.id || 0)) * 0.7;
     const H = a.h, tw = a.tw;
-    const shirt = isPlayer ? '#6e4a2f' : (e.outfit ? e.outfit.shirt : '#5b7291');
+    // The player wears the one good year: a varsity jacket, dark body + cream sleeves,
+    // still on him at 26. Nobody else in Hopewell has that two-tone shape.
+    const shirt = isPlayer ? '#5c2f28' : (e.outfit ? e.outfit.shirt : '#5b7291');
+    const armCol = isPlayer ? '#ddd0b4' : shade(shirt, -0.3);
     const pants = isPlayer ? '#3d4c63' : (e.outfit ? e.outfit.pants : '#3d4c63');
     const skin = isPlayer ? '#c99b74' : (e.skin || '#c99b74');
 
@@ -770,17 +807,35 @@ export class Renderer {
       return;
     }
 
+    // idle business — nobody in Hopewell stands at attention. View-only, no rng:
+    // derived from clock + entity id so it's stable per frame and free of sim state.
+    let busy = null, weight = 0;
+    if (!moving && !isPlayer && !e.cop && e.state === 'idle') {
+      const cyc = (this.t * 0.19 + (e.id || 0) * 0.37) % 1;
+      const kind = (e.id || 0) % 3;
+      if (cyc < 0.30) busy = kind === 0 ? 'phone' : (kind === 1 ? 'smoke' : 'pockets');
+      else if (cyc < 0.36) busy = 'phone';
+      weight = Math.sin(this.t * 0.6 + (e.id || 0)) * 1.6; // weight on one hip, then the other
+    }
+
     c.save();
-    c.translate(x + sway, y);
+    c.translate(x + sway + weight * 0.5, y);
     const hitK = (e.hitT || 0) > 0 ? Math.sin((e.hitT) * 40) * 2.5 : 0;
     c.translate(hitK, 0);
     const flipX = Math.cos(e.facing || 0) < 0 ? -1 : 1;
 
-    // legs
+    // legs — wide enough to read as legs, with shoes to plant them on the mat
     c.fillStyle = pants;
-    const legH = H * 0.42, legW = 4.6;
-    c.fillRect(-tw * 0.28 - legW / 2, -legH + Math.max(0, step) * -3, legW, legH + Math.max(0, step) * 3);
-    c.fillRect(tw * 0.28 - legW / 2, -legH + Math.max(0, -step) * -3, legW, legH + Math.max(0, -step) * 3);
+    const legH = H * 0.42, legW = 5.4;
+    const wl = weight > 0 ? Math.abs(weight) * 0.4 : 0, wr = weight < 0 ? Math.abs(weight) * 0.4 : 0;
+    const lyL = -legH + wl + Math.max(0, step) * -3, lhL = legH - wl + Math.max(0, step) * 3;
+    const lyR = -legH + wr + Math.max(0, -step) * -3, lhR = legH - wr + Math.max(0, -step) * 3;
+    const lxL = -tw * 0.28 - legW / 2 - wr * 0.6, lxR = tw * 0.28 - legW / 2 + wl * 0.6;
+    c.fillRect(lxL, lyL, legW, lhL);
+    c.fillRect(lxR, lyR, legW, lhR);
+    c.fillStyle = shade(pants, -0.55);
+    c.fillRect(lxL - 0.8, lyL + lhL - 2.6, legW + 1.6, 2.6);
+    c.fillRect(lxR - 0.8, lyR + lhR - 2.6, legW + 1.6, 2.6);
     // torso: archetype shape, belly forward of the spine
     const torsoH = H * 0.38, ty = -legH - torsoH;
     c.fillStyle = shirt;
@@ -788,13 +843,19 @@ export class Renderer {
     c.roundRect(-tw / 2 - a.sh / 2, ty + breathe * 0.4, tw + a.sh, torsoH, 5);
     c.fill();
     if (a.belly) { c.beginPath(); c.ellipse(flipX * 2, ty + torsoH * 0.62, tw * 0.42 + a.belly * 0.5, torsoH * 0.4, 0, 0, 7); c.fill(); }
+    if (isPlayer) { // the letter patch, and the jacket's cream waistband
+      c.fillStyle = '#ddd0b4';
+      c.fillRect(-tw / 2 - a.sh / 2, ty + torsoH - 3, tw + a.sh, 3);
+      c.fillRect(flipX * 3 - 2, ty + 5, 4, 5);
+    }
     // grime patch on workers
     if (!isPlayer && e.pool === 'townie_idle' && (e.id || 0) % 3 === 0) {
       c.fillStyle = 'rgba(30,26,20,0.25)'; c.fillRect(-tw * 0.2, ty + torsoH * 0.5, tw * 0.44, torsoH * 0.3);
     }
     // arms
-    c.strokeStyle = shirt; c.lineWidth = 4; c.lineCap = 'round';
+    c.strokeStyle = armCol; c.lineWidth = 4; c.lineCap = 'round';
     const armY = ty + 5;
+    const hand = (hxp, hyp) => { c.fillStyle = skin; c.beginPath(); c.arc(hxp, hyp, 2.1, 0, 7); c.fill(); c.fillStyle = shirt; };
     const swing = moving ? Math.sin(phase * 2) * 6 : breathe;
     const atk = isPlayer && this.g.player.atkT > 0.2;
     if (e.state === 'film') {
@@ -812,25 +873,53 @@ export class Renderer {
       c.beginPath(); c.moveTo(tw * 0.42, armY); c.lineTo(tw * 0.2, armY - 8); c.stroke();
       c.fillStyle = '#7a6a4a'; c.fillRect(-13, armY - 22, 26, 16);
       c.fillStyle = 'rgba(0,0,0,0.4)'; c.font = 'bold 5px Arial'; c.textAlign = 'center'; c.fillText('FUNSTATION', 0, armY - 12);
+    } else if (busy === 'phone') {
+      // half this town is looking at a phone at any given moment, and so should it be
+      c.beginPath(); c.moveTo(-tw * 0.4, armY); c.lineTo(-tw * 0.17, armY + 2); c.stroke();
+      c.beginPath(); c.moveTo(tw * 0.4, armY); c.lineTo(tw * 0.17, armY + 3); c.stroke();
+      hand(-tw * 0.17, armY + 2); hand(tw * 0.17, armY + 3);
+      c.fillStyle = '#15181f'; c.fillRect(-3.4, armY - 3, 7, 9);      // held at chest, not at the face
+      c.fillStyle = 'rgba(190,225,255,0.9)'; c.fillRect(-2.6, armY - 2.2, 5.4, 7.4);
+    } else if (busy === 'smoke') {
+      c.beginPath(); c.moveTo(-tw * 0.42, armY); c.lineTo(-tw * 0.44, armY + 11); c.stroke();
+      c.beginPath(); c.moveTo(tw * 0.42, armY); c.lineTo(tw * 0.1, armY - 11); c.stroke();
+      hand(-tw * 0.44, armY + 11); hand(tw * 0.1, armY - 11);
+      c.fillStyle = 'rgba(255,140,70,0.9)'; c.fillRect(flipX * 5, armY - 14, 1.6, 1.6);
+    } else if (busy === 'pockets') {
+      // elbows OUT — thumbs in the belt loops. Reads as a shape, not as armlessness.
+      c.beginPath(); c.moveTo(-tw * 0.42, armY); c.lineTo(-tw * 0.62, armY + 7); c.lineTo(-tw * 0.26, armY + 13); c.stroke();
+      c.beginPath(); c.moveTo(tw * 0.42, armY); c.lineTo(tw * 0.62, armY + 7); c.lineTo(tw * 0.26, armY + 13); c.stroke();
+      hand(-tw * 0.26, armY + 13); hand(tw * 0.26, armY + 13);
     } else {
       c.beginPath(); c.moveTo(-tw * 0.42, armY); c.lineTo(-tw * 0.42 - 1, armY + 11 + swing * 0.4); c.stroke();
       c.beginPath(); c.moveTo(tw * 0.42, armY); c.lineTo(tw * 0.42 + 1, armY + 11 - swing * 0.4); c.stroke();
+      hand(-tw * 0.42 - 1, armY + 11 + swing * 0.4); hand(tw * 0.42 + 1, armY + 11 - swing * 0.4);
       if (isPlayer && g.player.held) {
         const fdx = Math.cos(e.facing || 0), fdy = Math.sin(e.facing || 0);
         this._drawHeldWeapon(c, g.player.held.kind, fdx * 0.5, fdy * 0.5, armY + 8);
       }
     }
-    // head + hat; slouch pushes it forward, look-at leans it
+    // head + hat; slouch pushes it forward, look-at leans it.
+    // The head must OVERLAP the torso — a gap reads as a floating balloon, not a person.
     const slouch = a.slouch;
     let lookX = 0;
     if (!isPlayer && !e.static) {
       const d = Math.hypot(g.player.x - e.x, g.player.y - e.y);
       if (d < 150) lookX = Math.sign(g.player.x - e.x) * 1.6;
     }
-    const hy = ty - 6 + slouch * 0.5 + breathe * 0.5;
-    const hx = flipX * (2 + slouch * 0.8) + lookX;
+    const hy = ty - 3.5 + slouch * 0.5 + breathe * 0.5;
+    const hx = flipX * (1 + slouch * 0.35) + lookX * 0.6;   // a lean, not a dislocation
+    c.fillStyle = shade(skin, -0.22);                       // neck, in shadow under the jaw
+    c.fillRect(hx - 2.6, hy, 5.2, 7);
+    c.fillStyle = shirt;                                    // collar sits on top of it
+    c.beginPath(); c.ellipse(flipX * 1.2, ty + 2, tw * 0.34, 3.4, 0, 0, 7); c.fill();
     c.fillStyle = skin;
     c.beginPath(); c.arc(hx, hy, 6.5, 0, 7); c.fill();
+    if (busy === 'phone' && this.g.block >= 2) { // the screen lights the face — the modern campfire
+      c.save(); c.globalCompositeOperation = 'lighter';
+      c.fillStyle = 'rgba(150,195,255,0.30)';
+      c.beginPath(); c.arc(hx, hy + 2, 5.5, 0, 7); c.fill(); c.restore();
+    }
     if (isPlayer && g.player.blackEye) { c.fillStyle = 'rgba(60,40,80,0.8)'; c.beginPath(); c.arc(hx + flipX * 2.4, hy - 1, 1.8, 0, 7); c.fill(); }
     this._drawHat(c, e.hat || (isPlayer ? 'capBack' : 'none'), hx, hy, flipX, shirt);
     c.restore();
