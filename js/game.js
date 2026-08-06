@@ -362,7 +362,7 @@ export class Game {
   // Headless: doShiftAuto resolves through the same bookkeeping.
   finishShift({ perfect = 0, total = 8, skimmed = 0, caught = 0 }) {
     const p = this.player;
-    let pay = T.shiftPay + perfect * T.tipPerPerfect;
+    let pay = Math.round(T.shiftPay * Math.min(1, total / 8)) + perfect * T.tipPerPerfect;
     this._earn(pay + skimmed);
     this.stats.shifts++; this.stats.skimmed += skimmed;
     p.strikes += caught;
@@ -426,7 +426,8 @@ export class Game {
 
   canHeist() {
     const s = this.scheme;
-    return s.hear && s.case && this.player.inv.crowbar && this.isLate && this.room === 'ext' && !s.job;
+    return s.hear && s.case && this.player.inv.crowbar && this.isLate && this.room === 'ext'
+      && s.crates < T.crateCount && this._garyNight !== this.day; // caught once = the night is blown
   }
 
   heistWindowOpen() { // Thursday late is the drop window
@@ -435,12 +436,14 @@ export class Game {
 
   startHeist() {
     if (!this.canHeist()) return { ok: false, msg: 'Not yet. Wrong time, wrong tools, or wrong facts.' };
-    if (!this.heistWindowOpen() && this.chance(0.4)) {
+    if (this._heistNight !== this.day && !this.heistWindowOpen() && this.chance(0.4)) {
       this.scheme.garySawYou = true;
+      this._garyNight = this.day; // he's awake now; tonight is over
       this.addHeat(T.heatCrime.breakin * 0.5, 0, 'attempted entry');
       return { ok: false, caught: 'gary', msg: 'The window gives — onto Gary, doing inventory in the dark to save the light bill. "...I\'m calling somebody. I don\'t know who yet. GET OUT."' };
     }
     this.room = 'gamebarn'; this.gameBarnDark = true;
+    this._heistNight = this.day;
     this.player.x = 620; this.player.y = 80;
     this.addHeat(this.heistWindowOpen() ? 0 : T.heatCrime.breakin * 0.3, 0, 'entry');
     this.sfx('pry');
@@ -451,7 +454,7 @@ export class Game {
     if (this.room !== 'gamebarn' || !this.gameBarnDark) return { ok: false };
     if (this.scheme.crates >= T.crateCount) return { ok: false, msg: 'The back room is bare. Gary\'s whole retirement, in your trunk.' };
     if (this.player.carryCrate) return { ok: false, msg: 'One at a time. They weigh what dreams weigh: a lot.' };
-    this.player.carryCrate = true;
+    this.player.carryCrate = true; this.player._crateSeen = false;
     return { ok: true, msg: 'FunStation, factory sealed. Heavier than it looks. Move.' };
   }
 
@@ -527,7 +530,8 @@ export class Game {
 
   // ---- heat ---------------------------------------------------------------
   addHeat(base, extraWitnesses = 0, why = '') {
-    let mult = 1 + Math.max(0, this.countWitnesses() + extraWitnesses - 1) * 0.5;
+    // a crowd makes it worse, but never apocalyptic — one punch shouldn't near-max the county
+    let mult = Math.min(2.5, 1 + Math.max(0, this.countWitnesses() + extraWitnesses - 1) * 0.5);
     if (this.heatStage() >= 2) mult *= T.namedGainMult;
     if (this.weather === 'rain') mult *= 0.8; // cops stay in the car
     this.heat = Math.min(T.heatMax, this.heat + base * mult);
@@ -807,6 +811,13 @@ export class Game {
 
     // NPCs
     for (const n of this.npcs) this._updateNpc(n, dt);
+
+    // hauling a crate in public is its own confession
+    if (p.carryCrate && this.room === 'ext' && !p._crateSeen && this.countWitnesses() > 0) {
+      p._crateSeen = true;
+      this.addHeat(T.heatCrime.heistSeen * 0.6, 0, 'seen hauling');
+      this.alert('Somebody clocked the crate. The word "FUNSTATION" is now moving through Hopewell at group-chat speed.', 'bad');
+    }
 
     // dog
     if (this.room === 'ext' && !this.dogCalm) {

@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VICTORY LAP — an open-town roguelike about never leaving</title>
+<style>
+  :root {
+    --cream: #e8dcc3; --tobacco: #6b4a2f; --leather: #8a5a33; --green: #2e4632;
+    --tan: #c9b28a; --red: #9c3d2e; --denim: #5b7291; --amber: #ffb347;
+    --night: #141a2c; --ink: #1a1712; --paper: #efe6d0;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; background: #0c0e14; overflow: hidden;
+    font-family: Georgia, 'Times New Roman', serif; color: var(--cream); }
+  canvas { display: block; margin: 0 auto; image-rendering: auto; }
+
+  /* ---------- overlays base ---------- */
+  .overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    flex-direction: column; z-index: 40; background: rgba(8,9,14,0.82); }
+  .btn { font-family: Georgia, serif; font-size: 15px; padding: 9px 18px; cursor: pointer;
+    background: var(--tobacco); color: var(--cream); border: 1px solid #3a2c1c;
+    border-bottom-width: 3px; border-radius: 4px; transition: transform .06s, background .12s; }
+  .btn:hover { background: var(--leather); transform: translateY(-1px); }
+  .btn:active { transform: translateY(1px); }
+  .btn-dim { background: #2a2620; color: #9a8f7a; }
+
+  /* ---------- title ---------- */
+  #title { display: none; z-index: 60; background:
+    radial-gradient(ellipse at 50% 30%, #1c2338 0%, #0c0e14 70%); text-align: center; }
+  #t-logo { font-family: Impact, 'Arial Black', sans-serif; font-size: clamp(52px, 10vw, 110px);
+    letter-spacing: 4px; color: var(--cream);
+    text-shadow: 0 3px 0 #3a2c1c, 0 8px 24px rgba(255,179,71,0.25); }
+  #t-logo span { color: var(--amber); }
+  #t-sub { font-style: italic; color: var(--tan); margin: 8px 0 4px; font-size: 17px; }
+  #t-motto { color: #7a7060; font-size: 13px; margin-bottom: 26px; }
+  #t-runs { color: var(--amber); font-size: 14px; margin: 8px 0 2px; }
+  #t-knows { color: #8fa0c0; font-size: 12.5px; font-style: italic; margin-bottom: 18px; min-height: 16px; }
+  #t-start { font-size: 19px; padding: 13px 34px; background: var(--red); }
+  #t-start:hover { background: #b8503e; }
+  #t-controls { margin-top: 26px; color: #6e6455; font-size: 12.5px; line-height: 1.9; }
+  #t-controls b { color: var(--tan); font-weight: normal; }
+  #t-rating { position: absolute; bottom: 18px; left: 0; right: 0; color: #55503f; font-size: 11px; }
+
+  /* ---------- HUD ---------- */
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 20; display: none; }
+  .hud-on #hud { display: block; }
+  #hud-clock { position: absolute; top: 14px; left: 14px; background: var(--paper); color: var(--ink);
+    border-radius: 6px; padding: 8px 14px 10px; box-shadow: 0 3px 0 #b8a888, 0 6px 18px rgba(0,0,0,0.5);
+    transform: rotate(-1deg); min-width: 158px; }
+  #hud-day { font-family: 'Courier New', monospace; font-weight: bold; font-size: 15px; letter-spacing: 1px; }
+  #hud-clockbar { height: 5px; background: #cfc2a8; border-radius: 3px; margin-top: 6px; overflow: hidden; }
+  #hud-clockbar-fill { height: 100%; background: var(--red); width: 100%; transition: width .5s linear; }
+  #hud-money { position: absolute; top: 14px; right: 14px; text-align: right; }
+  #hud-cash { font-family: 'Courier New', monospace; font-size: 24px; font-weight: bold; color: #b8d8a0;
+    background: rgba(20,26,20,0.85); padding: 5px 13px; border-radius: 4px; border: 1px solid #2e4632;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.5); display: inline-block; transform: rotate(0.6deg); }
+  #hud-heat { position: absolute; top: 62px; right: 14px; display: flex; gap: 5px; }
+  .pip { font-family: 'Courier New', monospace; font-size: 10px; letter-spacing: 1px; padding: 3px 7px;
+    background: rgba(14,16,24,0.85); color: #4a4f60; border: 1px solid #262c3e; border-radius: 3px; }
+  .pip-on { color: #ffb347; border-color: #6e5222; background: rgba(40,30,10,0.9); }
+  .pip-on:last-child, .pip-hot { color: #ff6a5a; border-color: #7a2e22; animation: throb 0.9s infinite; }
+  @keyframes throb { 50% { background: rgba(80,20,10,0.9); } }
+  #hud-vitals { position: absolute; bottom: 16px; left: 14px; width: 190px; }
+  .vbar { height: 9px; background: rgba(10,12,18,0.85); border: 1px solid #33302a; border-radius: 4px;
+    overflow: hidden; margin-top: 5px; }
+  .vbar div { height: 100%; transition: width .25s; }
+  #hud-hp-fill { background: linear-gradient(90deg, #9c3d2e, #c05a3a); }
+  #hud-stam-fill { background: linear-gradient(90deg, #5b7291, #7e93c4); }
+  #hud-inv { position: absolute; bottom: 16px; left: 214px; display: flex; gap: 6px; flex-wrap: wrap; max-width: 40vw; }
+  .chip { background: rgba(24,22,18,0.88); border: 1px solid #3d382e; color: var(--tan);
+    font-size: 12px; padding: 4px 9px; border-radius: 10px; }
+  #hud-scheme { position: absolute; bottom: 16px; right: 14px; pointer-events: auto; cursor: pointer;
+    background: var(--paper); color: var(--ink); font-family: Georgia; font-size: 13px; font-style: italic;
+    padding: 8px 14px; border-radius: 4px 14px 4px 4px; transform: rotate(1.2deg);
+    box-shadow: 0 3px 0 #b8a888, 0 6px 18px rgba(0,0,0,0.5); border-left: 14px solid #d8c8a8; }
+  #hud-scheme.pulse { animation: schemepulse 1.2s 2; }
+  @keyframes schemepulse { 50% { transform: rotate(1.2deg) scale(1.08); background: #fff3d0; } }
+
+  #prompt { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%);
+    background: rgba(16,14,12,0.92); border: 1px solid #4a4234; color: var(--cream);
+    padding: 8px 18px; border-radius: 5px; font-size: 15px; display: none; z-index: 22;
+    box-shadow: 0 4px 18px rgba(0,0,0,0.6); }
+  #prompt::first-letter { color: var(--amber); }
+
+  #feed { position: fixed; left: 14px; top: 84px; z-index: 21; width: min(420px, 42vw); pointer-events: none; }
+  .feed-item { background: rgba(14,13,11,0.88); border-left: 3px solid var(--tan); color: var(--cream);
+    font-size: 13.5px; line-height: 1.45; padding: 7px 11px; margin-bottom: 6px; border-radius: 0 4px 4px 0;
+    animation: feedin .25s; }
+  .feed-warn { border-left-color: var(--amber); } .feed-bad { border-left-color: #ff6a5a; }
+  .feed-heat { border-left-color: #ff6a5a; font-family: 'Courier New', monospace; font-size: 12.5px; }
+  .feed-scheme { border-left-color: #8fd0a0; }
+  .feed-out { opacity: 0; transition: opacity .6s; }
+  @keyframes feedin { from { opacity: 0; transform: translateX(-8px); } }
+
+  #toast { position: fixed; top: 20vh; left: 0; right: 0; text-align: center; z-index: 26;
+    pointer-events: none; opacity: 0; transition: opacity .5s; }
+  #toast.show { opacity: 1; }
+  #toast-big { font-family: Impact, 'Arial Black', sans-serif; font-size: 44px; letter-spacing: 6px;
+    color: var(--cream); text-shadow: 0 2px 0 #3a2c1c, 0 6px 30px rgba(0,0,0,0.9); }
+  #toast-small { font-style: italic; color: var(--tan); font-size: 15px; margin-top: 4px;
+    text-shadow: 0 2px 8px #000; }
+
+  /* ---------- scheme panel ---------- */
+  #scheme-panel { position: fixed; right: -340px; bottom: 64px; width: 320px; z-index: 25;
+    background: var(--paper); color: var(--ink); border-radius: 6px; padding: 14px 16px 16px 30px;
+    transition: right .3s; box-shadow: 0 8px 30px rgba(0,0,0,0.6); transform: rotate(0.8deg);
+    background-image: repeating-linear-gradient(transparent 0 25px, rgba(90,110,160,0.18) 25px 26px);
+    border-left: 16px solid #d8c8a8; }
+  #scheme-panel.open { right: 12px; }
+  #scheme-title { font-weight: bold; font-size: 16px; letter-spacing: 0.5px; margin-bottom: 8px;
+    text-decoration: underline wavy rgba(156,61,46,0.5); }
+  .sch { font-size: 13.5px; margin: 7px 0; }
+  .sch span { color: var(--red); font-weight: bold; margin-right: 4px; }
+  .sch-done { color: #6a6152; text-decoration: line-through; }
+  .sch-done span { color: #4c7a4c; }
+  .sch-hint { font-size: 11.5px; font-style: italic; color: #8a7d68; margin: 1px 0 0 16px; }
+
+  /* ---------- choice ---------- */
+  #choice { z-index: 45; }
+  .card { background: #201d18; border: 1px solid #4a4234; border-radius: 8px; padding: 22px 26px;
+    max-width: 440px; box-shadow: 0 20px 60px rgba(0,0,0,0.7); }
+  #choice-title { font-size: 19px; color: var(--cream); margin-bottom: 6px; }
+  #choice-sub { font-size: 13.5px; color: var(--tan); font-style: italic; margin-bottom: 14px; line-height: 1.5; }
+  #choice-opts { display: flex; flex-direction: column; gap: 8px; }
+
+  /* ---------- register minigame ---------- */
+  #register { z-index: 48; background: rgba(10,9,8,0.9); }
+  #reg-box { background: #262019; border: 2px solid #4a4234; border-radius: 10px; padding: 20px 26px;
+    width: min(620px, 94vw); box-shadow: 0 24px 70px rgba(0,0,0,0.8); position: relative; }
+  #reg-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  #reg-count { font-family: 'Courier New', monospace; color: var(--tan); font-size: 13px; }
+  .reg-cam { font-family: 'Courier New', monospace; font-size: 13px; padding: 3px 9px; border-radius: 3px; }
+  .reg-cam.on { color: #ff5a4a; background: #2e120e; animation: throb 1s infinite; }
+  .reg-cam.off { color: #7ac080; background: #12281410; }
+  #reg-camsweep { height: 4px; background: #1c1914; border-radius: 2px; margin-bottom: 10px; overflow: hidden; }
+  #reg-camsweep-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #ff5a4a 61%, #7ac080 61%); }
+  #reg-ticket { background: var(--paper); color: var(--ink); font-family: 'Courier New', monospace;
+    font-size: 14px; padding: 12px 16px; border-radius: 3px; margin-bottom: 12px;
+    box-shadow: 0 3px 0 #b8a888; }
+  #reg-ticket div { display: flex; justify-content: space-between; padding: 1.5px 0; }
+  .reg-total { border-top: 1px dashed #8a7d68; margin-top: 5px; padding-top: 5px !important; font-weight: bold; }
+  .reg-paidline { font-weight: bold; color: #2e5a2e; }
+  #reg-tray { font-family: 'Courier New', monospace; font-size: 17px; color: #b8d8a0; margin-bottom: 9px; }
+  #reg-denoms { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .reg-denom { font-family: 'Courier New', monospace; font-size: 16px; min-width: 62px; }
+  #reg-actions { display: flex; gap: 10px; align-items: center; }
+  #reg-skim { background: #3a2318; color: #d0a060; border-color: #241209; }
+  #reg-skim:hover { background: #4c2e1e; }
+  #reg-timer { flex: 1; height: 7px; background: #1c1914; border-radius: 4px; overflow: hidden; }
+  #reg-timer-fill { height: 100%; background: var(--denim); }
+  #reg-flash { min-height: 20px; margin-top: 10px; font-style: italic; font-size: 14px; }
+  .reg-ok { color: #8fd0a0; } .reg-bad { color: #ff8a7a; }
+  #reg-strikes { color: #ff8a7a; letter-spacing: 3px; }
+  #reg-skimmed { color: #d0a060; font-size: 12px; font-family: 'Courier New', monospace; }
+
+  /* ---------- cuff ---------- */
+  #cuff { z-index: 49; }
+  #cuff .card { text-align: center; }
+  #cuff h2 { font-family: Impact, sans-serif; letter-spacing: 3px; color: #ff8a7a; margin-bottom: 10px; }
+  #cuff-bar { width: 300px; height: 16px; background: #1c1914; border: 1px solid #4a4234;
+    border-radius: 8px; overflow: hidden; margin: 0 auto; }
+  #cuff-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #9c3d2e, #ffb347); transition: width .08s; }
+  #cuff p { color: var(--tan); font-style: italic; margin-top: 10px; font-size: 13px; }
+
+  /* ---------- ending ---------- */
+  #ending { z-index: 55; background: rgba(6,7,11,0.94); }
+  #end-card { max-width: 560px; text-align: center; padding: 30px 36px; }
+  #end-art { font-size: 54px; }
+  #end-title { font-family: Impact, 'Arial Black', sans-serif; font-size: 58px; letter-spacing: 8px;
+    color: var(--cream); text-shadow: 0 3px 0 #3a2c1c, 0 8px 30px rgba(156,61,46,0.4); margin: 4px 0 14px; }
+  #end-text { color: var(--tan); font-size: 15px; line-height: 1.65; white-space: pre-line; margin-bottom: 12px; }
+  #end-tag { color: var(--amber); font-style: italic; font-size: 14px; margin-bottom: 18px; }
+  #end-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 22px; margin-bottom: 16px; }
+  .est { display: flex; justify-content: space-between; font-size: 13px; color: #9a8f7a;
+    border-bottom: 1px dotted #3d382e; padding-bottom: 3px; }
+  .est b { color: var(--cream); font-weight: normal; }
+  #end-meta { font-family: 'Courier New', monospace; color: #8fa0c0; font-size: 13px; margin-bottom: 20px; }
+  #end-next { font-size: 17px; background: var(--red); }
+  #end-sub { color: #6e6455; font-size: 12px; margin-top: 14px; font-style: italic; }
+
+  /* ---------- pause ---------- */
+  #pause .card { text-align: center; }
+  #pause h2 { font-family: Impact, sans-serif; letter-spacing: 3px; margin-bottom: 14px; }
+  #pause .btn { display: block; width: 240px; margin: 8px auto; }
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+
+<div id="hud">
+  <div id="hud-clock">
+    <div id="hud-day">MON — MORNING</div>
+    <div id="hud-clockbar"><div id="hud-clockbar-fill"></div></div>
+  </div>
+  <div id="hud-money"><div id="hud-cash">$61</div></div>
+  <div id="hud-heat"></div>
+  <div id="hud-vitals">
+    <div class="vbar"><div id="hud-hp-fill" style="width:100%"></div></div>
+    <div class="vbar"><div id="hud-stam-fill" style="width:100%"></div></div>
+  </div>
+  <div id="hud-inv"></div>
+  <div id="hud-scheme">📓 the plan (TAB)</div>
+</div>
+
+<div id="prompt"></div>
+<div id="feed"></div>
+<div id="toast"><div id="toast-big"></div><div id="toast-small"></div></div>
+
+<div id="scheme-panel">
+  <div id="scheme-title"></div>
+  <div id="scheme-list"></div>
+</div>
+
+<div id="choice" class="overlay"><div class="card">
+  <div id="choice-title"></div>
+  <div id="choice-sub"></div>
+  <div id="choice-opts"></div>
+</div></div>
+
+<div id="register" class="overlay"><div id="reg-box">
+  <div id="reg-head">
+    <span id="reg-count">ORDER 1 / 8</span>
+    <span id="reg-skimmed"></span>
+    <span id="reg-strikes">—</span>
+    <span id="reg-cam" class="reg-cam on">● CAM</span>
+  </div>
+  <div id="reg-camsweep" style="display:none"><div id="reg-camsweep-fill"></div></div>
+  <div id="reg-ticket"></div>
+  <div id="reg-tray">CHANGE TRAY: $0.00</div>
+  <div id="reg-denoms"></div>
+  <div id="reg-actions">
+    <button class="btn" id="reg-submit">Give change (Enter)</button>
+    <button class="btn btn-dim" id="reg-clear">Clear (Bksp)</button>
+    <button class="btn" id="reg-skim">HOLD to skim</button>
+    <div id="reg-timer"><div id="reg-timer-fill"></div></div>
+  </div>
+  <div id="reg-flash"></div>
+</div></div>
+
+<div id="cuff" class="overlay"><div class="card">
+  <h2>CUFFS OUT</h2>
+  <div id="cuff-bar"><div id="cuff-fill"></div></div>
+  <p>MASH SPACE — wriggle out before the click</p>
+</div></div>
+
+<div id="ending" class="overlay"><div class="card" id="end-card">
+  <div id="end-art"></div>
+  <div id="end-title"></div>
+  <div id="end-text"></div>
+  <div id="end-tag"></div>
+  <div id="end-stats"></div>
+  <div id="end-meta"></div>
+  <button class="btn" id="end-next">NEXT SEMESTER — the town remembers</button>
+  <div id="end-sub">Charges dropped. Debts restructured. Bones set. Hopewell keeps the receipts.</div>
+</div></div>
+
+<div id="pause" class="overlay"><div class="card">
+  <h2>PAUSED</h2>
+  <button class="btn" id="p-resume">Back to it</button>
+  <button class="btn" id="p-mute">🔊 Mute</button>
+  <button class="btn btn-dim" id="p-restart">Abandon the week</button>
+</div></div>
+
+<div id="title" class="overlay">
+  <div id="t-logo">VICTORY <span>LAP</span></div>
+  <div id="t-sub">an open-town roguelike about never leaving</div>
+  <div id="t-motto">HOPEWELL — "It Gets Better From Here"</div>
+  <div id="t-runs"></div>
+  <div id="t-knows"></div>
+  <button class="btn" id="t-start">START THE WEEK</button>
+  <div id="t-controls">
+    <b>WASD</b> move &nbsp;•&nbsp; <b>SHIFT</b> sprint &nbsp;•&nbsp; <b>E</b> talk / use &nbsp;•&nbsp;
+    <b>SPACE</b> swing &nbsp;•&nbsp; <b>Q</b> throw / drop &nbsp;•&nbsp; <b>TAB</b> the plan &nbsp;•&nbsp; <b>P</b> pause<br>
+    One week. One score. Finish it and catch the 6 a.m. — or leave in the other kind of car.
+  </div>
+  <div id="t-rating">Phase 1 prototype • mature themes, fictional town, every character an adult • no minors anywhere in the simulation</div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+<script>
+  // the HUD only exists once a run starts
+  const obs = new MutationObserver(() => {
+    document.body.classList.toggle('hud-on', document.getElementById('title').style.display === 'none');
+  });
+  obs.observe(document.getElementById('title'), { attributes: true });
+</script>
+</body>
+</html>

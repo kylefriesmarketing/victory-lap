@@ -74,8 +74,24 @@ Uses the portable Node at `C:\Users\kylef\tools\node` (not on PATH).
   here; the root gives you no undo.
 - `game.js` must stay importable in Node: no `window`/`document` at module top level;
   view callbacks all guarded (`this.cb.x && this.cb.x()`).
-- Hidden Browser-pane tabs suspend rAF and throttle timers — anything that must advance
-  for verification lives in the setInterval fallback path.
-- Skim strikes and heat witnesses key off SIGHTLINES (`seenBy`), not distance alone.
-  Camera cone state in the register minigame is authoritative in `game.js`, mirrored in
-  DOM — don't fork it.
+- Hidden Browser-pane tabs suspend rAF — three real bugs came from this on day one:
+  (1) anything that must advance lives in the setInterval fallback; (2) `regTick`/
+  `cuffTick` sit OUTSIDE the `!modalPause` gate there (the modals ARE the modalPause —
+  gating them deadlocks the cuff overlay forever); (3) the E-interact handler computes
+  `findNearest()` ON DEMAND — the prompt cache is rAF-fed and goes stale when hidden.
+- `serve.mjs` must build ROOT with `fileURLToPath`, never `URL.pathname` — this
+  workspace path contains a SPACE ("New folder") and pathname keeps it as `%20`,
+  which 404s every file while the server looks perfectly healthy.
+- `tools-shot-receiver.mjs` (repo root, one level up) HARDCODES port 8399 and treats
+  argv[2] as the OUTPUT DIR — passing a port as an arg silently creates a directory
+  named after the port. Concurrent sessions fight over 8399; check who's listening and
+  read the POST response body — it contains the actual written file path.
+- The Browser pane allows 5 dev servers per folder and concurrent chats consume them —
+  when the slots are gone, run the server detached (`Start-Process`) and point
+  `preview_start {url}` at it. Harness background tasks got reaped mid-session;
+  detached processes survived.
+- One Gary catch blows the whole night (`_garyNight`), or players spam the 40% roll.
+  Heat witness multiplier is CAPPED at 2.5× or one punch in a crowd nearly maxes the
+  county. Shift pay scales by orders completed (Escape = walk off mid-shift).
+- The morning-after meta lives in `localStorage['vl-meta-v1']`; the sim writes to the
+  SAME meta object it was constructed with, so soak metas and live metas never mix.
