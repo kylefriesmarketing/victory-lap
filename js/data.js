@@ -3,7 +3,9 @@
 // Pure data module: importable in Node (tests/soak.mjs) and the browser alike.
 
 export const TUNING = {
-  blockSeconds: 150,          // wall-clock seconds of free roam per block
+  // ⚠️ 150 made a 70-minute run where ~16 of 28 blocks were empty walking. The README
+  // targets 20–30 min. Skipping a block is a DECISION (the clock widget), not a tax.
+  blockSeconds: 75,           // wall-clock seconds of free roam per block
   blocksPerDay: 4,
   days: 7,                    // MON..SUN — the Add/Drop Week mini-run
   hpMax: 100,
@@ -53,10 +55,10 @@ export const TUNING = {
   crateCount: 3,
   crateFenceBase: 70,
   crateHaggleWin: 30,         // per crate, if the push works
-  crateHaggleLose: 10,        // per crate, if it doesn't
+  crateHaggleLose: 25,        // per crate, if it doesn't — at 10 the push was free money
   haggleOdds: 0.6,
-  holdBuyerMult: 1.5,         // Sunday city buyer
-  holdAmbushChance: 0.35,     // per night holding the haul
+  holdBuyerMult: 2.2,         // Sunday city buyer — must beat 3 nights of ambush EV
+  holdAmbushChance: 0.35,     // per night holding the haul (caps at ONE crate lost)
   heistPatrolRisk: [0.10, 0.22, 0.38], // per carry-trip, by trips completed
   fatigueNoSleepHp: 15,       // skip sleep: tomorrow's max hp haircut
   sleepHeal: 45,
@@ -260,9 +262,9 @@ export const BARKS = {
     "The Zillow said this place was 'up and coming.' Which one is it doing right now?",
   ],
   filming: [
-    "Yoooo, it's happening again. World star. WORLD. STAR.",
-    "Hold my Rip, I'm getting this vertical.",
     "This is going in the group chat SO fast.",
+    "Hold my Rip, I'm getting this vertical.",
+    "Ohhh, somebody's mom is gonna see this by dinner.",
   ],
   fled: [ "NOPE.", "Not today, I got a probation thing.", "I did NOT see anything and I mean that legally." ],
   hit_react: [ "OW. Okay. OKAY.", "That's assault, baby!", "My guy, I have a TIMESHARE MEETING tomorrow—" ],
@@ -333,6 +335,28 @@ export const BARKS = {
     "Look who the week spat back up.",
     "You know what they say. Nothing sticks in Hopewell. Especially you.",
   ],
+  // Fires only after the job. The town has to know something happened, or the
+  // heart the design promises isn't in the build.
+  aftermath: [
+    "Somebody hit the Game Barn. GARY. Who does that to Gary.",
+    "Heard they took the back room. The SEALED stuff. That was his whole retirement, man.",
+    "Cops been by twice. Twice! For Gary. They didn't come twice when my truck got took.",
+    "You know what the worst part is? He's gonna open tomorrow anyway. He always opens.",
+    "Whoever did it — and I'm not saying I know — did NOT think about who they were doing it to.",
+  ],
+  gary_after: [
+    "Back room's empty. Twenty-eight years I sat on that. ...You want a controller? Everything's half off. I don't know why I said that.",
+    "They came through the window. The propped one. I knew about the propped one. I just never — you don't think it'll be YOUR window.",
+    "Fairview called an hour after. An HOUR. Said they heard I might be ready to sell now. How'd they hear that fast, kid. How.",
+  ],
+  bev_after: [
+    "Something's different about you. Don't tell me. I mean it — don't.",
+    "There's a plate in the microwave. There's always a plate. Even the weeks I don't like you.",
+  ],
+  peanut_after: [
+    "Yo. Yo. I did not tell you nothing. We never talked. I don't even know your name, and I've known your name since the SEVENTH GRADE.",
+    "Everybody's asking who. Nobody's asking me, 'cause nobody asks me anything. That's the one good part about being me.",
+  ],
   hospital_roommate: [
     "You're awake! Great. So like I was saying — it's a pyramid, sure, but it's MY level of the pyramid—",
     "They got me in for the gallbladder. Third time. I keep growing 'em back. Doctors HATE me, and I mean that literally—",
@@ -358,6 +382,8 @@ export const SCHEME = {
   ],
 };
 
+// `coda(sum)` appends a clause that knows what your week actually was. The epilogue
+// should read like YOUR week, not like a screen. sum = {crates, cash, heat, day, stats}.
 export const ENDINGS = {
   WALKING: {
     title: 'WALKING',
@@ -365,13 +391,21 @@ export const ENDINGS = {
     text: "The 6 a.m. bus smells like coffee and other people's better decisions. You take a window seat. Nobody chases you. Nobody even looks up. That's the whole trick of this town — it only holds people who stop moving.",
     tag: 'Cashed out clean. He just walked. Nobody even chased him.',
     meta: 'rep',
+    coda: (s) =>
+      s.cash >= 400 ? "You've got more in your jacket than the Wing Barn nets in a week. Somewhere behind you, Gary is opening anyway. He always opens."
+      : s.cash >= 150 ? "It isn't a fortune. It's a bus ticket and a month of not asking anybody for anything, which around here is the same thing."
+      : "You're leaving with almost nothing, which is still more than you came back with. Barely. Count it again at the next stop.",
   },
   BUSTED: {
     title: 'BUSTED',
     art: '🚔',
-    text: "Cuffed on the curb outside Ca$h Kingdom while somebody you went to middle school with films it vertically. Brill reads you your rights from memory, bored. The county DA will drop it by Friday — he always does — but the video's forever.",
+    text: "Brill reads you your rights from memory, bored, while somebody you went to middle school with films it vertically. The county DA will drop it by Friday — he always does — but the video's forever.",
     tag: 'Charges evaporate. The footage doesn’t. +CRED',
     meta: 'cred',
+    coda: (s) =>
+      s.crates > 0 ? "They found the crates in the beater. Sealed, 1997, still shrink-wrapped. The evidence photo is going to be the single best-lit picture ever taken of your car."
+      : s.heat >= 85 ? "Both cars came. BOTH of them. Tapp looked thrilled. Brill looked like a man who had been eating a sandwich."
+      : "You weren't even doing anything right then. That's the part that'll bother you — not the cuffs, the timing.",
   },
   BODIED: {
     title: 'BODIED',
@@ -379,13 +413,20 @@ export const ENDINGS = {
     text: "County hospital, curtain bed 2. Your roommate has been talking since before you woke up and possibly since before you were admitted. The doctor signing your discharge golfs with the officer who scraped you off the lot. Small town. Everything's connected. Mostly at the elbow.",
     tag: 'The bone sets. The story stays. +SCARS',
     meta: 'scars',
+    coda: (s) =>
+      s.debtOpen ? "Reggie signed the visitor log. Under 'relationship to patient' he wrote 'business.' He also left a card. The debt's square, at least."
+      : s.stats.koGiven >= 3 ? `You put ${s.stats.koGiven} people down this week and the parking lot still won. It's undefeated. It's been undefeated since 1974.`
+      : "You don't remember the last ten seconds of it. Everyone else in that lot does, and by Thursday they'll each remember it differently and better.",
   },
   STUCK: {
     title: 'STUCK',
     art: '🕒',
-    text: "Sunday night. The week just… ended. No cuffs, no casts, no cash. You watched the drop night come and go from a parking lot you know better than your own face. Nothing happened. That's the worst one.",
+    text: "Sunday night. The week just… ended.",
     tag: 'The week cost more than it paid. +LESSONS',
     meta: 'lessons',
+    coda: (s) =>
+      s.crates > 0 ? "You made the money on Thursday. The bus runs every single morning after that. You know exactly how many mornings that was, and so does everybody who watched you not get on it."
+      : "No cuffs, no casts, no cash. You watched the drop night come and go from a parking lot you know better than your own face. Nothing happened. That's the worst one.",
   },
 };
 

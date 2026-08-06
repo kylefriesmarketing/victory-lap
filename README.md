@@ -30,6 +30,20 @@ Uses the portable Node at `C:\Users\kylef\tools\node` (not on PATH).
   knowledge (the propped window, the camera blind spot, the bank-drop night stay
   *known*), Cred/Scars/Lessons/Rep tallies, run count, NPC greet-by-run barks.
 
+- **M1.1 — outside review pass** ✅ (2026-08-05)
+  Full review against the design doc + art bible, then the ship list applied. Run length
+  halved (`blockSeconds` 150→75) plus a clickable clock to skip a dead block — gated off
+  at NAMED, so it's a decision the cops can take away from you. The heist now exits
+  through the window it entered (that branch was unreachable). Shop hours consolidated
+  into `game.isOpen()` with per-shop refusal lines. The Sunday buyer requires actually
+  committing to `hold`. Map knowledge carries forward and pre-completes scheme stages.
+  The live heist gained real per-trip patrol risk. The Rip hangover became a mechanic in
+  the register instead of a CSS jitter. Register stalling no longer out-earns playing
+  well; haggle/hold EV rebalanced so neither is strictly dominant. Six named characters
+  got bodies in their shops (they were invisible hotspots). Three per-frame
+  `Math.random()` "flickers" became time-driven. The town talks about the heist
+  afterward, and every ending gained a coda that knows what your week actually was.
+
 ## What's deliberately NOT in Phase 1 (per the roadmap — don't "fix" these)
 
 - No Hopeless Tech, classes, GPA, or majors (Phase 2).
@@ -95,3 +109,20 @@ Uses the portable Node at `C:\Users\kylef\tools\node` (not on PATH).
   county. Shift pay scales by orders completed (Escape = walk off mid-shift).
 - The morning-after meta lives in `localStorage['vl-meta-v1']`; the sim writes to the
   SAME meta object it was constructed with, so soak metas and live metas never mix.
+- **`leaveRoom`'s branch order is load-bearing.** `gamebarn` is in `BUILDINGS`, so the
+  generic front-door exit shadows the "out the window" branch unless the dark-store
+  check comes FIRST. Symptom: the heist dumps you on the lit sidewalk out front, 338px
+  from your entry point, in the NPC walk lane.
+- **Shop hours live in `game.isOpen()`, never in the UI.** main.js used to keep its own
+  `openMap` for the prompt while `enterRoom` guarded only two doors — three shops read
+  "(closed)" and opened anyway.
+- Anything the soak bot uses must also exist on the LIVE path. `heistPatrolRisk` and
+  `shakeAmp`'s outcome effects were bot-only for a day: the real heist had no escalating
+  danger and the Rip hangover was a 2px CSS jitter. If a constant is referenced only
+  from a `*Auto()` method, that's the smell.
+- Heat multiplier: discount the empty alley without discounting the crowd. A first pass
+  at a witness floor quietly halved every heat gain in the game (BUSTED fell 8→2 of 64).
+  Always re-run the soak and read the ENDING DISTRIBUTION, not just the green check.
+- WALKING is only ever granted by `walkOut()` (catching the 6 a.m.). Reaching Sunday
+  with the money and no bus ticket is STUCK, on purpose — it's the best story the
+  prototype tells. Don't "fix" it back into a week-end win.

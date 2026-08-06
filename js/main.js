@@ -78,6 +78,11 @@ function startRun() {
     feed('Move: WASD • Sprint: SHIFT • Talk/use: E • Swing: SPACE • Throw/drop: Q • Scheme: TAB', 'ok');
     feed('Rent is theoretical. The week is not. Find Peanut when the sun drops.', 'scheme');
   }, 900);
+  // what you carried over from last time — the town forgot; you didn't
+  if (game.knewWindow || game.knewDrop) setTimeout(() => {
+    if (game.knewWindow) feed('You already know about the window over the dumpster. You always will.', 'scheme');
+    if (game.knewDrop) feed('And you know when the store sits empty. Thursday. Nine o\'clock. Nobody had to tell you twice.', 'scheme');
+  }, 1500);
 }
 
 function weatherLine(w) {
@@ -170,10 +175,9 @@ function interactables() {
         feed('"DAYBREAK COMMONS — curated retail, elevated living." Elevated from whom, it doesn\'t say.', 'warn'); }); continue; }
       if (b.key === 'tattoo') { add(dx, dy, 46, 'Stick City (walk-ins, not you)', () => {
         renderer.bark(null, 'Tattoo guy, through the door: "Booked. Come back when you got scheme money."', dx, dy - 20); }); continue; }
-      const openMap = { qwikstop: true, hardware: g.block <= 1, buffet: g.block >= 1 && g.block <= 2,
-                        wingbarn: g.block <= 2, gamebarn: g.block <= 2, cashking: g.block >= 1 };
-      if (openMap[b.key]) add(dx, dy, 46, `Enter ${b.label}`, () => result(g.act('enter', b.key)));
-      else add(dx, dy, 46, `${b.label} (closed)`, () => result(g.act('enter', b.key)));
+      // hours come from the sim (g.isOpen) — the UI must never keep its own copy
+      if (g.isOpen(b.key)) add(dx, dy, 46, `Enter ${b.label}`, () => result(g.act('enter', b.key)));
+      else add(dx, dy, 46, `${b.label} — closed`, () => result(g.act('enter', b.key)));
     }
     add(GARAGE.door.x + 20, GARAGE.y - 8, 50, 'The garage (home, roughly)', () => result(g.act('enter', 'garage')));
     // the alley window behind Game Barn
@@ -255,9 +259,12 @@ function interactables() {
         add(s[0], s[1], 44, 'Grab a crate (FUNSTATION — sealed)', () => result(g.act('grabCrate')));
         break; // one prompt at a time; they're in a row
       }
-      add(620, 66, 60, p.carryCrate ? 'Out the window (with the goods)' : 'Out the window', () => result(g.act('leave')));
+      const odds = g.patrolOdds();
+      const risk = odds > 0.3 ? ' — the odds are getting rude' : odds > 0.16 ? ' — pushing it' : '';
+      add(620, 66, 60, p.carryCrate ? `Out the window with it (trip ${g.scheme.crates + 1} of ${T.crateCount}${risk})` : 'Out the window', () => result(g.act('leave')));
     } else {
-      add(530, 165, 60, 'Gary', () => renderer.bark('Gary', uiPick(BARKS.gary), 530, 148));
+      add(530, 165, 60, 'Gary', () => renderer.bark('Gary',
+        uiPick(g.scheme.job ? BARKS.gary_after : BARKS.gary), 530, 148));
       add(150, 210, 60, 'The back room (GARY ONLY. This means you, Peanut.)', () => feed('Deadbolted from this side. But rooms have more than one side. Alleys know that.', 'warn'));
       add(INTERIORS.gamebarn.w / 2, INTERIORS.gamebarn.h - 26, 60, 'Leave', () => result(g.act('leave')));
     }
@@ -265,7 +272,8 @@ function interactables() {
     add(120, 95, 60, 'The cot (sleep — ends the day)', () => showChoice('Sleep?', 'The rest of today goes with it. Heat cools double here — the Flats don\'t talk to police.', [
       { label: 'Sleep. Let the town cool off.', go: () => result(g.act('sleep')) }]));
     add(335, 95, 54, 'The beer fridge (Bev\'s. Ask first.)', () => feed(`Inside: three beers, a film canister of quarters, and the rent jar. The jar notices you.`, 'warn'));
-    add(560, 100, 60, 'The house door', () => renderer.bark('Bev', uiPick(BARKS.bev), 560, 82));
+    add(560, 100, 60, 'The house door', () => renderer.bark('Bev',
+      uiPick(g.scheme.job ? BARKS.bev_after : BARKS.bev), 560, 82));
     add(INTERIORS.garage.w / 2, INTERIORS.garage.h - 26, 60, 'Out to the street', () => result(g.act('leave')));
   }
   return out;
@@ -302,12 +310,23 @@ function registerStart() {
           timer: 0, camT: 0, camOn: true, holdSkim: false, skimT: 0, done: false };
   $('register').style.display = 'flex';
   const dv = $('reg-denoms'); dv.innerHTML = '';
-  for (const [cents, label] of DENOMS) {
+  DENOMS.forEach(([cents, label], i) => {
     const b = document.createElement('button');
     b.className = 'btn reg-denom'; b.textContent = label;
-    b.onclick = () => { if (!reg.done) { reg.tray += cents; regPaint(); sfx.play('pickup'); } };
+    b.onclick = () => {
+      if (reg.done) return;
+      let v = cents;
+      // THE RIP BILL, where you actually feel it: yesterday's can makes your hand
+      // miss the slot. This used to be a 2px jitter — a graphic, not a mechanic.
+      if (game.player.shakeAmp > 0 && Math.random() < game.player.shakeAmp * 0.07) {
+        const j = Math.max(0, Math.min(DENOMS.length - 1, i + (Math.random() < 0.5 ? -1 : 1)));
+        v = DENOMS[j][0];
+        flashReg('Your hand goes to the wrong slot.', 'bad');
+      }
+      reg.tray += v; regPaint(); sfx.play('pickup');
+    };
     dv.appendChild(b);
-  }
+  });
   regOrder();
 }
 
@@ -320,7 +339,9 @@ function regOrder() {
   total = Math.round(total * 100);
   const paid = Math.ceil(total / 500) * 500 + (Math.random() < 0.35 ? 500 : 0);
   reg.items = items; reg.totalC = total; reg.paid = paid; reg.target = paid - total;
-  reg.tray = 0; reg.timer = 22; reg.submitted = false;
+  reg.tray = 0; reg.timer = 16; reg.timerMax = 16; reg.submitted = false;
+  reg.skimBase = reg.skimmed;                 // per-ORDER cap: stalling can't farm it
+  reg.camCycle = 7.5 + Math.random() * 3;     // jittered, so the sweep bar makes you FAST, not safe
   regPaint();
 }
 
@@ -347,17 +368,27 @@ function flashReg(text, kind) { const el = $('reg-flash'); el.textContent = text
 function regTick(dt) {
   if (!reg || reg.done) return;
   reg.timer -= dt;
-  if (reg.timer <= 0 && !reg.submitted) { reg.submitted = true; flashReg('Too slow. The line has opinions.', 'bad'); setTimeout(regOrder, 700); }
-  // camera cycle: 5.5s on, 3.5s off
-  reg.camT = (reg.camT + dt) % 9;
+  if (reg.timer <= 0 && !reg.submitted) {
+    // running out the clock used to be the optimal play — it cost a $3 tip and let you
+    // farm the skim. Now the drawer runs late and Dale counts it.
+    reg.submitted = true; reg.caught++;
+    flashReg('The line backs up. Dale counts the drawer himself.', 'bad');
+    sfx.play('yell'); regPaint();
+    if ((game.player.strikes + reg.caught) >= T.skimStrikeLimit) return regEnd();
+    setTimeout(regOrder, 700);
+  }
+  const cyc = reg.camCycle, onFor = cyc * 0.61;
+  reg.camT = (reg.camT + dt) % cyc;
   const wasOn = reg.camOn;
-  reg.camOn = reg.camT < 5.5;
+  reg.camOn = reg.camT < onFor;
   const knows = game.meta.knows.blind;
   $('reg-cam').textContent = reg.camOn ? '● CAM' : '○ cam';
   $('reg-cam').className = reg.camOn ? 'reg-cam on' : 'reg-cam off';
   $('reg-camsweep').style.display = knows ? 'block' : 'none';
-  if (knows) $('reg-camsweep-fill').style.width = `${(reg.camT / 9) * 100}%`;
-  if (reg.camOn && !wasOn && reg.holdSkim) { // caught mid-reach
+  if (knows) $('reg-camsweep-fill').style.width = `${(reg.camT / cyc) * 100}%`;
+  // caught on the flip — and the shakes WIDEN that window, because you're slow today
+  const preFlip = !reg.camOn && (cyc - reg.camT) < game.player.shakeAmp * 0.22;
+  if (((reg.camOn && !wasOn) || preFlip) && reg.holdSkim) {
     reg.caught++; reg.holdSkim = false;
     flashReg('Dale\'s eyes flick to the drawer. He KNOWS.', 'bad');
     sfx.play('yell'); regPaint();
@@ -365,10 +396,9 @@ function regTick(dt) {
   }
   if (reg.holdSkim && !reg.camOn) {
     reg.skimT += dt;
-    if (reg.skimT > 0.45) { reg.skimT = 0; reg.skimmed = Math.min(reg.skimmed + 1, 6 * reg.order); regPaint(); sfx.play('pickup'); }
+    if (reg.skimT > 0.45) { reg.skimT = 0; reg.skimmed = Math.min(reg.skimmed + 1, reg.skimBase + 6); regPaint(); sfx.play('pickup'); }
   }
-  $('reg-timer-fill').style.width = `${Math.max(0, reg.timer / 22) * 100}%`;
-  // the shakes are a mechanic, not a graphic
+  $('reg-timer-fill').style.width = `${Math.max(0, reg.timer / reg.timerMax) * 100}%`;
   const amp = game.player.shakeAmp;
   $('reg-denoms').style.transform = amp ? `translate(${(Math.random() - 0.5) * amp * 2}px, ${(Math.random() - 0.5) * amp * 2}px)` : '';
 }
@@ -459,7 +489,8 @@ function showEnding(key, sum) {
   if (key === 'BUSTED') sfx.play('siren');
   $('end-art').textContent = E.art;
   $('end-title').textContent = E.title;
-  $('end-text').textContent = E.text + (sum.roommate ? `\n\nYour roommate: "${sum.roommate}"` : '');
+  $('end-text').textContent = E.text + (sum.coda ? `\n\n${sum.coda}` : '')
+    + (sum.roommate ? `\n\nYour roommate: "${sum.roommate}"` : '');
   $('end-tag').textContent = E.tag;
   $('end-stats').innerHTML = [
     ['Days survived', `${Math.min(sum.day + 1, 7)} / 7`],
@@ -563,6 +594,15 @@ $('p-resume').onclick = togglePause;
 $('p-mute').onclick = () => { sfx.setMute(!sfx.muted); $('p-mute').textContent = sfx.muted ? '🔇 Unmute' : '🔊 Mute'; };
 $('p-restart').onclick = () => location.reload();
 $('hud-scheme').onclick = () => $('scheme-panel').classList.toggle('open');
+// The universal "call it" — skipping dead time should be a DECISION you make, and one
+// the cops can take away from you. Gated at NAMED and above: you don't get to skip a
+// day the whole force is asking about you.
+$('hud-clock').onclick = () => {
+  if (!game || game.over || modalPause) return;
+  if (game.heatStage() >= 2) { feed('Not today. Half this town is telling the other half where you are.', 'warn'); return; }
+  showChoice('Call it?', 'Walk the rest of this block off. Nothing good was going to happen in it.', [
+    { label: 'Move on.', go: () => result(game.act('endBlock', 'called it')) }]);
+};
 $('reg-submit').onclick = regSubmit;
 $('reg-clear').onclick = () => { if (reg) { reg.tray = 0; regPaint(); } };
 const skimBtn = $('reg-skim');

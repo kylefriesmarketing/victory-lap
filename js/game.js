@@ -46,6 +46,13 @@ export class Game {
     };
     this.scheme = { hear: false, case: false, tools: false, window: false, job: false, fence: false,
                     crates: 0, inCar: 0, sold: 0, holding: false, cash: 0, garySawYou: false };
+    // THE META-PROGRESSION: the town drops the charges, but you keep the map. A player
+    // on run 5 starts the scheme further along because THEY know more, not because a
+    // number went up. This is the whole roguelike promise — don't quietly delete it.
+    this.knewWindow = !!this.meta.knows.window;
+    this.knewDrop = !!this.meta.knows.drop;
+    if (this.knewWindow) { this.scheme.hear = true; this.scheme.case = true; }
+    if (this.knewDrop) this.scheme.window = true;
     this.npcs = []; this.pickups = []; this.projectiles = [];
     this.stats = { punches: 0, koGiven: 0, koTaken: 0, skimmed: 0, shifts: 0, rip: 0,
                    crimesSeen: 0, cuffsEscaped: 0, spent: 0, earned: 0 };
@@ -188,6 +195,28 @@ export class Game {
         this.npcs.push(this._mkNpc({ key: 'tanner', name: 'Tanner', ...NAMED.tanner, x: 1030, y: 820, brawler: true, hp: 62, pool: 'tanner' }));
       }
     }
+    // SHOPKEEPERS — every interior gets a body. These characters had full archetype,
+    // outfit and silhouette specs in data.js and were never once drawn; the interact
+    // prompts were talking to a coordinate in an empty room.
+    // y sits just ABOVE each counter's top edge — any higher and they stand on the wall
+    const STAFF = [
+      ['wingbarn', 'dale', 300, 116], ['gamebarn', 'gary', 530, 126],
+      ['buffet', 'wanda', 150, 106],  ['hardware', 'earl', 460, 106],
+      ['cashking', 'roxy', 320, 106],   // between both windows; she IS both windows
+    ];
+    for (const [room, key, x, y] of STAFF) {
+      if (!this.isOpen(room)) continue;
+      const d = NAMED[key];
+      this.npcs.push(this._mkNpc({ ...d, key, x, y, room, static: true, pool: BARKS[key] ? key : 'townie_idle' }));
+    }
+    // the QwikStop clerk has no name and never will; he is a fixture, like the ice machine
+    this.npcs.push(this._mkNpc({ arch: 'wiry', outfit: { shirt: '#7a7468', pants: '#3d4c63' }, hat: 'cap',
+      name: 'Clerk', x: 170, y: 106, room: 'qwikstop', static: true, pool: 'townie_idle' }));
+    // Bev is up early and up late, because of course she is
+    if (this.block === 0 || this.block >= 3) {
+      this.npcs.push(this._mkNpc({ ...NAMED.bev, key: 'bev', x: 560, y: 95, room: 'garage', static: true, pool: 'bev' }));
+    }
+
     // cops
     if (this.block === 1) this._spawnCop('tapp', [[500, 505], [1300, 505], [1900, 508], [1000, 1060]]);
     if (this.block >= 2) this._spawnCop('brill', [[1880, 508], [1100, 505], [520, 508], [900, 1060], [1500, 1060]]);
@@ -195,9 +224,12 @@ export class Game {
     // debt collector
     if (this.player.debt > 0 && this.day >= 5 && this.block >= 2 && !this.reggieSpawned) {
       this.reggieSpawned = true;
-      this.npcs.push(this._mkNpc({ key: 'reggie', name: 'Big Reggie', arch: 'broad', outfit: { shirt: '#3a3a36', pants: '#22221e' },
-        hat: 'beanie', x: 1150, y: 900, brawler: true, hp: 120, pool: 'drunk' }));
-      this.alert('Somebody built like a vending machine is asking around for you.', 'warn');
+      const reg = this._mkNpc({ key: 'reggie', name: 'Big Reggie', arch: 'broad', outfit: { shirt: '#3a3a36', pants: '#22221e' },
+        hat: 'beanie', x: 1150, y: 900, brawler: true, hp: 120, pool: 'drunk' });
+      reg.persistent = true;      // the debt does not evaporate at the block boundary
+      reg.state = 'aggro';        // he is not here to chat about the terms
+      this.npcs.push(reg);
+      this.alert('Somebody built like a vending machine is asking around for you. He found you.', 'bad');
     }
   }
 
@@ -234,7 +266,9 @@ export class Game {
     if (this.scheme.holding && this.scheme.inCar > 0 && this.chance(T.holdAmbushChance)) this._holdAmbush();
     this.day++;
     this.block = 0; this.blockT = 0;
-    if (this.day >= T.days) return this.endGame(this.scheme.fence ? 'WALKING' : 'STUCK');
+    // ⚠️ WALKING is ONLY earned by catching the 6 a.m. (walkOut). Ending the week with
+    // the money and no bus ticket is the game's best story, and it is STUCK.
+    if (this.day >= T.days) return this.endGame('STUCK');
     this.cb.dayEnd && this.cb.dayEnd();
     this._spawnWeapons();
     this._populate();
@@ -244,7 +278,7 @@ export class Game {
 
   _holdAmbush() {
     this.alert('Word got out you\'re sitting on merchandise. Somebody visited the beater overnight.', 'bad');
-    const lost = Math.min(this.scheme.inCar, 1 + (this.chance(0.4) ? 1 : 0));
+    const lost = Math.min(this.scheme.inCar, 1);   // capped at one — three nights shouldn't wipe you
     this.scheme.inCar -= lost;
     if (this.chance(0.5)) { this.player.hp -= this.ri(15, 30); this.alert(`You caught them at it. You kept ${this.scheme.inCar} crate${this.scheme.inCar === 1 ? '' : 's'} and some bruises.`, 'bad'); }
     else this.alert(`${lost} crate${lost === 1 ? '' : 's'} walked off into the night.`, 'bad');
@@ -396,12 +430,15 @@ export class Game {
   _schemeCheck(stage) {
     if (this.scheme[stage]) return;
     this.scheme[stage] = true;
+    if (stage === 'window') this.meta.knows.drop = true;
+    if (stage === 'case') this.meta.knows.window = true;
     const s = SCHEME.stages.find(s => s.id === stage);
     this.cb.scheme && this.cb.scheme(stage);
     this.alert(`SCHEME — ${s ? s.label : stage}: done.`, 'scheme');
   }
 
   talkPeanut() {
+    if (this.scheme.job) return { name: 'Peanut', text: this.pick(BARKS.peanut_after) };
     if (!this.scheme.hear) {
       this._schemeCheck('hear');
       return { name: 'Peanut', text: BARKS.peanut[0] };
@@ -488,6 +525,24 @@ export class Game {
     return { ok: true, seen: false };
   }
 
+  // ⚠️ This used to exist ONLY in the headless bot, so the live heist had no escalating
+  // danger — trip 3 was exactly as safe as trip 1. Press-your-luck needs teeth.
+  patrolOdds() {
+    const base = T.heistPatrolRisk[Math.min(this.scheme.crates, T.heistPatrolRisk.length - 1)];
+    return base * (this.heistWindowOpen() ? 0.5 : 1) * (this.weather === 'rain' ? 0.7 : 1);
+  }
+
+  _patrolRoll() {
+    if (!this.chance(this.patrolOdds())) return false;
+    this.addHeat(T.heatCrime.heistSeen, 1, 'a cruiser rolled the alley');
+    this.alert('Headlights sweep the alley mouth. Somebody in a HPD car is looking right at a man holding a crate.', 'bad');
+    this.sfx('siren');
+    const near = this.npcs.find(n => n.cop);
+    if (near) { near.x = 1420; near.y = 150; near.state = 'chase'; }
+    else this._spawnCop('brill', [[1420, 150]]);
+    return true;
+  }
+
   fenceHaul(haggle = false) {
     const s = this.scheme;
     if (this.room !== 'cashking' || s.inCar <= 0) return { ok: false, msg: 'Window 2 has nothing to discuss with an empty trunk.' };
@@ -513,7 +568,9 @@ export class Game {
 
   sundayBuyer() {
     const s = this.scheme;
-    if (this.day !== 6 || s.inCar <= 0) return { ok: false };
+    // must have actually COMMITTED to holding — otherwise the risk is opt-out and
+    // the +50% is free money for anyone who simply waits.
+    if (this.day !== 6 || s.inCar <= 0 || !s.holding) return { ok: false };
     const take = Math.round(T.crateFenceBase * T.holdBuyerMult) * s.inCar;
     const n = s.inCar;
     s.inCar = 0; s.sold += n; s.cash += take; s.holding = false;
@@ -530,8 +587,12 @@ export class Game {
 
   // ---- heat ---------------------------------------------------------------
   addHeat(base, extraWitnesses = 0, why = '') {
-    // a crowd makes it worse, but never apocalyptic — one punch shouldn't near-max the county
-    let mult = Math.min(2.5, 1 + Math.max(0, this.countWitnesses() + extraWitnesses - 1) * 0.5);
+    // A crowd makes it worse; an empty alley at 3am makes it cheap. Without a floor
+    // below 1.0 there's no "do it where nobody's looking," which is the whole fantasy.
+    // ⚠️ Discount the empty alley WITHOUT discounting the crowd — a first pass used
+    // 1+(w-2)*0.5 and quietly halved every heat gain in the game (BUSTED fell 8→2/64).
+    const w = this.countWitnesses() + extraWitnesses;
+    let mult = w <= 0 ? 0.25 : w === 1 ? 0.6 : Math.min(2.5, 1.2 + (w - 2) * 0.6);
     if (this.heatStage() >= 2) mult *= T.namedGainMult;
     if (this.weather === 'rain') mult *= 0.8; // cops stay in the car
     this.heat = Math.min(T.heatMax, this.heat + base * mult);
@@ -607,6 +668,7 @@ export class Game {
     } else if (!n.cop && !n.brawler) {
       n.state = this.chance(0.35) ? 'film' : 'flee';
       if (n.state === 'film') { n.filmer = true; this.say(n.name || 'Townie', this.pick(BARKS.filming), n.x, n.y); }
+      else this.say(n.name || 'Townie', this.pick(BARKS.fled), n.x, n.y);
     }
     if (n.cop) { this.addHeat(30, 1, 'assaulting an officer'); n.state = 'chase'; }
   }
@@ -619,7 +681,7 @@ export class Game {
     this.fx('impact', p.x, p.y, { ang });
     this.sfx('thud', p.x, p.y);
     if (this.chance(0.15)) p.blackEye = true;
-    if (p.hp <= 0 && !this.over) this.endGame('BODIED');
+    if (p.hp <= 0 && !this.over) { this.stats.koTaken++; this.endGame('BODIED'); }
   }
 
   throwHeld() {
@@ -710,9 +772,11 @@ export class Game {
     const summary = {
       key, day: this.day, dayName: this.dayName, cash: Math.round(this.player.cash),
       heat: Math.round(this.heat), crates: this.scheme.sold, schemeCash: this.scheme.cash,
+      debtOpen: this.player.debt > 0,
       stats: { ...this.stats }, meta: { ...m, knows: { ...m.knows } },
       roommate: key === 'BODIED' ? this.pick(BARKS.hospital_roommate) : null,
     };
+    summary.coda = (ENDINGS[key] && ENDINGS[key].coda) ? ENDINGS[key].coda(summary) : '';
     this.note(`ENDING: ${key}`);
     this.cb.ending && this.cb.ending(key, summary);
     return { ok: true, key, summary };
@@ -737,11 +801,36 @@ export class Game {
     return A[name]() || { ok: true };
   }
 
+  // ⚠️ Hours live HERE, not in the UI. main.js used to compute its own openMap for the
+  // prompt while enterRoom guarded only two doors — so three shops read "(closed)" and
+  // opened anyway. One source of truth; the UI asks this.
+  isOpen(key, block = this.block) {
+    switch (key) {
+      case 'qwikstop': return true;                     // never closes, that's the point
+      case 'garage': return true;
+      case 'hardware': return block <= 1;
+      case 'buffet': return block >= 1 && block <= 2;
+      case 'wingbarn': return block <= 2;
+      case 'gamebarn': return block <= 2;
+      case 'cashking': return block >= 1;
+      default: return true;
+    }
+  }
+
+  closedLine(key) {
+    return {
+      hardware: 'Earl closes early. Everything must go, including Earl, at 3 p.m.',
+      buffet: this.block === 0 ? 'The steam table doesn\'t open until lunch. Wanda has standards, and one of them is lunch.'
+                               : 'Dark. The fish tank light is on. The fish is on his own out there.',
+      wingbarn: 'Closed. Through the glass you can see the mop bucket, waiting for a man it has already broken.',
+      gamebarn: 'Locked. The sign flips to CLOSED at dark. Gary sleeps above the shop, allegedly.',
+      cashking: 'Roxy isn\'t in yet. The glass is doing its job in the meantime.',
+    }[key] || 'Closed.';
+  }
+
   enterRoom(key) {
     if (!INTERIORS[key]) return { ok: false };
-    // Game Barn front door only when open (morning..evening); the heist goes in the window
-    if (key === 'gamebarn' && this.isLate) return { ok: false, msg: 'Locked. The sign flips to CLOSED at dark. Gary sleeps above the shop, allegedly.' };
-    if (key === 'hardware' && this.block > 1) return { ok: false, msg: 'Earl closes early. Everything must go, including Earl, at 3 p.m.' };
+    if (!this.isOpen(key)) return { ok: false, msg: this.closedLine(key) };
     this.room = key; this.gameBarnDark = false;
     const it = INTERIORS[key];
     this.player.x = it.w / 2; this.player.y = it.h - 50;
@@ -753,9 +842,14 @@ export class Game {
     if (this.room === 'ext') return { ok: false };
     const wasShop = ['qwikstop', 'hardware'].includes(this.room);
     const b = BUILDINGS.find(b => b.key === this.room);
-    if (b) { this.player.x = b.x + b.w / 2; this.player.y = STRIP_Y.base + 30; }
+    // ⚠️ ORDER MATTERS: gamebarn IS in BUILDINGS, so this check must precede the
+    // generic front-door exit or the heist walks you out onto the lit sidewalk.
+    if (this.room === 'gamebarn' && this.gameBarnDark) {
+      this.player.x = 1540; this.player.y = 160;
+      if (this.player.carryCrate) this._patrolRoll();
+    }
+    else if (b) { this.player.x = b.x + b.w / 2; this.player.y = STRIP_Y.base + 30; }
     else if (this.room === 'garage') { this.player.x = GARAGE.door.x + 20; this.player.y = GARAGE.y - 26; }
-    else if (this.room === 'gamebarn') { this.player.x = 1540; this.player.y = 160; } // out the window
     this.room = 'ext';
     this.gameBarnDark = false;
     if (wasShop) this.exitShopCheck();
@@ -855,7 +949,10 @@ export class Game {
         n.barkT -= dt;
         if (n.barkT <= 0 && dToP < 190 && this.chance(0.5)) {
           n.barkT = this.rr(14, 30);
-          this.say(n.name || null, this.pick(BARKS[n.pool] || BARKS.townie_idle), n.x, n.y);
+          // after the job, the town talks about the job
+          const pool = (this.scheme.job && !n.key && this.chance(0.55))
+            ? BARKS.aftermath : (BARKS[n.pool] || BARKS.townie_idle);
+          this.say(n.name || null, this.pick(pool), n.x, n.y);
         } else if (n.barkT <= 0) n.barkT = this.rr(8, 16);
         break;
       }

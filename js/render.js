@@ -497,7 +497,14 @@ export class Renderer {
   render(dt) {
     const g = this.g, c = this.ctx, cv = this.cv;
     this.t += dt;
-    this.flicker = Math.random();
+    // ⚠️ NEVER reseed a "flicker" from per-frame noise — at 60fps that is a 30Hz strobe,
+    // not a failing tube, and it reads as screen tearing. All three flickers below are
+    // driven by TIME so they stutter and HOLD like real dying hardware.
+    this.flicker = Math.random();                                   // non-visual jitter only
+    this.barLight = Math.floor(this.t * 4.5) % 2;                   // cop bar: alternating halves
+    const n = Math.sin(this.t * 2.3) + Math.sin(this.t * 7.1) * 0.6 + Math.sin(this.t * 1.1) * 0.3;
+    this.neonG = n > 1.15;                                          // the dead G, in believable bursts
+    this.tubeDim = Math.sin(this.t * 5.7) + Math.sin(this.t * 13.3) * 0.5 < -1.32;
     const p = g.player;
     // camera follows with lag; shake decays
     this.cam.x += (p.x - this.cam.x) * Math.min(1, dt * 5);
@@ -637,8 +644,10 @@ export class Renderer {
       c.fillStyle = 'rgba(20,26,34,0.85)'; c.beginPath(); c.roundRect(car.x - 34, car.y - 16, 68, 32, 5); c.fill();
       c.fillStyle = car.cop ? '#e8e4dc' : car.col; c.beginPath(); c.roundRect(car.x - 20, car.y - 11, 40, 22, 3); c.fill();
       if (car.cop) {
-        c.fillStyle = this.flicker < 0.5 ? '#e04040' : '#4060e0';
-        c.fillRect(car.x - 12, car.y - 22, 24, 6);
+        c.fillStyle = this.barLight ? '#e04040' : '#4060e0';
+        c.fillRect(car.x - 12, car.y - 22, 12, 6);
+        c.fillStyle = this.barLight ? '#4060e0' : '#e04040';
+        c.fillRect(car.x, car.y - 22, 12, 6);
         c.fillStyle = '#2a2e33'; c.font = 'bold 8px Arial'; c.textAlign = 'center'; c.fillText('HPD', car.x, car.y + 4);
       }
       if (late) { // headlight cones
@@ -659,7 +668,7 @@ export class Renderer {
       c.textAlign = 'center';
       if (b.key === 'wingbarn') {
         c.font = 'bold 15px Impact, Arial';
-        const txt = neonOn && this.flicker < 0.94 ? 'WI G BARN' : 'WING BARN'; // the dead G
+        const txt = neonOn && !this.neonG ? 'WI G BARN' : 'WING BARN'; // the G catches, then quits
         c.fillStyle = neonOn ? '#ffd9a0' : PAL.cream;
         if (neonOn) { c.shadowColor = '#ffb347'; c.shadowBlur = 12; }
         c.fillText(txt, sx, sy); c.shadowBlur = 0;
@@ -770,7 +779,7 @@ export class Renderer {
     } else {
       // interiors: warm pools over counters, fluorescent flicker at Wing Barn
       const it = INTERIORS[room];
-      if (it.counter) pool(it.counter.x + it.counter.w / 2, it.counter.y + 30, 180, room === 'wingbarn' && this.flicker < 0.06 ? 0.5 : 0.85);
+      if (it.counter) pool(it.counter.x + it.counter.w / 2, it.counter.y + 30, 180, room === 'wingbarn' && this.tubeDim ? 0.5 : 0.85);
       pool(it.w / 2, it.h / 2, 220, 0.6);
     }
     c.drawImage(L, 0, 0);

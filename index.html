@@ -47,7 +47,10 @@
   .hud-on #hud { display: block; }
   #hud-clock { position: absolute; top: 14px; left: 14px; background: var(--paper); color: var(--ink);
     border-radius: 6px; padding: 8px 14px 10px; box-shadow: 0 3px 0 #b8a888, 0 6px 18px rgba(0,0,0,0.5);
-    transform: rotate(-1deg); min-width: 158px; }
+    transform: rotate(-1deg); min-width: 158px; pointer-events: auto; cursor: pointer; }
+  #hud-clock:hover { background: #fff6e2; }
+  #hud-clock::after { content: 'click to move on'; display: block; font-family: Georgia, serif;
+    font-size: 9.5px; font-style: italic; color: #9a8f7a; margin-top: 3px; }
   #hud-day { font-family: 'Courier New', monospace; font-weight: bold; font-size: 15px; letter-spacing: 1px; }
   #hud-clockbar { height: 5px; background: #cfc2a8; border-radius: 3px; margin-top: 6px; overflow: hidden; }
   #hud-clockbar-fill { height: 100%; background: var(--red); width: 100%; transition: width .5s linear; }
