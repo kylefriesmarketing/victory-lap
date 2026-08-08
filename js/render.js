@@ -172,6 +172,32 @@ export class Renderer {
       gr.addColorStop(0, PAL.oil); gr.addColorStop(1, 'rgba(20,18,22,0)');
       c.fillStyle = gr; c.beginPath(); c.ellipse(x, y, 14 + rnd() * 20, 6 + rnd() * 9, 0, 0, 7); c.fill();
     });
+    // litter drifts where the wind and the people put it: against the curb, behind the
+    // dumpsters, under the bus shelter bench. Nobody has ever emptied a bin on this street.
+    const litter = (n, seed, x0, y0, w, h) => scatter(n, seed, (rnd) => {
+      const lx = x0 + rnd() * w, ly = y0 + rnd() * h, r = rnd();
+      if (r < 0.3) {            // flattened cup
+        c.fillStyle = 'rgba(226,220,206,0.55)';
+        c.beginPath(); c.ellipse(lx, ly, 3.4, 2.1, rnd() * 3, 0, 7); c.fill();
+      } else if (r < 0.55) {    // fast-food bag, gone grey
+        c.fillStyle = 'rgba(200,186,158,0.5)'; c.fillRect(lx, ly, 5 + rnd() * 4, 4 + rnd() * 3);
+      } else if (r < 0.78) {    // cigarette butts, always in pairs
+        c.fillStyle = 'rgba(232,224,206,0.6)';
+        c.fillRect(lx, ly, 2.6, 1.1); c.fillRect(lx + 2 + rnd() * 3, ly + 1 + rnd() * 2, 2.4, 1.1);
+        c.fillStyle = 'rgba(120,90,50,0.6)'; c.fillRect(lx + 1.8, ly, 0.9, 1.1);
+      } else if (r < 0.92) {    // scratcher, losing
+        c.fillStyle = 'rgba(190,160,90,0.5)'; c.fillRect(lx, ly, 5, 3);
+      } else {                  // bottle cap
+        c.fillStyle = 'rgba(150,60,50,0.55)';
+        c.beginPath(); c.arc(lx, ly, 1.3, 0, 7); c.fill();
+      }
+    });
+    litter(90, 301, 0, STRIP_Y.base + 34, W, 26);     // against the curb line
+    litter(40, 302, 860, 60, 260, 120);               // behind the buffet dumpster
+    litter(40, 303, 1440, 60, 280, 120);              // behind Game Barn — your route
+    litter(34, 304, 930, 1040, 240, 60);              // the bus shelter, obviously
+    litter(26, 305, 150, 560, 240, 90);               // the QwikStop pumps
+
     // gum constellation on sidewalks
     scatter(240, 61, (rnd) => {
       c.fillStyle = PAL.gum; c.globalAlpha = 0.5 + rnd() * 0.3;
@@ -941,9 +967,15 @@ export class Renderer {
     const a = ARCHETYPES[isPlayer ? 'average' : (e.arch || 'average')];
     const x = e.x, y = e.y;
     const t = this.t;
-    const phase = (isPlayer ? t * 9 : t * 7 + (e.id || 0)) % (Math.PI * 2);
+    // ART BIBLE: "characters get visibly worse through a run." A hurt toy LIMPS — one
+    // leg carries less, the whole body dips on the bad side. Reads at any zoom, unlike
+    // the 1.8px black-eye dot that was standing in for injury before.
+    const hurtF = isPlayer ? Math.max(0, 1 - e.hp / e.hpMax) : Math.max(0, 1 - e.hp / (e.hpMax0 || 46));
+    const limping = hurtF > 0.62;
+    const phase = (isPlayer ? t * (limping ? 6.4 : 9) : t * 7 + (e.id || 0)) % (Math.PI * 2);
     const moving = isPlayer ? e.moving : (e.state === 'walk' || e.state === 'flee' || e.state === 'chase' || e.state === 'aggro');
     const step = moving ? Math.sin(phase * 2) : 0;
+    const hobble = (limping && moving) ? Math.max(0, Math.sin(phase * 2)) * 3.2 : 0;
     const sway = e.drunk ? Math.sin(t * 2.2 + (e.id || 0)) * 3.4 : 0;
     const breathe = Math.sin(t * 1.6 + (e.id || 0)) * 0.7;
     const H = a.h, tw = a.tw;
@@ -975,10 +1007,11 @@ export class Renderer {
     }
 
     c.save();
-    c.translate(x + sway + weight * 0.5, y);
+    c.translate(x + sway + weight * 0.5, y + hobble);   // the dip: weight off the bad leg
     const hitK = (e.hitT || 0) > 0 ? Math.sin((e.hitT) * 40) * 2.5 : 0;
     c.translate(hitK, 0);
     const flipX = Math.cos(e.facing || 0) < 0 ? -1 : 1;
+    if (limping) c.rotate(flipX * 0.055);               // and a list to one side
 
     // legs — wide enough to read as legs, with shoes to plant them on the mat
     c.fillStyle = pants;
@@ -1090,8 +1123,42 @@ export class Renderer {
       c.fillStyle = 'rgba(150,195,255,0.30)';
       c.beginPath(); c.arc(hx, hy + 2, 5.5, 0, 7); c.fill(); c.restore();
     }
-    if (isPlayer && g.player.blackEye) { c.fillStyle = 'rgba(60,40,80,0.8)'; c.beginPath(); c.arc(hx + flipX * 2.4, hy - 1, 1.8, 0, 7); c.fill(); }
+    // The week shows on your face. A 1.8px dot did not survive contact with a real
+    // screen; this is a proper shiner with a split lip once you're properly wrecked.
+    if (isPlayer && g.player.blackEye) {
+      c.fillStyle = 'rgba(64,40,86,0.85)';
+      c.beginPath(); c.ellipse(hx + flipX * 2.6, hy - 0.5, 3.4, 2.6, 0, 0, 7); c.fill();
+      c.fillStyle = 'rgba(120,60,70,0.5)';
+      c.beginPath(); c.ellipse(hx + flipX * 2.6, hy + 1.6, 3.0, 1.3, 0, 0, 7); c.fill();
+    }
+    if (isPlayer && hurtF > 0.55) {   // split lip
+      c.fillStyle = 'rgba(150,40,34,0.8)';
+      c.fillRect(hx + flipX * 1.2, hy + 3.4, 3, 1.4);
+    }
     this._drawHat(c, e.hat || (isPlayer ? 'capBack' : 'none'), hx, hy, flipX, shirt);
+
+    // ── Smokers ───────────────────────────────────────────────────────────────
+    // View-only (keys off e.id parity, never sim rng). Half this town is outside at
+    // 1 a.m. holding a cigarette, and an ember is the single best night-read detail
+    // available: a moving orange pixel that says "a person is standing there."
+    if (!isPlayer && !e.cop && !e.ko && (e.id % 3 === 0) && this.g.block >= 2 && !e.static) {
+      const drag = (Math.sin(t * 0.55 + e.id) + 1) * 0.5;      // slow raise-to-mouth
+      const ex = flipX * (tw * 0.42 + 2), ey = armY + 11 - drag * 13;
+      c.strokeStyle = '#e8dcc3'; c.lineWidth = 1.4;
+      c.beginPath(); c.moveTo(ex, ey); c.lineTo(ex + flipX * 3.5, ey - 1); c.stroke();
+      const hot = 0.5 + drag * 0.5;
+      c.fillStyle = `rgba(255,${110 + drag * 60},60,${hot})`;
+      c.beginPath(); c.arc(ex + flipX * 4.4, ey - 1.2, 1.1 + drag * 0.5, 0, 7); c.fill();
+      c.save(); c.globalCompositeOperation = 'lighter';
+      c.fillStyle = `rgba(255,140,60,${0.10 + drag * 0.16})`;
+      c.beginPath(); c.arc(ex + flipX * 4.4, ey - 1.2, 4.5 + drag * 2.5, 0, 7); c.fill();
+      c.restore();
+      if (drag > 0.86) {   // exhale
+        c.fillStyle = 'rgba(210,208,200,0.10)';
+        c.beginPath(); c.ellipse(hx + flipX * 7, hy - 3, 5.5, 3, 0, 0, 7); c.fill();
+      }
+      c.lineWidth = 4;
+    }
     c.restore();
   }
 

@@ -58,12 +58,24 @@
   #hud-cash { font-family: 'Courier New', monospace; font-size: 24px; font-weight: bold; color: #b8d8a0;
     background: rgba(20,26,20,0.85); padding: 5px 13px; border-radius: 4px; border: 1px solid #2e4632;
     box-shadow: 0 4px 14px rgba(0,0,0,0.5); display: inline-block; transform: rotate(0.6deg); }
-  #hud-heat { position: absolute; top: 62px; right: 14px; display: flex; gap: 5px; }
-  .pip { font-family: 'Courier New', monospace; font-size: 10px; letter-spacing: 1px; padding: 3px 7px;
-    background: rgba(14,16,24,0.85); color: #4a4f60; border: 1px solid #262c3e; border-radius: 3px; }
-  .pip-on { color: #ffb347; border-color: #6e5222; background: rgba(40,30,10,0.9); }
-  .pip-on:last-child, .pip-hot { color: #ff6a5a; border-color: #7a2e22; animation: throb 0.9s infinite; }
-  @keyframes throb { 50% { background: rgba(80,20,10,0.9); } }
+  /* The heat readout is a police scanner: a dashboard box talking about you in cop
+     shorthand. Beats three abstract pips, and the copy already existed in data.js. */
+  #hud-heat { position: absolute; top: 62px; right: 14px; width: min(330px, 34vw);
+    background: rgba(12,14,20,0.9); border: 1px solid #2a3040; border-left: 3px solid #4a5265;
+    border-radius: 3px; padding: 5px 9px 6px; }
+  #hud-scan-head { display: flex; justify-content: space-between; align-items: center;
+    font-family: 'Courier New', monospace; font-size: 8.5px; letter-spacing: 1.5px; color: #5a6478; }
+  #hud-scan-bars { display: flex; gap: 2px; }
+  #hud-scan-bars i { width: 12px; height: 4px; background: #262c3e; border-radius: 1px; font-style: normal; }
+  #hud-scan-bars i.on { background: #ffb347; }
+  #hud-scan-bars i.hot { background: #ff6a5a; animation: throb 0.8s infinite; }
+  #hud-scan-line { font-family: 'Courier New', monospace; font-size: 11px; line-height: 1.35;
+    color: #93a4bd; margin-top: 3px; min-height: 30px; }
+  #hud-heat.st1 { border-left-color: #6e5222; } #hud-heat.st1 #hud-scan-line { color: #d6b98a; }
+  #hud-heat.st2 { border-left-color: #a86a2a; } #hud-heat.st2 #hud-scan-line { color: #ffc98a; }
+  #hud-heat.st3 { border-left-color: #ff6a5a; animation: throb 0.9s infinite; }
+  #hud-heat.st3 #hud-scan-line { color: #ff9a8a; }
+  @keyframes throb { 50% { background: rgba(80,20,10,0.55); } }
   #hud-vitals { position: absolute; bottom: 16px; left: 14px; width: 190px; }
   .vbar { height: 9px; background: rgba(10,12,18,0.85); border: 1px solid #33302a; border-radius: 4px;
     overflow: hidden; margin-top: 5px; }
@@ -197,7 +209,10 @@
     <div id="hud-clockbar"><div id="hud-clockbar-fill"></div></div>
   </div>
   <div id="hud-money"><div id="hud-cash">$61</div></div>
-  <div id="hud-heat"></div>
+  <div id="hud-heat">
+    <div id="hud-scan-head"><span>HPD BAND 4 · SCANNER</span><span id="hud-scan-bars"><i></i><i></i><i></i></span></div>
+    <div id="hud-scan-line">…quiet out there. 10-8, nothing to report…</div>
+  </div>
   <div id="hud-vitals">
     <div class="vbar"><div id="hud-hp-fill" style="width:100%"></div></div>
     <div class="vbar"><div id="hud-stam-fill" style="width:100%"></div></div>

@@ -210,8 +210,11 @@ function interactables() {
       if (n.key === 'peanut') add(n.x, n.y, 50, 'Talk to Peanut', () => { const r = g.act('talkPeanut'); renderer.bark('Peanut', r.text, n.x, n.y); });
       else if (n.key === 'chuck' || n.key === 'tanner') add(n.x, n.y, 44, `${n.name} (Alumni, loud)`, () => renderer.bark(n.name, uiPick(BARKS[n.key]), n.x, n.y));
     }
+    // a body on the ground is an opportunity now and a problem in about thirty seconds
+    const body = g.rollableNear();
+    if (body) add(body.x, body.y, 44, `Go through ${body.name ? body.name + "'s" : 'his'} pockets`, () => result(g.act('roll')));
     // pickups
-    for (const it of g.pickups) add(it.x, it.y, 34, `Pick up the ${it.kind}`, () => result(g.act === undefined ? null : (g.pickupNearby(), { ok: true })));
+    for (const it of g.pickups) add(it.x, it.y, 34, `Pick up the ${it.kind}`, () => { g.pickupNearby(); });
   } else if (g.room === 'qwikstop') {
     add(180, 240, 56, 'The Rip rack (ORIGINAL SCREAM, $6)', () => showChoice('Rip.', 'The can is screaming. +1 block today. Tomorrow files an invoice.', [
       { label: `Buy — $${T.ripCost}`, go: () => result(g.act('buy', 'rip')) },
@@ -279,6 +282,7 @@ function interactables() {
   return out;
 }
 
+let lastScanStage = -1, lastScanAt = 0;
 let nearest = null;
 function findNearest() {
   const p = game && game.player;
@@ -464,8 +468,14 @@ function updateHud() {
   $('hud-hp-fill').style.width = `${Math.max(0, p.hp / p.hpMax) * 100}%`;
   $('hud-stam-fill').style.width = `${(p.stamina / T.staminaMax) * 100}%`;
   const st = g.heatStage();
-  $('hud-heat').innerHTML = ['NOTICED', 'NAMED', 'WANTED'].map((n, i) =>
-    `<span class="pip ${st > i ? 'pip-on' : ''} ${i === 2 && st > 2 ? 'pip-hot' : ''}">${n}</span>`).join('');
+  $('hud-heat').className = 'st' + st;
+  $('hud-scan-bars').innerHTML = [0, 1, 2].map(i =>
+    `<i class="${st > i ? (st === 3 ? 'hot' : 'on') : ''}"></i>`).join('');
+  // the scanner re-chatters on a stage change, then idles on its own slow rotation
+  if (st !== lastScanStage || performance.now() - lastScanAt > 11000) {
+    lastScanStage = st; lastScanAt = performance.now();
+    $('hud-scan-line').textContent = uiPick(BARKS.scanner[st]);
+  }
   const chips = [];
   if (p.held) chips.push(`✊ ${p.held.kind}`);
   if (p.carryCrate) chips.push('📦 CRATE');
@@ -579,7 +589,11 @@ setInterval(() => {
 }, 200);
 
 function resize() {
-  const w = Math.min(window.innerWidth, 1500), h = window.innerHeight;
+  // ⚠️ Clamp to a real minimum. A collapsed/hidden pane reports innerHeight 0, the
+  // canvases go to 0×0, and the lighting pass throws on drawImage("width or height
+  // of 0") — which kills the render loop for good. Never trust the viewport.
+  const w = Math.max(480, Math.min(window.innerWidth || 1280, 1500));
+  const h = Math.max(320, window.innerHeight || 720);
   if (renderer) renderer.resize(w, h);
   $('cv').style.width = w + 'px'; $('cv').style.height = h + 'px';
 }

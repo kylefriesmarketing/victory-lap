@@ -155,11 +155,17 @@ export class Game {
       skin: def.skin || (opool.skins ? this.pick(opool.skins) : '#c99b74'),
       hat: def.hat || (this.chance(0.5) ? this.pick(['cap', 'capBack', 'trucker', 'beanie', 'none']) : 'none'),
       x: def.x, y: def.y, hx: def.x, hy: def.y, vx: 0, vy: 0, facing: this.rr(0, 6.28),
-      hp: def.hp || 46, state: 'idle', stateT: this.rr(0, 3), atkT: 0, hitT: 0, hitDir: 0,
+      hp: def.hp || 46, hpMax0: def.hp || 46,
+      state: 'idle', stateT: this.rr(0, 3), atkT: 0, hitT: 0, hitDir: 0,
       drunk: def.drunk || false, filmer: false, cop: !!def.cop, brawler: !!def.brawler,
       ko: false, koT: 0, barkT: this.rr(4, 14), pool: def.pool || 'townie_idle',
       wpt: 0, route: def.route || null, static: !!def.static, room: def.room || 'ext',
       tourist: okey.startsWith('tourist'),
+      // everyone in Hopewell is carrying something, and the amount is characterisation
+      wallet: this.ri(...(T.rollCash[
+        def.brawler ? 'alumni' : okey.startsWith('tourist') ? 'tourist' : def.drunk ? 'drunk' : 'townie'
+      ])),
+      robbed: false, grudge: false,
     };
   }
 
@@ -656,6 +662,37 @@ export class Game {
     else this.fx('whiff', p.x + Math.cos(p.windDir) * 26, p.y + Math.sin(p.windDir) * 26, { ang: p.windDir });
   }
 
+  // ── Rolling a body ────────────────────────────────────────────────────────
+  // The payoff combat never had. It's also the meanest thing in the prototype, so it
+  // bills you twice: heat now (robbery, not a scuffle) and a grudge that gets up later.
+  rollableNear() {
+    const p = this.player;
+    let best = null, bd = 46;
+    for (const n of this.npcs) {
+      if (!n.ko || n.robbed || n.room !== this.room || n.cop) continue;
+      const d = Math.hypot(n.x - p.x, n.y - p.y);
+      if (d < bd) { bd = d; best = n; }
+    }
+    return best;
+  }
+
+  rollBody() {
+    const n = this.rollableNear();
+    if (!n) return { ok: false };
+    n.robbed = true;
+    const take = n.wallet;
+    if (take > 0) this._earn(take);
+    this.stats.rolled = (this.stats.rolled || 0) + 1;
+    this.stats.rolledCash = (this.stats.rolledCash || 0) + take;
+    this.addHeat(T.rollHeat, 0, 'robbing a man on the ground');
+    if (this.chance(T.grudgeChance)) n.grudge = true;      // he will remember this
+    this.sfx('pickup');
+    const line = take >= 20 ? this.pick(BARKS.rolled_fat)
+               : take > 0   ? this.pick(BARKS.rolled)
+               :              this.pick(BARKS.rolled_empty);
+    return { ok: true, msg: take > 0 ? `+$${take}. ${line}` : line };
+  }
+
   // Shove: no damage, all consequence. The bible's stumbling drunk, and the reason
   // T.shoveForce existed for a day without a single caller.
   shove() {
@@ -831,6 +868,7 @@ export class Game {
       fence: () => this.fenceHaul(!!arg), hold: () => this.holdForBuyer(), sundayBuyer: () => this.sundayBuyer(),
       walkOut: () => this.walkOut(), talkPeanut: () => this.talkPeanut(),
       shove: () => this.shove(),
+      roll: () => this.rollBody(),
       shiftAuto: () => this.doShiftAuto(arg || 0), endBlock: () => { this.endBlock(arg || 'waited'); return { ok: true }; },
       brawlAuto: () => this.brawlAuto(arg || 2), heistTripAuto: () => this.heistTripAuto(),
       exitShopCheck: () => { this.exitShopCheck(); return { ok: true }; },
@@ -972,7 +1010,25 @@ export class Game {
     if (n.stunT) { n.stunT = Math.max(0, n.stunT - dt); return; }
     n.x += n.vx * dt; n.y += n.vy * dt;
     n.vx *= Math.pow(0.001, dt); n.vy *= Math.pow(0.001, dt);
-    if (n.ko) { n.koT += dt; return; }
+    if (n.ko) {
+      n.koT += dt;
+      // Hopewell does not leave bodies lying in the lot all night. They get up, and
+      // the ones you searched get up with a specific opinion about you.
+      const wake = n.robbed ? T.wakeRobbedAfterS : T.wakeAfterS;
+      if (n.koT > wake && !n.static) {
+        n.ko = false; n.koT = 0; n.hp = Math.max(8, Math.round(n.hpMax0 * T.wakeHpFrac));
+        n.wallet = 0;                       // already picked clean
+        if (n.grudge) {
+          n.state = 'aggro'; n.brawler = true; n.persistent = true;
+          this.say(n.name || 'Townie', this.pick(BARKS.woke_grudge), n.x, n.y);
+          this.sfx('yell', n.x, n.y);
+        } else {
+          n.state = this.chance(0.5) ? 'flee' : 'idle';
+          this.say(n.name || 'Townie', this.pick(BARKS.woke), n.x, n.y);
+        }
+      }
+      return;
+    }
     const dToP = Math.hypot(p.x - n.x, p.y - n.y);
 
     if (n.cop) return this._updateCop(n, dt, dToP);
