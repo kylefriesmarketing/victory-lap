@@ -75,8 +75,8 @@ function startRun() {
     renderer.bark(null, BARKS.greet_run[meta.runs % BARKS.greet_run.length], game.player.x + 60, game.player.y - 20);
   }, 2200);
   if (meta.runs === 0) setTimeout(() => {
-    feed('Move: WASD • Sprint: SHIFT • Talk/use: E • Swing: SPACE • Throw/drop: Q • Scheme: TAB', 'ok');
-    feed('Rent is theoretical. The week is not. Find Peanut when the sun drops.', 'scheme');
+    feed('Move: WASD • Sprint: SHIFT • Talk/use: E • Swing: SPACE • Shove: F • Throw/drop: Q • Scheme: TAB', 'ok');
+    feed('Rent is theoretical. The week is not. Find Peanut when the sun drops, and don\'t lend anybody shit.', 'scheme');
   }, 900);
   // what you carried over from last time — the town forgot; you didn't
   if (game.knewWindow || game.knewDrop) setTimeout(() => {
@@ -86,19 +86,19 @@ function startRun() {
 }
 
 function weatherLine(w) {
-  return { clear: 'Clear. The sky owes nobody here anything.',
-           overcast: 'Overcast, like a lid on a pot.',
-           rain: 'Rain. The cops stay in the car. Remember that.',
-           heatwave: 'Heatwave. Everyone\'s outside. Every window\'s open.' }[w] || '';
+  return { clear: 'Clear. The sky owes nobody here a damn thing.',
+           overcast: 'Overcast, like a lid on a pot somebody forgot they were boiling.',
+           rain: 'Rain. The cops stay in the car. Remember that, and get wet accordingly.',
+           heatwave: 'Heatwave. Everybody\'s outside, every window\'s open, and everyone\'s a little more naked than the law prefers.' }[w] || '';
 }
 
 function onBlock() {
   ambience();
   const lines = {
-    1: 'AFTERNOON — the town at its least romantic.',
-    2: 'EVENING — the neon wakes up. So does everyone worth talking to.',
-    3: 'LATE — the hour of bad ideas. Yours are waiting.',
-    4: 'BONUS BLOCK — the Rip is writing checks your Tuesday will cash.',
+    1: 'AFTERNOON — the town with its makeup off.',
+    2: 'EVENING — the neon wakes up. So does everybody worth avoiding.',
+    3: 'LATE — the hour of bad ideas. Yours are already stretching.',
+    4: 'BONUS BLOCK — the Rip is writing checks your Tuesday will bounce.',
   };
   toast(game.blockName, lines[Math.min(game.block, 4)] || '', 2.2);
 }
@@ -208,8 +208,8 @@ function interactables() {
     if (!g.dogCalm) add(600, 1215, 60, p.inv.jerky > 0 ? 'Offer Buster the jerky (a treaty)' : 'Buster (he is narrating your position)', () => result(g.act('feedDog')));
     else add(600, 1215, 60, 'Buster (an ally)', () => renderer.bark('Buster', BARKS.buster[2], 600, 1195));
     // bench + bus
-    add(1160, 1062, 46, 'The bench (kill the rest of the block)', () => showChoice('Kill time on the bench?', 'The rest of this block goes nowhere, on purpose. Heals a little.', [
-      { label: 'Sit. Watch the street.', go: () => { p.hp = Math.min(p.hpMax, p.hp + T.benchRestHeal); result(g.act('endBlock', 'bench')); } }]));
+    add(1160, 1062, 46, 'The bench (kill the rest of the block)', () => showChoice('Kill time on the bench?', 'The rest of this block goes nowhere, on purpose. Heals a little. BIG DON\'s laminated face watches you the whole time.', [
+      { label: 'Sit. Watch the street. Become the street.', go: () => { p.hp = Math.min(p.hpMax, p.hp + T.benchRestHeal); result(g.act('endBlock', 'bench')); } }]));
     if (g.scheme.fence && g.block === 0) add(1035, 1082, 56, 'CATCH THE 6 A.M. — end it clean', () => showChoice('Walk?', 'Cash out, bank it, let the town wonder. That\'s the win.', [
       { label: 'Get on the bus.', go: () => { sfx.play('bus'); result(g.act('walkOut')); } }]));
     else add(1035, 1082, 56, 'Bus schedule (a work of fiction)', () => feed('The 6 a.m. runs when it wants. It\'ll run for a winner.', 'ok'));
@@ -225,7 +225,7 @@ function interactables() {
     // pickups
     for (const it of g.pickups) add(it.x, it.y, 34, `Pick up the ${it.kind}`, () => { g.pickupNearby(); });
   } else if (g.room === 'qwikstop') {
-    add(180, 240, 56, 'The Rip rack (ORIGINAL SCREAM, $6)', () => showChoice('Rip.', 'The can is screaming. +1 block today. Tomorrow files an invoice.', [
+    add(180, 240, 56, 'The Rip rack (ORIGINAL SCREAM, $6)', () => showChoice('Rip.', 'The can is screaming. The can knows something. +1 block today; tomorrow bills you like an ex with a lawyer.', [
       { label: `Buy — $${T.ripCost}`, go: () => result(g.act('buy', 'rip')) },
       { label: 'Pocket it', go: () => result(g.act('shoplift', 'rip')) }]));
     add(345, 240, 50, 'Jerky ($3, dog-grade)', () => showChoice('Gas-station jerky.', 'Technically food. Definitely diplomacy.', [
@@ -309,8 +309,8 @@ function interactables() {
     ]));
     add(380, IT.h - 24, 60, 'Out to the gravel', () => result(g.act('leave')));
   } else if (g.room === 'garage') {
-    add(120, 95, 60, 'The cot (sleep — ends the day)', () => showChoice('Sleep?', 'The rest of today goes with it. Heat cools double here — the Flats don\'t talk to police.', [
-      { label: 'Sleep. Let the town cool off.', go: () => result(g.act('sleep')) }]));
+    add(120, 95, 60, 'The cot (sleep — ends the day)', () => showChoice('Sleep?', 'The rest of today goes with it. Heat cools double here — the Flats wouldn\'t give a cop directions to a fire.', [
+      { label: 'Sleep. Let the town forget your face a little.', go: () => result(g.act('sleep')) }]));
     add(335, 95, 54, 'The beer fridge (Bev\'s. Ask first.)', () => feed(`Inside: three beers, a film canister of quarters, and the rent jar. The jar notices you.`, 'warn'));
     add(560, 100, 60, 'The house door', () => renderer.bark('Bev',
       uiPick(g.scheme.job ? BARKS.bev_after : BARKS.bev), 560, 82));
@@ -399,8 +399,8 @@ function regPaint() {
 function regSubmit() {
   if (!reg || reg.submitted) return;
   reg.submitted = true;
-  if (reg.tray === reg.target) { reg.perfect++; sfx.play('register'); flashReg('EXACT. The drawer sings.', 'ok'); }
-  else { sfx.play('yell'); flashReg(reg.tray > reg.target ? 'Too much. The drawer weeps.' : 'Short. The customer counts. Loudly.', 'bad'); }
+  if (reg.tray === reg.target) { reg.perfect++; sfx.play('register'); flashReg('EXACT. The drawer sings its one sad note.', 'ok'); }
+  else { sfx.play('yell'); flashReg(reg.tray > reg.target ? 'Too much. You just tipped a customer, dumbass.' : 'Short. He counts it twice, out loud, like a prick.', 'bad'); }
   setTimeout(regOrder, 700);
 }
 
@@ -413,7 +413,7 @@ function regTick(dt) {
     // running out the clock used to be the optimal play — it cost a $3 tip and let you
     // farm the skim. Now the drawer runs late and Dale counts it.
     reg.submitted = true; reg.caught++;
-    flashReg('The line backs up. Dale counts the drawer himself.', 'bad');
+    flashReg('The line backs up. Somebody says "the hell is this, the DMV?" Dale counts the drawer himself.', 'bad');
     sfx.play('yell'); regPaint();
     if ((game.player.strikes + reg.caught) >= T.skimStrikeLimit) return regEnd();
     setTimeout(regOrder, 700);

@@ -368,7 +368,7 @@ export class Game {
       this.addHeat(T.heatCrime.shoplift, 1, 'shoplifting');
       this.alert('The clerk absolutely saw that. The scanner hears about you within the minute.', 'bad');
       this.sfx('yell');
-    } else this.alert('Out the door. Nobody looked up from their phone. God bless the phone.', 'ok');
+    } else this.alert('Out the door. Nobody looked up from their phone. God bless the phone, the great American accomplice.', 'ok');
     p.stolenPending = null;
   }
 
@@ -394,8 +394,8 @@ export class Game {
     const p = this.player;
     if (p.inv.rip <= 0) return { ok: false, msg: 'No Rip on you. The QwikStop cooler hums your name.' };
     p.inv.rip--; p.ripToday++; p.ripUses++; this.stats.rip++;
-    if (p.ripToday === 1) { this.bonusBlocks += T.ripBonusBlocks; this.alert('The Rip hits. The day grows a fifth block it did not earn. Tomorrow knows.', 'ok'); }
-    else this.alert('More Rip. Your heartbeat is now audible to others.', 'warn');
+    if (p.ripToday === 1) { this.bonusBlocks += T.ripBonusBlocks; this.alert('The Rip hits like a dumpster lid. The day grows a fifth block it did not earn. Tomorrow knows, and tomorrow is petty.', 'ok'); }
+    else this.alert('More Rip. Your heartbeat is now audible to others. A dog two yards over is answering it.', 'warn');
     if (p.ripUses >= T.addictionWarm) this.alert(`Addiction meter: warming (${p.ripUses} this week). The buff is quietly filing to become a requirement.`, 'warn');
     this.sfx('crack');
     return { ok: true };
@@ -602,8 +602,8 @@ export class Game {
   }
 
   walkOut() {
-    if (!this.scheme.fence) return { ok: false, msg: 'The bus costs nothing. Leaving with nothing costs everything. Finish it first.' };
-    if (this.block !== 0) return { ok: false, msg: 'The 6 a.m. is a morning creature.' };
+    if (!this.scheme.fence) return { ok: false, msg: 'The bus costs nothing. Leaving with nothing costs everything. Finish the damn job first.' };
+    if (this.block !== 0) return { ok: false, msg: 'The 6 a.m. is a morning creature. It does not do encores and neither does the driver.' };
     return this.endGame('WALKING');
   }
 

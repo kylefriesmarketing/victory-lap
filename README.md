@@ -92,6 +92,19 @@ Uses the portable Node at `C:\Users\kylef\tools\node` (not on PATH).
   an adult, intimacy is always fade-to-black, nothing explicit is ever rendered, and
   the vulgarity serves jokes — never slurs, never cruelty without a punchline.
 
+- **M1.4 — the Fable pass: crudeness lands everywhere** ✅ (2026-08-06)
+  Full writing sweep with the vulgarity treated as the design doc treats it — load-
+  bearing, and not sandboxed to one building. The SYSTEM VOICE itself talks like
+  Hopewell now: block toasts, weather lines, choice dialogs, register flashes, scheme
+  hints ("they weigh what a retirement weighs"), the title screen ("Sign here,
+  dumbass. With love."), the menu (The Divorce Special — double everything). Bev went
+  crude-grandmother ("I've buried two husbands and a Buick"), Brill's threats got
+  domestic ("I'll come to the house. I'll ACCEPT LEMONADE."), and the Foxhole staff
+  got filthier ON THEIR OWN TERMS — crude and in charge is the register, never
+  diminished (Cherry: "We have a plaque."). 42 pools, 213 lines, 0 malformed.
+  The doc's fence is untouched and permanent: adults only, fade-to-black, no slurs,
+  no cruelty without a punchline. Crude is the water table, not a district.
+
 ## What's deliberately NOT in Phase 1 (per the roadmap — don't "fix" these)
 
 - No Hopeless Tech, classes, GPA, or majors (Phase 2).

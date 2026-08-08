@@ -390,13 +390,15 @@ export const BARKS = {
     "Oh, it's like that? It's like that. — It's not like that, I'm leaving.",
   ],
   cop_noticed: [
-    "There he is. You know I know your face, right?",
-    "Mm. Keeping a little list today, bud.",
+    "There he is. You know I know your face, right? I know your whole damn FACE.",
+    "Mm. Keeping a little list today, bud. You're the list.",
+    "I pulled your grandpa outta the lake in '02. Try not to make it a family tradition.",
   ],
   cop_named: [
-    "Hey! Heyyy. Tell Bev I said hi. I WILL be mentioning this to her.",
-    "You again. I'm not chasing you, man, I'm telling your grandmother.",
-    "Saw your little show earlier. Bev raise you like that? She did not.",
+    "Hey! Heyyy. Tell Bev I said hi. I WILL be mentioning this shit to her.",
+    "You again. I'm not chasing you, man. I'm forty-one years old and I ate at the buffet. I'm telling your grandmother.",
+    "Saw your little show earlier. Bev raise you like that? She did not. She raised you with a wooden spoon and SHAME.",
+    "Keep it up and I'll do the thing you hate. I'll come to the house. I'll sit on the porch. I'll ACCEPT LEMONADE.",
   ],
   cop_wanted: [
     "STOP— goddammit, I JUST ATE—",
@@ -434,6 +436,9 @@ export const BARKS = {
     "You break the streak on my perfect drawer and I will cry in the walk-in again. Don't test me.",
     "I got a degree. Business admin. It's in the office, under the fry oil invoices, where it belongs.",
     "Twelve years I been here. Twelve. My wife calls it a career. She says it mean.",
+    "I have cried in that walk-in so many times there is a ME-shaped cold spot. Health code says I can't tell you which shelf.",
+    "Corporate sent a poster that says HUSTLE. I hung it over the grease trap. Felt correct.",
+    "You smell that? That's forty gallons of oil that legally should've retired in March. Same as me. We soldier on.",
   ],
   gary: [
     "Everything's buy-sell-trade except the back room. Back room's the retirement plan.",
@@ -449,12 +454,18 @@ export const BARKS = {
     "I'm not asking where the money's from. I'm saying the JAR is for rent, and the jar NOTICES.",
     "Your grandfather drank himself stupid in that same chair. Sit somewhere else. Humor me.",
     "You're not a bad kid. You're a dumb kid with good hands. That's fixable, barely.",
+    "I've buried two husbands and a Buick, sweetheart. You think YOU'RE gonna be the thing that breaks me?",
+    "Watch your mouth. ...Not for me. I've heard worse at church. For your mother, on the phone, on Sunday.",
+    "I know what a hangover walks like. Yours walks like your grandfather's, and his killed him, so eat the eggs.",
+    "Brill came by. I gave him lemonade and nothing else. Fifty years I've been giving that family lemonade and nothing else.",
   ],
   roxy: [
     "Window one: checks, loans. Window two: 'goods.' Pick a window, this glass ain't got all day.",
     "Twenty percent a week. It's not a trick, sweetheart, it's just math you're gonna hate later.",
     "I've been robbed twice and proposed to four times through this glass. All six, same damn energy.",
     "Everybody's got a story about why they're short. I got a drawer full of 'em and none of 'em spend.",
+    "A man flashed me through this glass once. Bulletproof, honey. It's rated for a lot more than THAT.",
+    "You know what the kingdom part is? I outlast everybody. That's the whole royal secret. I'm still here at close.",
   ],
   roxy_fence: [
     "Where'd these come from? Don't answer. That was a test and you passed.",
@@ -462,13 +473,16 @@ export const BARKS = {
   ],
   earl: [
     "Everything must go. Including me. ESPECIALLY me.",
-    "Crowbar's twenty-two. You want a receipt, or is this a no-receipt kind of purchase?",
+    "Crowbar's twenty-two. You want a receipt, or is this a no-receipt kind of purchase? Don't answer with your face like that.",
     "Forty-one years my family had this place. Ends with me. No kids, and the ones I got sense enough not to saddle with it.",
+    "A Fairview fella measured my storefront with a laser. A LASER. I measured his ass with a broom on the way out.",
+    "PVC's aisle three. Whatever you're building, I don't wanna know, and whatever it is, use primer, you animal.",
   ],
   wanda: [
-    "Buffet's nine dollars. Plate rules: what fits, fits. No towers. I have SEEN towers.",
+    "Buffet's nine dollars. Plate rules: what fits, fits. No towers. I have SEEN towers. I have PHOTOGRAPHED towers.",
     "Third name was the best name. 'Lucky Dragon Palace.' The fire disagreed.",
     "Health inspector's a nephew of mine. Don't make that face, everybody's a nephew of somebody here.",
+    "The fish? The fish has seen two fires and a divorce. The fish stays. Ask about the fish again and YOU go.",
   ],
   chuck: [
     "LAKE THIS WEEKEND. Boys' trip. Tanner's bringing the speaker. The BIG bastard.",
@@ -498,8 +512,10 @@ export const BARKS = {
     "I own the building, the liquor licence, and everybody's secrets. Guess which one pays.",
     "You want to know something? Everything in here has a price and information's the dearest.",
     "Half this county's cried at this bar. The OTHER half's the reason.",
-    "Fairview came in here too. Offered me a number. I laughed so hard I had to sit down.",
+    "Fairview came in here too. Offered me a number. I laughed so hard I pissed off a man three stools down just by existing.",
     "Rule of the house: you don't touch, you don't photograph, and you don't ask Cherry what she's studying — she WILL tell you, at length.",
+    "I've cut off a mayor, a pastor, and one very surprised state trooper. This bar is the only equal ground in the county.",
+    "My third husband's under a commemorative coaster somewhere in here. His ashes. Relax. Mostly his ashes.",
   ],
   dee_info: [
     "Gary Loomis. Thursday nights he does the drop himself, nine o'clock, no alarm since '19. He told me that HIMSELF, drunk, at this bar, twice.",
@@ -513,6 +529,8 @@ export const BARKS = {
     "Tip the DJ too. He's got a kid and a Corolla with one door that opens.",
     "No, I don't want a drink. I've watched what happens to people in here who want a drink.",
     "Ask me about the clavicle. Go on. ASK me about the clavicle.",
+    "A man told me last week I was 'too smart for this.' Honey, I made four hundred dollars while you were deciding that.",
+    "I've been groped exactly once in this room. Moose threw the guy so far he technically left via the roof. We have a plaque.",
   ],
   sable: [
     "Nineteen years on this floor. My knee tells the weather and it's never wrong and it's never good news.",
@@ -520,6 +538,7 @@ export const BARKS = {
     "Everybody in this town's got a plan to leave. I had one too. It's around here somewhere.",
     "You're Bev's grandkid, ain't you? Sit up straight. She'd want that.",
     "Money's money, sugar. It don't care where it's been and neither do I, but MY knees do.",
+    "The pole's older than you and holds up better under pressure. Think about that on your way home.",
   ],
   fox_patron: [
     "I'm not here for THAT, I'm here 'cause it's the only place with cold beer past eleven. ...And also for that.",
@@ -569,6 +588,8 @@ export const BARKS = {
     "Back again? It's Tuesday somewhere.",
     "Look who the week spat back up.",
     "You know what they say. Nothing sticks in Hopewell. Especially you.",
+    "Heard they let you go. They always let you go. This town's catch-and-release, baby.",
+    "You look like shit, and I say that with love, and also because it's true.",
   ],
   // Fires only after the job. The town has to know something happened, or the
   // heart the design promises isn't in the build.
@@ -596,6 +617,8 @@ export const BARKS = {
     "You're awake! Great. So like I was saying — it's a pyramid, sure, but it's MY level of the pyramid—",
     "They got me in for the gallbladder. Third time. I keep growing 'em back. Doctors HATE me, and I mean that literally—",
     "You scream in your sleep. Anyway, do you follow the county commissioner race, because buddy—",
+    "They took my appendix Tuesday and I feel like they took somethin' ELSE, 'cause I've been real calm about my ex and that ain't me—",
+    "I've seen your ass. Gown came loose when they wheeled you in. Wasn't looking. Small room. We're past it. ANYWAY—",
   ],
 };
 
@@ -608,12 +631,12 @@ export const SCHEME = {
   title: 'THE GAME BARN JOB',
   pitch: "A sealed case of '97 FunStation consoles in Gary's back room. Gary's waiting on a price that died with the mall. Fairview's waiting on Gary. Somebody should get paid who actually lives here.",
   stages: [
-    { id: 'hear',   label: 'Hear about it',            hint: 'Peanut holds court outside the QwikStop, evenings and late.' },
-    { id: 'case',   label: 'Case the back alley',      hint: 'Behind the strip. Find the way in that isn’t a door.' },
-    { id: 'tools',  label: 'Get a crowbar',            hint: 'Mile Hardware sells one. Other arrangements exist.' },
-    { id: 'window', label: 'Learn the drop night',     hint: 'When does the store sit empty? Somebody always knows.' },
-    { id: 'job',    label: 'Do the job (3 crates)',    hint: 'In through the window. Crates to the beater. One at a time — they’re heavy.' },
-    { id: 'fence',  label: 'Fence the haul',           hint: 'Ca$h Kingdom, window 2. Or hold for the Sunday buyer, if your nerve holds.' },
+    { id: 'hear',   label: 'Hear about it',            hint: 'Peanut runs his mouth outside the QwikStop after dark. Free, if you can stand him. Dee charges, but Dee\'s faster.' },
+    { id: 'case',   label: 'Case the back alley',      hint: 'Behind the strip. Find the way in that isn\'t a door. Bring your whole ass — the dumpster smells like the fall of Rome.' },
+    { id: 'tools',  label: 'Get a crowbar',            hint: 'Mile Hardware sells one, twenty-two bucks. Other, cheaper, stupider arrangements exist.' },
+    { id: 'window', label: 'Learn the drop night',     hint: 'When does the store sit there with its ass out? Somebody always knows. Somebody always tells.' },
+    { id: 'job',    label: 'Do the job (3 crates)',    hint: 'In through the window. Crates to the beater. One at a time — they weigh what a retirement weighs.' },
+    { id: 'fence',  label: 'Fence the haul',           hint: 'Ca$h Kingdom, window 2. Or hold for the Sunday buyer, if your nerve holds and nobody visits your trunk.' },
   ],
 };
 
@@ -672,13 +695,14 @@ export const WEATHER_KINDS = ['clear', 'overcast', 'rain', 'heatwave'];
 // Register minigame content — the Wing Barn menu
 export const MENU = [
   { item: 'Barnstormer 8pc',   price: 8.99 },
-  { item: 'Barnstormer 20pc',  price: 17.49 },
+  { item: 'Barnstormer 20pc (feeds 4, serves 1)', price: 17.49 },
   { item: 'Rip-Glazed Tenders',price: 6.79 },
-  { item: 'Barn Fries',        price: 3.29 },
-  { item: 'Ranch (extra)',     price: 0.60 },
-  { item: 'Fountain Drink',    price: 2.19 },
+  { item: 'Barn Fries (bottom-of-bag guarantee)', price: 3.29 },
+  { item: 'Ranch (mandatory)', price: 0.60 },
+  { item: 'Flat Fountain Drink', price: 2.19 },
   { item: 'Coleslaw Nobody Wanted', price: 1.99 },
   { item: 'The Loyalty Combo', price: 11.99 },
+  { item: 'The Divorce Special (double everything)', price: 14.49 },
 ];
 
 export const RIP = {
