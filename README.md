@@ -54,6 +54,24 @@ Uses the portable Node at `C:\Users\kylef\tools\node` (not on PATH).
   `Math.random()` "flickers" became time-driven. The town talks about the heist
   afterward, and every ending gained a coda that knows what your week actually was.
 
+- **M1.2 — voice, pockets, and street life** ✅ (2026-08-06)
+  **Vulgarity pass**: the shipped dialogue was PG-13 against a design doc that calls
+  the vulgarity "load-bearing." Rewritten to the doc's own standard — R-rated in
+  service of the joke, never slurs, never cruelty without a punchline — now 155 lines,
+  with a second beat of pathos under the profanity for Earl, Dale, Gary and Bev.
+  **Rolling bodies**: combat finally pays. Everyone carries a wallet sized to
+  characterise them (tourists $22–55, townies $3–11); robbing a downed man costs heat
+  and buys a 65% grudge. Bodies get back up (26s, 38s if searched) and the robbed ones
+  get up angry, turn brawler, go persistent, and hunt you. **Scanner HUD**: the heat
+  readout is now the police band talking about you in cop shorthand, four stages of
+  chatter, replacing three abstract pips. **Visible injury**: real shiner + split lip,
+  and a hurt player limps (dip, list, slowed gait). **Street life**: cigarette embers
+  on night idlers, and litter drifted against the curb, both dumpsters, the bus
+  shelter and the pumps.
+  ⚠️ Bugfix worth remembering: `resize()` clamps to a minimum now — a collapsed
+  viewport reports `innerHeight` 0, the canvases go 0×0, and the lighting pass throws
+  on `drawImage`, permanently killing the render loop.
+
 ## What's deliberately NOT in Phase 1 (per the roadmap — don't "fix" these)
 
 - No Hopeless Tech, classes, GPA, or majors (Phase 2).
