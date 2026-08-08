@@ -72,6 +72,26 @@ Uses the portable Node at `C:\Users\kylef\tools\node` (not on PATH).
   viewport reports `innerHeight` 0, the canvases go 0×0, and the lighting pass throws
   on `drawImage`, permanently killing the render loop.
 
+- **M1.3 — THE FOXHOLE** ✅ (2026-08-06)
+  A windowless cinder-block club on gravel at the southeast edge of the Mile, open
+  evening and late. **Not a joke sign — a real location with real mechanics**: $8
+  cover at the door (Moose does not negotiate), $7 beers, a $5 tip economy that buys
+  standing (3 tips = a discount and a nod), the **best heat sanctuary in the game**
+  (−24 for a block; nobody in this building has ever helped a police officer), a
+  fade-to-black back room that burns a block and patches you up, and **Dee behind the
+  bar sells all three scheme intel stages** — an instant, expensive second route to
+  what Peanut gives away slowly. That last one is the point: the club is a genuine
+  strategic alternative, not set dressing.
+  Cast written as people with jobs: Moose (four hundred pages into a submarine book),
+  Dee (owns the building, the licence, and everybody's secrets), Cherry (nursing
+  school; will tell you about the clavicle), Sable (nineteen years, one knee that
+  forecasts weather). **The crudeness is aimed at the clientele, never the staff** —
+  that's the Rockstar discipline and it's funnier.
+
+  ⚠️ CONTENT LINES, non-negotiable, straight from the design doc: every character is
+  an adult, intimacy is always fade-to-black, nothing explicit is ever rendered, and
+  the vulgarity serves jokes — never slurs, never cruelty without a punchline.
+
 ## What's deliberately NOT in Phase 1 (per the roadmap — don't "fix" these)
 
 - No Hopeless Tech, classes, GPA, or majors (Phase 2).

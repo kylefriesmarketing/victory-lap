@@ -3,12 +3,12 @@
 // All sim randomness goes through this.rng (seeded LCG). View code may use Math.random.
 
 import {
-  TUNING as T, WEAPONS, WORLD, BUILDINGS, ALLEY_GAPS, STRIP_Y, EXTERIOR_PROPS, GARAGE,
+  TUNING as T, WEAPONS, WORLD, BUILDINGS, ALLEY_GAPS, STRIP_Y, EXTERIOR_PROPS, GARAGE, FOXHOLE,
   WEAPON_SPAWNS, INTERIORS, ARCHETYPES, OUTFITS, NAMED, POPULATION, SPOTS,
   BARKS, SCHEME, ENDINGS, BLOCK_NAMES, DAY_NAMES, WEATHER_KINDS, MENU, RIP,
 } from './data.js';
 
-export { T, WEAPONS, WORLD, BUILDINGS, ALLEY_GAPS, STRIP_Y, EXTERIOR_PROPS, GARAGE, INTERIORS,
+export { T, WEAPONS, WORLD, BUILDINGS, ALLEY_GAPS, STRIP_Y, EXTERIOR_PROPS, GARAGE, FOXHOLE, INTERIORS,
          ARCHETYPES, OUTFITS, NAMED, BARKS, SCHEME, ENDINGS, BLOCK_NAMES, DAY_NAMES, MENU, RIP };
 
 let _eid = 1;
@@ -45,6 +45,7 @@ export class Game {
     this.knewDrop = !!this.meta.knows.drop;
     if (this.knewWindow) { this.scheme.hear = true; this.scheme.case = true; }
     if (this.knewDrop) this.scheme.window = true;
+    this.fox = { paid: -1, visits: 0, drinks: 0, tips: 0, bought: 0, vip: -1 };
     this.npcs = []; this.pickups = []; this.projectiles = [];
     this.stats = { punches: 0, koGiven: 0, koTaken: 0, skimmed: 0, shifts: 0, rip: 0,
                    crimesSeen: 0, cuffsEscaped: 0, spent: 0, earned: 0 };
@@ -92,6 +93,7 @@ export class Game {
       // strip buildings (minus alley gaps handled by per-building rects)
       for (const b of BUILDINGS) s.push({ x: b.x, y: STRIP_Y.roofTop, w: b.w, h: STRIP_Y.base - STRIP_Y.roofTop, door: b.key });
       s.push({ x: GARAGE.x, y: GARAGE.y, w: GARAGE.w, h: GARAGE.h, door: 'garage' });
+      s.push({ x: FOXHOLE.x, y: FOXHOLE.y, w: FOXHOLE.w, h: FOXHOLE.h, door: 'foxhole' });
       for (const p of EXTERIOR_PROPS) {
         if (p.kind === 'pumps') s.push({ x: p.x, y: p.y, w: p.w, h: p.h });
         if (p.kind === 'dumpster') s.push({ x: p.x, y: p.y, w: p.w, h: p.h });
@@ -114,6 +116,10 @@ export class Game {
       if (room === 'wingbarn') s.push({ x: 480, y: 220, w: 180, h: 60 }, { x: 480, y: 320, w: 180, h: 60 }); // booths
       if (room === 'buffet') s.push({ x: 340, y: 90, w: 280, h: 54 }, { x: 120, y: 250, w: 160, h: 60 });    // steam table, booth
       if (room === 'garage') s.push({ x: 60, y: 60, w: 120, h: 50 }, { x: 460, y: 60, w: 120, h: 70 });      // cot, shelves
+      if (room === 'foxhole') {
+        s.push({ ...it.stage });                                                       // the stage is a platform
+        s.push({ x: 470, y: 250, w: 150, h: 46 }, { x: 90, y: 320, w: 130, h: 44 });   // booths
+      }
     }
     this.solidsCache[room] = s;
     return s;
@@ -213,6 +219,24 @@ export class Game {
     // Bev is up early and up late, because of course she is
     if (this.block === 0 || this.block >= 3) {
       this.npcs.push(this._mkNpc({ ...NAMED.bev, key: 'bev', x: 560, y: 95, room: 'garage', static: true, pool: 'bev' }));
+    }
+    // The Foxhole: staff, stage, and a floor of regulars who'd rather be here
+    if (this.isOpen('foxhole')) {
+      this.npcs.push(this._mkNpc({ ...NAMED.dee, key: 'dee', x: 595, y: 104, room: 'foxhole', static: true, pool: 'dee' }));
+      this.npcs.push(this._mkNpc({ ...NAMED.cherry, key: 'cherry', x: 215, y: 150, room: 'foxhole', static: true, pool: 'cherry' }));
+      this.npcs.push(this._mkNpc({ ...NAMED.sable, key: 'sable', x: 300, y: 300, room: 'foxhole', static: true, pool: 'sable' }));
+      this.npcs.push(this._mkNpc({ ...NAMED.moose, key: 'moose', x: 380, y: 396, room: 'foxhole', static: true, pool: 'moose', hp: 150 }));
+      for (let i = 0; i < 4; i++) {
+        this.npcs.push(this._mkNpc({
+          x: 140 + i * 96 + this.ri(-16, 16), y: 268 + (i % 2) * 46, room: 'foxhole',
+          outfitKey: this.pick(['flannel', 'denim', 'greasy', 'camo']),
+          drunk: this.chance(0.6), pool: 'fox_patron',
+        }));
+      }
+      if (this.block === 2) {  // the Alumni have a spot and they will tell you about it
+        this.npcs.push(this._mkNpc({ ...NAMED.chuck, key: 'chuck', x: 520, y: 300, room: 'foxhole', brawler: true, hp: 70, pool: 'fox_alumni' }));
+        this.npcs.push(this._mkNpc({ ...NAMED.tanner, key: 'tanner', x: 578, y: 322, room: 'foxhole', brawler: true, hp: 62, pool: 'fox_alumni' }));
+      }
     }
 
     // cops
@@ -662,6 +686,82 @@ export class Game {
     else this.fx('whiff', p.x + Math.cos(p.windDir) * 26, p.y + Math.sin(p.windDir) * 26, { ang: p.windDir });
   }
 
+  // ── THE FOXHOLE ───────────────────────────────────────────────────────────
+  // Everything here is a transaction, which is the point: it's the purest expression
+  // of the design's third pillar. Cover to get in, drinks to stay, tips to be treated
+  // like a person, and information priced above all of it.
+  enterFoxhole() {
+    const p = this.player;
+    if (!this.isOpen('foxhole')) return { ok: false, msg: this.closedLine('foxhole') };
+    if (this.fox.paid === this.day) { this.room = 'foxhole'; this._placeIn('foxhole'); return { ok: true }; }
+    if (!this._spend(T.foxCover)) return { ok: false, msg: `Moose doesn't move. "Eight bucks. You ain't got eight bucks. That's a whole THING to not have."` };
+    this.fox.paid = this.day;
+    this.fox.visits++;
+    this.room = 'foxhole'; this._placeIn('foxhole');
+    this.sfx('doorchime');
+    return { ok: true, msg: `−$${T.foxCover} cover. Inside it's dark, loud, and forty degrees warmer than the parking lot.` };
+  }
+
+  _placeIn(key) {
+    const it = INTERIORS[key];
+    this.player.x = it.w / 2; this.player.y = it.h - 46;
+  }
+
+  // Nobody in this building has ever helped a police officer with anything.
+  foxLayLow() {
+    if (this.room !== 'foxhole') return { ok: false };
+    const before = this.heat;
+    this.heat = Math.max(0, this.heat - T.foxHeatDecay);
+    this.endBlock('sat in the dark at the Foxhole');
+    return { ok: true, msg: `You sit in a corner booth and become furniture. Heat ${Math.round(before)} → ${Math.round(this.heat)}. Nobody here saw you. Nobody here sees anybody.` };
+  }
+
+  foxDrink() {
+    if (this.room !== 'foxhole') return { ok: false };
+    if (!this._spend(T.foxDrink)) return { ok: false, msg: 'Dee looks at your hand, then your face. "Cash bar, sweetheart."' };
+    this.player.hp = Math.min(this.player.hpMax, this.player.hp + 8);
+    this.fox.drinks++;
+    return { ok: true, msg: `−$${T.foxDrink}. It's cold and it's honest, which is two more things than most of this town.` };
+  }
+
+  foxTip(who) {
+    if (this.room !== 'foxhole') return { ok: false };
+    if (!this._spend(T.foxTip)) return { ok: false, msg: 'You pat your pockets. Everyone politely pretends not to watch you do it.' };
+    this.fox.tips++;
+    if (this.fox.tips === 3) this.alert('Word gets around the floor that you tip. Doors open a little wider in here.', 'ok');
+    return { ok: true, tips: this.fox.tips,
+      msg: `−$${T.foxTip}. ${this.fox.tips >= 3 ? 'You get a nod. In here that\'s a knighthood.' : 'Standing bought, five dollars at a time.'}` };
+  }
+
+  // Dee sells what she hears. Peanut is free but slow; Dee is instant and expensive.
+  // This is a REAL second route to the scheme intel, not a flavour button.
+  foxBuyInfo() {
+    if (this.room !== 'foxhole') return { ok: false };
+    if (this.scheme.hear && this.scheme.window && this.scheme.case)
+      return { ok: true, msg: 'Dee: "You already know everything I\'d charge you for. Go do it or go home."' };
+    const price = Math.max(10, T.foxInfoCost - (this.fox.tips >= 3 ? 10 : 0));
+    if (!this._spend(price)) return { ok: false, msg: `Dee taps the bar. "Thirty. Information's the only thing in here that's honestly priced."` };
+    let line, learned;
+    if (!this.scheme.hear) { this._schemeCheck('hear'); line = BARKS.dee_info[0]; learned = 'the job exists'; }
+    else if (!this.scheme.window) { this._schemeCheck('window'); line = BARKS.dee_info[1]; learned = 'the drop night'; }
+    else { this._schemeCheck('case'); line = BARKS.dee_info[2]; learned = 'the window'; }
+    this.fox.bought++;
+    return { ok: true, msg: `−$${price}. Dee, not looking up: "${line}"`, learned };
+  }
+
+  foxVip() {
+    const p = this.player;
+    if (this.room !== 'foxhole') return { ok: false };
+    if (this.fox.vip === this.day) return { ok: false, msg: 'Sable: "Twice in one night? Go home, sugar. I mean that kindly."' };
+    if (!this._spend(T.foxVipCost)) return { ok: false, msg: `Forty-five dollars. You do not have forty-five dollars. You have a look on your face.` };
+    this.fox.vip = this.day;
+    p.hp = Math.min(p.hpMax, p.hp + T.foxVipHeal);
+    this.heat = Math.max(0, this.heat - 8);
+    this.endBlock('the back room');
+    // Fade to black. The design doc: "the camera has manners even when nobody else does."
+    return { ok: true, msg: `−$${T.foxVipCost}. The curtain closes.\n\nLater: you're in the gravel lot, warmer, calmer, poorer, and no wiser. Somebody put your jacket back on you. The night went somewhere without you and left you the receipt.` };
+  }
+
   // ── Rolling a body ────────────────────────────────────────────────────────
   // The payoff combat never had. It's also the meanest thing in the prototype, so it
   // bills you twice: heat now (robbery, not a scuffle) and a grudge that gets up later.
@@ -869,6 +969,9 @@ export class Game {
       walkOut: () => this.walkOut(), talkPeanut: () => this.talkPeanut(),
       shove: () => this.shove(),
       roll: () => this.rollBody(),
+      foxEnter: () => this.enterFoxhole(), foxDrink: () => this.foxDrink(),
+      foxTip: () => this.foxTip(arg), foxInfo: () => this.foxBuyInfo(),
+      foxVip: () => this.foxVip(), foxLayLow: () => this.foxLayLow(),
       shiftAuto: () => this.doShiftAuto(arg || 0), endBlock: () => { this.endBlock(arg || 'waited'); return { ok: true }; },
       brawlAuto: () => this.brawlAuto(arg || 2), heistTripAuto: () => this.heistTripAuto(),
       exitShopCheck: () => { this.exitShopCheck(); return { ok: true }; },
@@ -890,6 +993,7 @@ export class Game {
       case 'wingbarn': return block <= 2;
       case 'gamebarn': return block <= 2;
       case 'cashking': return block >= 1;
+      case 'foxhole': return block >= 2;      // evening and late only, obviously
       default: return true;
     }
   }
@@ -902,6 +1006,7 @@ export class Game {
       wingbarn: 'Closed. Through the glass you can see the mop bucket, waiting for a man it has already broken.',
       gamebarn: 'Locked. The sign flips to CLOSED at dark. Gary sleeps above the shop, allegedly.',
       cashking: 'Roxy isn\'t in yet. The glass is doing its job in the meantime.',
+      foxhole: 'Dark. The fox sign\'s off and Moose\'s truck is gone. Doors at six, same as it\'s been since the eighties.',
     }[key] || 'Closed.';
   }
 
@@ -927,6 +1032,7 @@ export class Game {
     }
     else if (b) { this.player.x = b.x + b.w / 2; this.player.y = STRIP_Y.base + 30; }
     else if (this.room === 'garage') { this.player.x = GARAGE.door.x + 20; this.player.y = GARAGE.y - 26; }
+    else if (this.room === 'foxhole') { this.player.x = FOXHOLE.door.x; this.player.y = FOXHOLE.door.y + 24; }
     this.room = 'ext';
     this.gameBarnDark = false;
     if (wasShop) this.exitShopCheck();

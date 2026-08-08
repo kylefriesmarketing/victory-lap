@@ -43,6 +43,18 @@ export const TUNING = {
   wakeRobbedAfterS: 38,       // unless you went through their pockets first
   wakeHpFrac: 0.34,
   grudgeChance: 0.65,         // …and then they come looking for you
+  // ── THE FOXHOLE ───────────────────────────────────────────────────────────
+  // A windowless cinder-block box on gravel at the edge of the Mile. Mechanically
+  // it's three things: a money sink, the best heat sanctuary in the district (nobody
+  // in here has ever helped a police officer with anything), and the town's actual
+  // information exchange — Dee behind the bar knows more than Peanut ever will.
+  foxCover: 8,
+  foxHeatDecay: 24,           // beats laying low anywhere else in the game
+  foxDrink: 7,
+  foxTip: 5,                  // tipping is how you buy standing here
+  foxInfoCost: 30,            // Dee sells what she hears. Peanut is free but slower.
+  foxVipCost: 45,             // fade to black; you wake up somewhere with fewer problems
+  foxVipHeal: 40,
   // heat
   heatStage: { noticed: 15, named: 40, wanted: 70 },
   heatMax: 100,
@@ -164,6 +176,15 @@ export const EXTERIOR_PROPS = [
 
 export const GARAGE = { x: 300, y: 1150, w: 220, h: 180, door: { x: 395, y: 1150 } };
 
+// ⚠️ NOT part of the BUILDINGS strip row — the Foxhole is a standalone windowless
+// cinder-block box set back on its own gravel lot, which is exactly how these places
+// actually sit at the edge of a town like this. Its own geometry, its own door.
+export const FOXHOLE = {
+  x: 1770, y: 1150, w: 280, h: 170,
+  door: { x: 1895, y: 1320 },       // faces the lot, south side, under the one light
+  lot: { x: 1720, y: 1330, w: 380, h: 120 },
+};
+
 // bottles and loose junk seed the improvised-weapon economy; positions jitter per run
 export const WEAPON_SPAWNS = [
   { kind: 'bottle', x: 760, y: 820 }, { kind: 'bottle', x: 1180, y: 780 }, { kind: 'bottle', x: 340, y: 700 },
@@ -195,6 +216,10 @@ export const INTERIORS = {
     props: ['glassWall', 'window1', 'window2', 'sadChairs'] },
   garage:   { w: 640, h: 380, label: "Bev's Garage",
     props: ['cot', 'stashShelf', 'beerFridge', 'tools', 'boxMaze', 'houseDoor'] },
+  foxhole:  { w: 760, h: 440, label: 'The Foxhole',
+    counter: { x: 470, y: 120, w: 250, h: 56 },        // the bar, back right
+    stage:   { x: 90, y: 90, w: 250, h: 150 },          // stage + one pole, house left
+    props: ['stage', 'pole', 'mirrorWall', 'boothRow', 'dj', 'tipRail', 'atmMachine'] },
 };
 
 // ---------------------------------------------------------------------------
@@ -246,6 +271,18 @@ export const NAMED = {
             silhouette: 'has survived four names and both fires' },
   earl:   { name: 'Earl', role: 'Mile Hardware', arch: 'tall', outfit: { shirt: '#8a5a33', pants: '#4a4a42' }, hat: 'trucker',
             silhouette: 'leans on the counter like it owes him rent' },
+  // ── The Foxhole ───────────────────────────────────────────────────────────
+  // Written as PEOPLE WITH JOBS, deliberately. The club is crude; the crudeness is
+  // aimed at the clientele, never at the staff — that's the Rockstar discipline, and
+  // it's also just funnier. Every one of them is smarter than everyone they serve.
+  moose:  { name: 'Moose', role: 'Foxhole door', arch: 'broad', outfit: { shirt: '#22242a', pants: '#2e3138' }, hat: 'beanie',
+            silhouette: 'a doorway with a person in front of it; reads paperbacks between ejections' },
+  dee:    { name: 'Dee', role: 'Foxhole bar (and owner)', arch: 'average', outfit: { shirt: '#5a2e3d', pants: '#2e2a2e' }, hat: 'bun',
+            silhouette: 'towel over the shoulder, has heard your whole life story twice' },
+  cherry: { name: 'Cherry', role: 'Foxhole stage', arch: 'wiry', outfit: { shirt: '#c04a7a', pants: '#3a2e3a' }, hat: 'ponytail',
+            silhouette: 'robe cinched between sets; flashcards in the pocket' },
+  sable:  { name: 'Sable', role: 'Foxhole stage', arch: 'average', outfit: { shirt: '#6a4a8a', pants: '#3a2e3a' }, hat: 'bun',
+            silhouette: 'nineteen years on this floor and a knee that reports the weather' },
 };
 
 // ambient population per block: [count, archetype pool, outfit pool, where]
@@ -444,6 +481,58 @@ export const BARKS = {
     "We're not washed. We're VINTAGE. There's a difference and I'll fight the man who says otherwise.",
   ],
   buster: [ "(Buster is barking at you specifically.)", "(Buster accepts the jerky. A treaty is signed.)", "(Buster's tail says you're famous here.)" ],
+  // ── THE FOXHOLE ───────────────────────────────────────────────────────────
+  moose: [
+    "Eight bucks. I don't care that you know me. I know EVERYBODY, that's the whole job.",
+    "Rules: hands to yourself, tip the girls, don't be a dick. You'll break one. Pick carefully.",
+    "You start something in here, you don't get thrown out. You get CARRIED out. Ask Tanner.",
+    "I'm four hundred pages into a book about a submarine and you're interrupting the good part.",
+    "Bathroom's out of order. It's been out of order since Obama. Piss at the QwikStop.",
+  ],
+  moose_regular: [
+    "Ahh, hell. Go on in. Don't make me regret it in front of people.",
+    "You're alright. Low bar in here, but you cleared it.",
+  ],
+  dee: [
+    "Seven bucks a beer. It's cold, it's wet, and it's the only one you're getting on credit — which is none.",
+    "I own the building, the liquor licence, and everybody's secrets. Guess which one pays.",
+    "You want to know something? Everything in here has a price and information's the dearest.",
+    "Half this county's cried at this bar. The OTHER half's the reason.",
+    "Fairview came in here too. Offered me a number. I laughed so hard I had to sit down.",
+    "Rule of the house: you don't touch, you don't photograph, and you don't ask Cherry what she's studying — she WILL tell you, at length.",
+  ],
+  dee_info: [
+    "Gary Loomis. Thursday nights he does the drop himself, nine o'clock, no alarm since '19. He told me that HIMSELF, drunk, at this bar, twice.",
+    "Cops run the Mile twice a shift and never once at closing. Brill's a creature of habit and the habit is dinner.",
+    "That back window at the Game Barn's been propped since the AC died. Everybody knows. Nobody says.",
+  ],
+  cherry: [
+    "Two hundred and six bones in the human body. I can name every one, and I have named every one, out loud, to a man who did not ask.",
+    "This pays for nursing school. Nursing school pays for leaving. Don't look so sad about it, it's a PLAN, which is more than you've got.",
+    "You want the truth? Y'all are the easiest money in Montana. Half of you just want somebody to say your name right.",
+    "Tip the DJ too. He's got a kid and a Corolla with one door that opens.",
+    "No, I don't want a drink. I've watched what happens to people in here who want a drink.",
+    "Ask me about the clavicle. Go on. ASK me about the clavicle.",
+  ],
+  sable: [
+    "Nineteen years on this floor. My knee tells the weather and it's never wrong and it's never good news.",
+    "I've seen three mayors, two grease fires, and one man propose to a woman who was on her BREAK.",
+    "Everybody in this town's got a plan to leave. I had one too. It's around here somewhere.",
+    "You're Bev's grandkid, ain't you? Sit up straight. She'd want that.",
+    "Money's money, sugar. It don't care where it's been and neither do I, but MY knees do.",
+  ],
+  fox_patron: [
+    "I'm not here for THAT, I'm here 'cause it's the only place with cold beer past eleven. ...And also for that.",
+    "My wife thinks I'm at the plant. I AM at the plant. Later. Probably.",
+    "Tuesday's wing night. A strip club with a WING NIGHT. This town's a goddamn miracle.",
+    "I tipped my whole check once. Best night of my life, worst month of my life.",
+    "Don't tell Dee I'm broke. Dee has a bat and a very specific memory.",
+  ],
+  fox_alumni: [
+    "CHUCK. CHUUUCK. Get the man a beer, he's had a WEEK—",
+    "This is our spot. Been our spot since college. It was a Napa Auto Parts then but same energy.",
+    "Bachelor party in here in '18. Groom's divorced now. Coincidence? ...Yeah, probably.",
+  ],
   // ⚠️ keep these AMOUNT-NEUTRAL — an early pass said "a damp twenty" on a $7 haul.
   // rollBody picks the pool by size; only rolled_fat may talk like it's real money.
   rolled: [   // what you find in a Hopewell pocket

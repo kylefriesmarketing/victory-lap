@@ -2,7 +2,7 @@
 // Canvas 2D view layer. Every choice here answers to ART_BIBLE.md.
 // View-only: free to use Math.random. Never touches sim state.
 
-import { T, WORLD, BUILDINGS, ALLEY_GAPS, STRIP_Y, EXTERIOR_PROPS, GARAGE, INTERIORS,
+import { T, WORLD, BUILDINGS, ALLEY_GAPS, STRIP_Y, EXTERIOR_PROPS, GARAGE, FOXHOLE, INTERIORS,
          ARCHETYPES, NAMED } from './game.js';
 
 const PAL = {
@@ -52,6 +52,8 @@ export class Renderer {
   resize(w, h) { this.cv.width = w; this.cv.height = h; this.light.width = w; this.light.height = h; }
 
   bark(who, text, x, y) {
+    // two people saying the identical sentence at once reads as a rendering bug
+    if (this.barks.some(b => b.text === text && b.t < 1.6)) return;
     // stack barks that land on top of each other instead of overprinting them into mush
     let lift = 0;
     for (const b of this.barks) {
@@ -251,6 +253,7 @@ export class Renderer {
     // buildings: roofs + facades + their whole biography
     for (const b of BUILDINGS) this._paintBuilding(c, b);
     this._paintGarage(c);
+    this._paintFoxhole(c);
     // south houses (set dressing)
     for (const h of [[760, 1200, 180, 140, '#6d5a4a'], [1000, 1220, 160, 120, '#5a5d52'], [1250, 1200, 200, 140, '#7a6a55'], [1550, 1230, 170, 120, '#615549']]) {
       c.fillStyle = h[4]; c.fillRect(h[0], h[1], h[2], h[3]);
@@ -460,6 +463,45 @@ export class Renderer {
     c.beginPath(); c.ellipse(g.x - 18, g.y + 58, 10, 12, 0, 0, 7); c.fill();
   }
 
+  // A windowless cinder-block box on gravel. The whole building is one architectural
+  // decision — "nobody can see in" — and one enormous sign doing all the talking.
+  _paintFoxhole(c) {
+    const f = FOXHOLE;
+    // gravel apron, rutted where everyone parks in exactly the same two spots
+    c.fillStyle = '#5f5a52'; c.fillRect(f.lot.x, f.lot.y, f.lot.w, f.lot.h);
+    scatter(240, 411, (rnd) => {
+      c.fillStyle = `rgba(${140 + rnd() * 50 | 0},${132 + rnd() * 46 | 0},${118 + rnd() * 40 | 0},${0.25 + rnd() * 0.4})`;
+      c.fillRect(f.lot.x + rnd() * f.lot.w, f.lot.y + rnd() * f.lot.h, 1.5 + rnd() * 2.5, 1.5 + rnd() * 2);
+    });
+    c.fillStyle = 'rgba(30,26,22,0.28)';
+    c.fillRect(f.lot.x + 40, f.lot.y + 30, 150, 34); c.fillRect(f.lot.x + 210, f.lot.y + 36, 140, 30);
+    // the box: painted cinder block, one colour, no windows anywhere
+    c.fillStyle = '#4a4048'; c.fillRect(f.x, f.y, f.w, f.h);
+    c.fillStyle = 'rgba(0,0,0,0.28)'; c.fillRect(f.x, f.y, f.w, 12);
+    for (let by = f.y + 14; by < f.y + f.h; by += 9) {           // block courses
+      c.strokeStyle = 'rgba(0,0,0,0.14)'; c.beginPath();
+      c.moveTo(f.x, by); c.lineTo(f.x + f.w, by); c.stroke();
+    }
+    scatter(30, 412, (rnd) => {   // patched paint over patched paint
+      c.fillStyle = `rgba(${70 + rnd() * 22 | 0},${58 + rnd() * 18 | 0},${68 + rnd() * 20 | 0},0.6)`;
+      c.fillRect(f.x + rnd() * f.w, f.y + 14 + rnd() * (f.h - 20), 16 + rnd() * 40, 8 + rnd() * 18);
+    });
+    // steel door, one bulb over it, a rail nobody holds
+    const dx = f.door.x - f.x;
+    c.fillStyle = '#2a2630'; c.fillRect(f.x + dx - 20, f.y + f.h - 10, 40, 10);
+    c.fillStyle = '#3a3440'; c.fillRect(f.x + dx - 22, f.y + f.h - 14, 44, 5);
+    // the SIGN — the only money ever spent on this building
+    c.save(); c.translate(f.x + f.w / 2, f.y - 4);
+    c.fillStyle = '#2e2630'; c.fillRect(-96, -46, 192, 46);
+    c.strokeStyle = '#6a5a52'; c.strokeRect(-96, -46, 192, 46);
+    c.fillStyle = '#d8486a'; c.font = 'bold 25px Impact, Arial'; c.textAlign = 'center';
+    c.fillText('THE FOXHOLE', 0, -22);
+    c.fillStyle = '#e8dcc3'; c.font = 'bold 8px Arial';
+    c.fillText('18 & OVER  ·  ATM INSIDE  ·  TUES WING NIGHT', 0, -8);
+    c.fillStyle = '#8a7a68'; c.fillRect(-4, 0, 8, 26);          // sign post
+    c.restore();
+  }
+
   _paintProp(c, p) {
     if (p.kind === 'pumps') {
       c.fillStyle = '#55524c'; c.fillRect(p.x, p.y, p.w, p.h);
@@ -616,6 +658,52 @@ export class Renderer {
       F(120, 280, 60, 40, '#7a4a3a'); F(200, 280, 60, 40, '#7a4a3a'); // sad chairs
       c.fillStyle = 'rgba(232,220,195,0.5)'; c.font = '7px Arial';
       c.fillText('NO we will NOT "just look at" your ring through the glass', 130, 350);
+    }
+    if (room === 'foxhole') {
+      const st = it.stage;
+      // carpet that has absorbed four decades and will not be discussing it
+      c.fillStyle = '#3a2630'; c.fillRect(0, 0, it.w, it.h);
+      scatter(160, 421, (rnd) => {
+        c.fillStyle = `rgba(${20 + rnd() * 30 | 0},14,${24 + rnd() * 20 | 0},${0.3 + rnd() * 0.4})`;
+        c.fillRect(rnd() * it.w, rnd() * it.h, 8 + rnd() * 30, 4 + rnd() * 10);
+      });
+      // the stage: raised, lit, mirrored at the back, one pole
+      c.fillStyle = '#5a3a48'; c.fillRect(st.x - 6, st.y - 6, st.w + 12, st.h + 12);
+      c.fillStyle = '#6e4658'; c.fillRect(st.x, st.y, st.w, st.h);
+      c.fillStyle = 'rgba(255,220,235,0.10)'; c.fillRect(st.x, st.y, st.w, 10);
+      c.fillStyle = 'rgba(160,190,220,0.16)'; c.fillRect(st.x, st.y - 6, st.w, 6);   // mirror strip
+      c.strokeStyle = '#c8c2b4'; c.lineWidth = 4;                                     // the pole
+      c.beginPath(); c.moveTo(st.x + st.w * 0.42, st.y + 8); c.lineTo(st.x + st.w * 0.42, st.y + st.h - 6); c.stroke();
+      c.lineWidth = 1;
+      c.fillStyle = 'rgba(255,255,255,0.25)'; c.fillRect(st.x + st.w * 0.42 - 1, st.y + 8, 1.5, st.h - 14);
+      // tip rail + the chairs pulled right up to it
+      c.fillStyle = '#4a3a2e'; c.fillRect(st.x - 10, st.y + st.h + 12, st.w + 20, 7);
+      for (let i = 0; i < 5; i++) { c.fillStyle = '#3a2e2a'; c.fillRect(st.x - 4 + i * 56, st.y + st.h + 24, 26, 22); }
+      // bar, bottles, the ATM that funds the whole economy
+      const k = it.counter;
+      c.fillStyle = '#3e2a26'; c.fillRect(k.x, k.y, k.w, k.h);
+      c.fillStyle = 'rgba(255,200,180,0.10)'; c.fillRect(k.x, k.y, k.w, 7);
+      c.fillStyle = 'rgba(0,0,0,0.35)'; c.fillRect(k.x, k.y + k.h, k.w, 6);
+      c.fillStyle = 'rgba(120,150,170,0.30)'; c.fillRect(k.x + 8, k.y - 44, k.w - 16, 40);   // back-bar mirror
+      for (let i = 0; i < 11; i++) {
+        c.fillStyle = ['#7a5a2a', '#5a7a4a', '#8a4a3a', '#3a5a7a'][i % 4];
+        c.fillRect(k.x + 16 + i * 20, k.y - 34, 7, 22);
+      }
+      c.fillStyle = '#2e3a4a'; c.fillRect(700, 250, 40, 60);                                  // ATM
+      c.fillStyle = '#7ac080'; c.fillRect(706, 258, 28, 14);
+      c.fillStyle = '#e8dcc3'; c.font = 'bold 6px Arial'; c.textAlign = 'center';
+      c.fillText('ATM', 720, 290); c.fillText('$4.50 FEE', 720, 298);
+      // DJ booth, blessedly small
+      c.fillStyle = '#2a2630'; c.fillRect(40, 40, 90, 46);
+      c.fillStyle = '#c04a7a'; c.fillRect(46, 46, 30, 8); c.fillRect(46, 60, 40, 6);
+      c.fillStyle = 'rgba(232,220,195,0.5)'; c.font = '6px Arial'; c.textAlign = 'left';
+      c.fillText('TIP THE DJ', 46, 78);
+      // booths along the wall, and the sign nobody reads
+      c.fillStyle = '#4a2e3a'; c.fillRect(470, 250, 150, 46); c.fillRect(90, 320, 130, 44);
+      c.fillStyle = 'rgba(232,220,195,0.42)'; c.font = 'bold 7px Arial'; c.textAlign = 'center';
+      c.fillText('NO TOUCHING · NO PHOTOS · NO EXCEPTIONS · WE WILL ASK ONCE', it.w / 2, it.h - 14);
+      c.fillStyle = 'rgba(232,220,195,0.22)'; c.font = '6px Arial';
+      c.fillText('MANAGEMENT (DEE) RESERVES EVERY RIGHT THERE IS', it.w / 2, it.h - 5);
     }
     if (room === 'garage') {
       F(60, 60, 120, 50, '#7a6a5a'); c.fillStyle = '#b8a890'; c.fillRect(66, 66, 108, 20); // cot
@@ -880,7 +968,8 @@ export class Renderer {
       'rgba(5,9,26,0.68)',        // rip bonus block: deeper night
     ];
     let amb = ambients[blockIdx] || ambients[3];
-    if (room !== 'ext') amb = room === 'gamebarn' && g.gameBarnDark ? 'rgba(4,6,16,0.84)' : 'rgba(30,22,12,0.22)';
+    if (room !== 'ext') amb = room === 'gamebarn' && g.gameBarnDark ? 'rgba(4,6,16,0.84)'
+                            : room === 'foxhole' ? 'rgba(20,4,16,0.78)' : 'rgba(30,22,12,0.22)';
     lc.fillStyle = amb; lc.fillRect(0, 0, L.width, L.height);
 
     const toScreen = (wx, wy) => [(wx - cx + vw / 2) * z, (wy - cy + vh / 2) * z];
@@ -926,6 +1015,16 @@ export class Renderer {
         // Bev's porch bulb — always on for you
         pool(GARAGE.door.x + 20, GARAGE.y - 6, 110, 0.85);
         glow(GARAGE.door.x + 20, GARAGE.y - 12, 36, 'rgba(255,220,150,A)', 0.5);
+        // THE FOXHOLE: the sign is the only thing anyone ever spent money on out here,
+        // so at night it's the brightest object in the southeast — a pink smear you can
+        // navigate by from halfway across the lot.
+        glow(FOXHOLE.x + FOXHOLE.w / 2, FOXHOLE.y - 28, 150, 'rgba(255,60,120,A)', 0.42);
+        glow(FOXHOLE.x + FOXHOLE.w / 2, FOXHOLE.y - 28, 60, 'rgba(255,150,190,A)', 0.30);
+        pool(FOXHOLE.x + FOXHOLE.w / 2, FOXHOLE.y + 40, 190, 0.55);
+        // the one bulb over the steel door, and the gravel it makes glitter
+        pool(FOXHOLE.door.x, FOXHOLE.door.y + 20, 120, 0.9);
+        glow(FOXHOLE.door.x, FOXHOLE.door.y - 6, 34, 'rgba(255,226,170,A)', 0.5);
+        glow(FOXHOLE.door.x, FOXHOLE.door.y + 30, 90, 'rgba(255,120,150,A)', 0.10);
         // one sodium bulb over each alley mouth: the route has to be findable at night,
         // and a lit doorway you're not supposed to use is its own invitation
         for (const gp of ALLEY_GAPS) {
@@ -949,6 +1048,18 @@ export class Renderer {
       const fx2 = p.x + Math.cos(p.facing) * 90, fy = p.y + Math.sin(p.facing) * 90;
       pool(fx2, fy, 90, 0.75);
       glow(fx2, fy, 60, 'rgba(255,240,200,A)', 0.10);
+    } else if (room === 'foxhole') {
+      // The club is a DARK room with three lit islands: the stage, the bar, the door.
+      // Everything between them is deliberately murk — that's the whole architecture.
+      const it = INTERIORS.foxhole, st = it.stage;
+      const beat = 0.5 + 0.5 * Math.sin(this.t * 3.1);
+      pool(st.x + st.w / 2, st.y + st.h / 2, 150 + beat * 22, 0.95);
+      glow(st.x + st.w / 2, st.y + st.h / 2, 130, 'rgba(255,70,130,A)', 0.24 + beat * 0.12);
+      glow(st.x + st.w * 0.42, st.y + 20, 60, 'rgba(190,120,255,A)', 0.18 + (1 - beat) * 0.14);
+      pool(it.counter.x + it.counter.w / 2, it.counter.y + 24, 130, 0.8);
+      glow(it.counter.x + it.counter.w / 2, it.counter.y + 10, 90, 'rgba(255,170,90,A)', 0.16);
+      pool(it.w / 2, it.h - 40, 90, 0.6);                       // the door
+      glow(720, 270, 40, 'rgba(120,255,150,A)', 0.10);          // the ATM's little green promise
     } else {
       // interiors: warm pools over counters, fluorescent flicker at Wing Barn
       const it = INTERIORS[room];

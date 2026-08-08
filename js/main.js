@@ -3,7 +3,7 @@
 // The sim never touches this file's DOM; this file never reaches into sim internals
 // except through game.act / documented fields.
 
-import { Game, soakRun, T, BUILDINGS, GARAGE, INTERIORS, STRIP_Y, BARKS, SCHEME,
+import { Game, soakRun, T, BUILDINGS, GARAGE, FOXHOLE, INTERIORS, STRIP_Y, BARKS, SCHEME,
          ENDINGS, BLOCK_NAMES, DAY_NAMES, NAMED } from './game.js';
 import { Renderer } from './render.js';
 import { Sfx } from './audio.js';
@@ -180,6 +180,15 @@ function interactables() {
       else add(dx, dy, 46, `${b.label} — closed`, () => result(g.act('enter', b.key)));
     }
     add(GARAGE.door.x + 20, GARAGE.y - 8, 50, 'The garage (home, roughly)', () => result(g.act('enter', 'garage')));
+    // The Foxhole — cover charge at the door, and Moose is not a negotiator
+    add(FOXHOLE.door.x, FOXHOLE.door.y + 16, 58,
+      g.isOpen('foxhole')
+        ? (g.fox.paid === g.day ? 'Back into the Foxhole (paid tonight)' : `The Foxhole — $${T.foxCover} cover`)
+        : 'The Foxhole (dark)',
+      () => {
+        const r = result(g.act('foxEnter'));
+        if (!r.ok && g.isOpen('foxhole')) renderer.bark('Moose', uiPick(BARKS.moose), FOXHOLE.door.x, FOXHOLE.door.y - 10);
+      });
     // the alley window behind Game Barn
     const wx = 1537, wy = 172;
     if (!g.scheme.case) add(wx, wy, 54, 'Look at that window (propped on a milk crate)', () => result(g.act('caseAlley')));
@@ -271,6 +280,34 @@ function interactables() {
       add(150, 210, 60, 'The back room (GARY ONLY. This means you, Peanut.)', () => feed('Deadbolted from this side. But rooms have more than one side. Alleys know that.', 'warn'));
       add(INTERIORS.gamebarn.w / 2, INTERIORS.gamebarn.h - 26, 60, 'Leave', () => result(g.act('leave')));
     }
+  } else if (g.room === 'foxhole') {
+    const IT = INTERIORS.foxhole, st = IT.stage;
+    add(IT.counter.x + IT.counter.w / 2, IT.counter.y + 40, 62, `Dee, behind the bar`, () => showChoice(
+      'The bar.', 'Dee has a towel, a bat, and everybody\'s secrets. Two of those are for sale.', [
+      { label: `Buy a beer — $${T.foxDrink}`, go: () => result(g.act('foxDrink')) },
+      { label: `Ask what she's heard — $${g.fox.tips >= 3 ? T.foxInfoCost - 10 : T.foxInfoCost}`, go: () => {
+          const r = result(g.act('foxInfo'));
+          if (r.ok && r.learned) { updateScheme(); pulse($('hud-scheme')); }
+        } },
+      { label: 'Just talk', go: () => renderer.bark('Dee', uiPick(BARKS.dee), IT.counter.x + 120, IT.counter.y + 20) },
+    ]));
+    add(st.x + st.w / 2, st.y + st.h + 26, 60, 'The rail (tip the stage)', () => showChoice(
+      'The tip rail.', 'The only honest transaction on the Miracle Mile.', [
+      { label: `Tip — $${T.foxTip}`, go: () => result(g.act('foxTip')) },
+      { label: 'Talk to Cherry', go: () => renderer.bark('Cherry', uiPick(BARKS.cherry), st.x + st.w / 2, st.y + 40) },
+    ]));
+    add(300, 300, 52, 'Sable', () => renderer.bark('Sable', uiPick(BARKS.sable), 300, 282));
+    add(700, 280, 52, 'The ATM ($4.50 fee, and you will pay it)', () =>
+      feed('The screen offers you $20, $40, or $60 like it already knows how tonight ends. You have no card worth the fee.', 'warn'));
+    add(560, 300, 60, `The back room — $${T.foxVipCost}`, () => showChoice(
+      'The back room.', 'Forty-five dollars, one curtain, and the rest of the block gone. You come out patched up and poorer.', [
+      { label: `Go back — $${T.foxVipCost}`, go: () => result(g.act('foxVip')) },
+    ]));
+    add(120, 340, 56, 'A dark corner booth (sit out the block)', () => showChoice(
+      'Sit in the dark?', 'Burns the rest of this block. Nobody in this building has ever helped a police officer with anything.', [
+      { label: `Become furniture (heat −${T.foxHeatDecay})`, go: () => result(g.act('foxLayLow')) },
+    ]));
+    add(380, IT.h - 24, 60, 'Out to the gravel', () => result(g.act('leave')));
   } else if (g.room === 'garage') {
     add(120, 95, 60, 'The cot (sleep — ends the day)', () => showChoice('Sleep?', 'The rest of today goes with it. Heat cools double here — the Flats don\'t talk to police.', [
       { label: 'Sleep. Let the town cool off.', go: () => result(g.act('sleep')) }]));
