@@ -55,6 +55,18 @@ export const TUNING = {
   foxInfoCost: 30,            // Dee sells what she hears. Peanut is free but slower.
   foxVipCost: 45,             // fade to black; you wake up somewhere with fewer problems
   foxVipHeal: 40,
+  // ── DOWNTOWN ─────────────────────────────────────────────────────────────
+  slBeer: 4,                  // Split Lip: cheapest beer in the county, tastes like it
+  slShot: 3,                  // well whiskey. the well is a crime scene
+  slRound: 25,                // buy the room a round: −12 heat, the room remembers
+  slRoundHeat: 12,
+  slHeatDecay: 14,            // laying low here works, but this room TALKS
+  hurlBase: 0.3,              // per shot past the second, the odds your stomach files a protest
+  latteCost: 9,               // Daybreak. Nine dollars. NINE.
+  latteHeal: 6,
+  pawnCrate: 55,              // Vern's flat rate: no faces, no questions, no haggling
+  pawnBat: 18,
+  pawnCrowbar: 26,            // pricier than Earl's; convenience tax for the south side
   // heat
   heatStage: { noticed: 15, named: 40, wanted: 70 },
   heatMax: 100,
@@ -109,6 +121,7 @@ export const TUNING = {
 // numbers a balance pass most wants to touch, and the README says tuning lives in data.
 export const WEAPONS = {
   fist:   { dmg: [8, 12],  range: 34, dur: Infinity, kb: 130, label: 'fists' },
+  bat:    { dmg: [14, 20], range: 44, dur: 8,  kb: 230, label: 'a Louisville opinion' },
   bottle: { dmg: [12, 17], range: 38, dur: 2,  kb: 170, throwable: true, label: 'a bottle' },
   chair:  { dmg: [15, 22], range: 46, dur: 5,  kb: 240, label: 'a folding chair' },
   cue:    { dmg: [13, 19], range: 56, dur: 4,  kb: 190, label: 'a pool cue' },
@@ -116,7 +129,37 @@ export const WEAPONS = {
   crowbar:{ dmg: [16, 22], range: 42, dur: 30, kb: 210, label: 'the crowbar' },
 };
 
-export const WORLD = { w: 2200, h: 1500 };
+export const WORLD = { w: 2200, h: 2400 };
+
+// ── DOWNTOWN ──────────────────────────────────────────────────────────────────
+// The old core, south of the rail spur the interstate was supposed to replace.
+// Eleven storefronts; four still breathing. The design doc's Downtown, scaled to
+// the prototype: the Split Lip, the pawn shop, Fairview's coffee beachhead, the
+// courthouse — and the dead fronts between them doing the storytelling.
+export const DT_Y = { roofTop: 1905, facadeTop: 2040, base: 2130 };  // shallower roofs than the strip — these are older, meaner buildings
+export const DOWNTOWN = [
+  { key: 'splitlip', label: 'The Split Lip',        x: 260,  w: 240, sign: 'THE SPLIT LIP', signC: '#c94a4a',
+    face: { parapet: 14, doorAt: 0.44, win: 'single', recess: 8 },
+    desc: 'The lone functioning bar. Third-shift congregation. Loyalty measured in decades and stitches.' },
+  { key: 'dead1',    label: 'COMING SOON (2009)',   x: 520,  w: 150, sign: '', signC: '#777',
+    face: { parapet: 0, doorAt: 0.5, win: 'papered', recess: 0 }, dead: 'old' },
+  { key: 'pawn',     label: 'Loanstar Pawn & Gold', x: 690,  w: 230, sign: 'LOANSTAR PAWN ✦ GOLD', signC: '#ffd23e',
+    face: { parapet: 6, doorAt: 0.62, win: 'grid', recess: 0 },
+    desc: 'Everything in the window has a story. Every story ends "and then I needed forty bucks."' },
+  { key: 'dead2',    label: 'COMING SOON',          x: 940,  w: 140, sign: '', signC: '#777',
+    face: { parapet: 4, doorAt: 0.5, win: 'papered', recess: 0 }, dead: 'mid' },
+  { key: 'daybreak', label: 'Daybreak Coffee',      x: 1100, w: 240, sign: 'daybreak', signC: '#2a2e33',
+    face: { parapet: 26, doorAt: 0.5, win: 'wide', recess: 0 },
+    desc: 'Exposed brick they paid to expose. $9 lattes. The invasion, with oat milk.' },
+  { key: 'dead3',    label: 'FUTURE FAIRVIEW',      x: 1360, w: 150, sign: '', signC: '#777',
+    face: { parapet: 30, doorAt: 0.5, win: 'papered', recess: 0 }, dead: 'fairview' },
+  { key: 'dead4',    label: 'GRAND OPENING (ghost)', x: 1530, w: 160, sign: '', signC: '#777',
+    face: { parapet: 0, doorAt: 0.42, win: 'papered', recess: 0 }, dead: 'ancient' },
+];
+export const RAIL_Y = 1505;            // the spur: two rails, zero stops, one long horn
+export const WATER_TOWER = { x: 330, y: 1700 };
+export const COURTHOUSE = { x: 700, y: 2290, w: 500, h: 110 };
+export const MAIN_ST = { y: 2150, h: 110 };
 
 export const STRIP_Y = { roofTop: 190, facadeTop: 400, base: 480 }; // buildings occupy y 190..480
 
@@ -169,6 +212,10 @@ export const EXTERIOR_PROPS = [
   { kind: 'lampPost', x: 560, y: 700 }, { kind: 'lampPost', x: 1000, y: 880, dead: true },
   { kind: 'lampPost', x: 1440, y: 700 }, { kind: 'lampPost', x: 1860, y: 880 },
   { kind: 'lampPost', x: 300, y: 1100 }, { kind: 'lampPost', x: 1500, y: 1100, dead: true },
+  { kind: 'lampPost', x: 180, y: 2146 }, { kind: 'lampPost', x: 560, y: 2146 },
+  { kind: 'lampPost', x: 940, y: 2146, dead: true }, { kind: 'lampPost', x: 1320, y: 2146 },
+  { kind: 'lampPost', x: 1700, y: 2146 }, { kind: 'lampPost', x: 2050, y: 2146 },
+  { kind: 'bench', x: 610, y: 2318, w: 60, h: 22 }, { kind: 'bench', x: 1230, y: 2326, w: 60, h: 22 },
   { kind: 'hydrant',  x: 700, y: 505 },
   { kind: 'bench',    x: 1130, y: 1058, w: 60, h: 22 },
   { kind: 'cone',     x: 820, y: 760 }, { kind: 'cone', x: 855, y: 792 },
@@ -220,6 +267,16 @@ export const INTERIORS = {
     counter: { x: 470, y: 120, w: 250, h: 56 },        // the bar, back right
     stage:   { x: 90, y: 90, w: 250, h: 150 },          // stage + one pole, house left
     props: ['stage', 'pole', 'mirrorWall', 'boothRow', 'dj', 'tipRail', 'atmMachine'] },
+  splitlip: { w: 720, h: 420, label: 'The Split Lip',
+    counter: { x: 70, y: 110, w: 260, h: 56 },
+    pool:    { x: 420, y: 200, w: 180, h: 100 },        // the felt, burned and beloved
+    props: ['bar', 'poolTable', 'cueRack', 'jukebox', 'dartboard', 'theBathroomDoor'] },
+  daybreak: { w: 640, h: 400, label: 'Daybreak Coffee',
+    counter: { x: 200, y: 110, w: 240, h: 56 },
+    props: ['pastryCase', 'menuBoard', 'communalTable', 'planWall', 'succulents'] },
+  pawn:     { w: 680, h: 400, label: 'Loanstar Pawn & Gold',
+    counter: { x: 380, y: 110, w: 240, h: 56 },
+    props: ['cage', 'guitarWall', 'ringCase', 'weedWhackers', 'emptyGunCase', 'owl'] },
 };
 
 // ---------------------------------------------------------------------------
@@ -283,22 +340,34 @@ export const NAMED = {
             silhouette: 'robe cinched between sets; flashcards in the pocket' },
   sable:  { name: 'Sable', role: 'Foxhole stage', arch: 'average', outfit: { shirt: '#6a4a8a', pants: '#3a2e3a' }, hat: 'bun',
             silhouette: 'nineteen years on this floor and a knee that reports the weather' },
+  // ── Downtown ──────────────────────────────────────────────────────────────
+  sal:    { name: 'Sal', role: 'Split Lip bar', arch: 'beerbelly', outfit: { shirt: '#6a5a4a', pants: '#3a3632' }, hat: 'bald',
+            silhouette: 'forearms like hams, apron that predates the health code' },
+  vern:   { name: 'Vern', role: 'Loanstar Pawn', arch: 'tall', outfit: { shirt: '#5a5a4a', pants: '#4a4438' }, hat: 'trucker',
+            silhouette: 'reading glasses on a chain, loupe in the shirt pocket, zero illusions' },
+  madison:{ name: 'Madison', role: 'Daybreak barista', arch: 'wiry', outfit: { shirt: '#e8e4dc', pants: '#3a3e44' }, hat: 'bun',
+            silhouette: 'clean apron, transplant posture, apologizing in advance' },
 };
 
 // ambient population per block: [count, archetype pool, outfit pool, where]
 export const POPULATION = {
   morning:  [ { n: 3, spots: 'bus',   outfits: ['hivis','greasy','denim'] },
               { n: 2, spots: 'qwik',  outfits: ['denim','flannel'] },
-              { n: 2, spots: 'walk',  outfits: ['denim','camo'] } ],
+              { n: 2, spots: 'walk',  outfits: ['denim','camo'] },
+              { n: 2, spots: 'dtwalk',outfits: ['denim','hivis'] } ],
   afternoon:[ { n: 4, spots: 'walk',  outfits: ['denim','flannel','camo'] },
               { n: 2, spots: 'buffet',outfits: ['greasy','denim'] },
-              { n: 1, spots: 'walk',  outfits: ['tourist'] } ],
+              { n: 1, spots: 'walk',  outfits: ['tourist'] },
+              { n: 2, spots: 'dtwalk',outfits: ['denim','flannel'] },
+              { n: 1, spots: 'square',outfits: ['camo'], pool: 'courthouse_idle' } ],
   evening:  [ { n: 3, spots: 'lot',   outfits: ['flannel','denim','camo'] },
               { n: 2, spots: 'buffet',outfits: ['denim','hivis'] },
               { n: 2, spots: 'qwik',  outfits: ['flannel','greasy'] },
-              { n: 1, spots: 'walk',  outfits: ['tourist2'] } ],
+              { n: 1, spots: 'walk',  outfits: ['tourist2'] },
+              { n: 2, spots: 'dtbar', outfits: ['flannel','greasy'], drunk: 0.4, pool: 'splitlip_reg' } ],
   late:     [ { n: 3, spots: 'lot',   outfits: ['flannel','camo','greasy'], drunk: 0.6 },
-              { n: 2, spots: 'qwik',  outfits: ['denim','greasy'], drunk: 0.3 } ],
+              { n: 2, spots: 'qwik',  outfits: ['denim','greasy'], drunk: 0.3 },
+              { n: 2, spots: 'dtbar', outfits: ['greasy','denim'], drunk: 0.8, pool: 'splitlip_reg' } ],
 };
 
 export const SPOTS = {
@@ -307,6 +376,10 @@ export const SPOTS = {
   walk:  [ [520, 505], [900, 508], [1300, 505], [1750, 508], [600, 1058], [1400, 1060] ],
   buffet:[ [920, 560], [980, 590], [1040, 555] ],
   lot:   [ [900, 780], [1000, 820], [1100, 760], [960, 860], [1180, 810] ],
+  // downtown: the smokers outside the Lip, the square, Main Street foot traffic
+  dtbar: [ [330, 2160], [400, 2170], [290, 2180] ],
+  dtwalk:[ [600, 2145], [1000, 2150], [1300, 2148], [800, 2270] ],
+  square:[ [640, 2320], [1260, 2330], [960, 2360] ],
 };
 
 // ---------------------------------------------------------------------------
@@ -359,6 +432,9 @@ export const BARKS = {
     "I'd fight you but my back's out and honestly I like you.",
     "Buy me a beer and I'll tell you who really burned down the old Dairy Freeze.",
     "Sorry, sorry — I thought you were somebody I owe money. Which, statistically, you might be.",
+    "I have thrown up twice tonight and I am STILL the best-looking man in this parking lot. That's the tragedy of Hopewell.",
+    "Held the door for a woman at the QwikStop and I've been thinking about it for six hours. It's the most action this town's seen since the grain elevator fire.",
+    "My body is a temple. Abandoned. Vandalized. Raccoons got in. But a TEMPLE.",
   ],
   tourist: [
     "Honey, look — a REAL pawn town! It's so authentic I could just cry.",
@@ -543,14 +619,69 @@ export const BARKS = {
   fox_patron: [
     "I'm not here for THAT, I'm here 'cause it's the only place with cold beer past eleven. ...And also for that.",
     "My wife thinks I'm at the plant. I AM at the plant. Later. Probably.",
-    "Tuesday's wing night. A strip club with a WING NIGHT. This town's a goddamn miracle.",
+    "Tuesday's wing night. A strip club with a WING NIGHT. This town's a goddamn miracle and my cardiologist's worst enemy.",
     "I tipped my whole check once. Best night of my life, worst month of my life.",
     "Don't tell Dee I'm broke. Dee has a bat and a very specific memory.",
+    "I'm sweating ranch and feelings, man. This is the most alive I get.",
+    "I came in here to forget a woman and now I owe two more women money. The system WORKS.",
+    "Every part of me is having a different night. My heart's in love, my stomach's in hell, and my wallet's calling its mother.",
   ],
   fox_alumni: [
     "CHUCK. CHUUUCK. Get the man a beer, he's had a WEEK—",
     "This is our spot. Been our spot since college. It was a Napa Auto Parts then but same energy.",
     "Bachelor party in here in '18. Groom's divorced now. Coincidence? ...Yeah, probably.",
+    "I'm in LOVE, Tanner. — You're in a strip club and you had nine beers. — A man can be BOTH places.",
+  ],
+  // ── THE SPLIT LIP — third-shift congregation, 2 a.m. poetry ───────────────
+  sal: [
+    "Beer's four bucks. Whiskey's three. The whiskey being cheaper should tell you everything about the whiskey.",
+    "Bathroom's for customers. Being a customer won't prepare you for it. NOTHING prepares you for it.",
+    "I've mopped up blood, teeth, and one entire toupee. The toupee was the worst. It looked ALIVE.",
+    "You break a cue on somebody, you bought the cue. House rule since '94. It's on the wall, in blood, coincidentally.",
+    "This bar has outlived four banks, two churches, and every single one of my marriages. Pour one out. Not literally, that's four dollars.",
+    "Fairview wanted to buy the Lip. Called it a 'legacy tavern experience.' I called their guy an ambulance, eventually.",
+  ],
+  splitlip_reg: [
+    "I love her, man. I love her like I love this bar: from a distance she's perfect and up close I start crying.",
+    "I threw up in that bathroom in 2011 and I swear to God it's still in there. It WAVES at me.",
+    "Half of me wants to go home. The other half of me IS home. This stool's got my ass print, look. LOOK at it.",
+    "She said I had to choose between her and this place. Anyway, Sal, the usual.",
+    "You know what this town needs? Nothing. It needs NOTHING. It's perfect. It's a perfect piece of shit and I'd die for it.",
+    "I've got a half a mind to go over there and talk to her. Other half's been gone since the second whiskey.",
+    "My doctor drinks here. My LAWYER drinks here. My ex drinks here. This bar is my entire government.",
+  ],
+  hurl: [
+    "Your stomach files a formal protest, in the lot, in front of God and the bottle cap you find down there.",
+    "It all comes up: the whiskey, the wings, a decision from Tuesday. You feel eleven percent holier.",
+    "You water Sal's one plant. It's plastic. It thrives anyway.",
+  ],
+  // ── LOANSTAR PAWN — the aisle of regret ───────────────────────────────────
+  vern: [
+    "Everything in that ring case is a marriage. Front row's the nineties. Prices go DOWN the sadder the story, ask me anything.",
+    "Gun case is empty. Ask Vern? Vern says no. Vern's BEEN saying no since the incident, and Vern was RIGHT.",
+    "Fourteen weed whackers. FOURTEEN. Every spring they buy 'em, every August they drink 'em. That wall is a calendar.",
+    "That owl's not for sale. That owl has seen me cry and it stays where the leverage is.",
+    "I give you forty for it, sell it for eighty, and we both agree not to do the math out loud. That's the whole industry, kid.",
+    "A man pawned his glass eye once. Came back for it in a WEEK with the money. Best customer I ever had. Great eye contact, eventually.",
+  ],
+  // ── DAYBREAK — the invasion, with oat milk ────────────────────────────────
+  madison: [
+    "Hi, welcome to Daybreak! The latte's nine dollars. I know. I KNOW. Please don't do the face, everyone does the face.",
+    "I moved here from Portland for the 'authenticity.' A man threw up on our succulents Tuesday. It's SO authentic.",
+    "Corporate says call customers 'neighbors.' A real neighbor came in and called me something I had to look up. It was creative!",
+    "The wifi password is 'community' with a dollar sign. I didn't pick it. I want you to know I didn't pick it.",
+    "The guys in the corner? Fairview. They tip in stickers. STICKERS of the logo. Of the building they're taking.",
+  ],
+  fairview_rep: [
+    "—footprint's undervalued, the whole corridor. The bar we flip to a raw-bar concept, keep the name, kill the smell—",
+    "—the pawn guy'll sell. They always sell. You just find the number where his dignity rounds down—",
+    "—call it 'The Lip.' Heritage signage, new everything. People LOVE a scar if you frame it—",
+    "—game store's the holdout. Old man's sitting on prime frontage like it's a memory. Memories have carrying costs—",
+  ],
+  courthouse_idle: [
+    "The docket's posted Thursdays. It's the town phone book with worse fonts.",
+    "My cousin beat a DUI in there by crying about his boat. The JUDGE has the same boat. Justice is a boat club.",
+    "That flag's flown at half mast since March. Nobody remembers for who. At this point it's just honest.",
   ],
   // ⚠️ keep these AMOUNT-NEUTRAL — an early pass said "a damp twenty" on a $7 haul.
   // rollBody picks the pool by size; only rolled_fat may talk like it's real money.

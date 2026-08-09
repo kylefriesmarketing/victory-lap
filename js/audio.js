@@ -133,9 +133,28 @@ export class Sfx {
       every(9000, 20000, () => this.tone(70, 0.6, 'sine', 0.014, 10));
       return;
     }
-    if (kind === 'in:hardware' || kind === 'in:gamebarn') {
+    if (kind === 'in:hardware' || kind === 'in:gamebarn' || kind === 'in:pawn') {
       bed(118, 'triangle', 0.009, 0.5, 0.004);
       every(11000, 24000, () => this.noise(0.4, 0.014, 300, 1));
+      return;
+    }
+    if (kind === 'in:splitlip') {
+      bed(88, 'triangle', 0.014, 0.3, 0.006);              // cooler + the hum of held opinions
+      hiss(0.014, 500);
+      every(3500, 8000, () => this.noise(0.12, 0.03, 900, 2));           // glass on wood
+      every(9000, 18000, () => this.tone(200 + Math.random() * 120, 0.3, 'sawtooth', 0.012, 60)); // a laugh, far end
+      return;
+    }
+    if (kind === 'in:daybreak') {
+      bed(140, 'sine', 0.008, 0.4, 0.003);                 // clean hum. suspiciously clean
+      every(5000, 12000, () => this.noise(0.5, 0.03, 2400, 1.2));        // the milk steamer, screaming politely
+      every(10000, 22000, () => { this.tone(1180, 0.1, 'sine', 0.02); this.tone(1560, 0.1, 'sine', 0.016, 0, 0.1); });
+      return;
+    }
+    if (kind === 'in:foxhole') {
+      bed(56, 'triangle', 0.02, 2.1, 0.01);                // bass through a wall
+      bed(112, 'triangle', 0.008, 2.1, 0.005);
+      hiss(0.012, 300);
       return;
     }
     if (kind === 'in:garage') {

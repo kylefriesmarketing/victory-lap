@@ -4,11 +4,13 @@
 
 import {
   TUNING as T, WEAPONS, WORLD, BUILDINGS, ALLEY_GAPS, STRIP_Y, EXTERIOR_PROPS, GARAGE, FOXHOLE,
+  DOWNTOWN, DT_Y, RAIL_Y, WATER_TOWER, COURTHOUSE, MAIN_ST,
   WEAPON_SPAWNS, INTERIORS, ARCHETYPES, OUTFITS, NAMED, POPULATION, SPOTS,
   BARKS, SCHEME, ENDINGS, BLOCK_NAMES, DAY_NAMES, WEATHER_KINDS, MENU, RIP,
 } from './data.js';
 
-export { T, WEAPONS, WORLD, BUILDINGS, ALLEY_GAPS, STRIP_Y, EXTERIOR_PROPS, GARAGE, FOXHOLE, INTERIORS,
+export { T, WEAPONS, WORLD, BUILDINGS, ALLEY_GAPS, STRIP_Y, EXTERIOR_PROPS, GARAGE, FOXHOLE,
+         DOWNTOWN, DT_Y, RAIL_Y, WATER_TOWER, COURTHOUSE, MAIN_ST, INTERIORS,
          ARCHETYPES, OUTFITS, NAMED, BARKS, SCHEME, ENDINGS, BLOCK_NAMES, DAY_NAMES, MENU, RIP };
 
 let _eid = 1;
@@ -46,6 +48,7 @@ export class Game {
     if (this.knewWindow) { this.scheme.hear = true; this.scheme.case = true; }
     if (this.knewDrop) this.scheme.window = true;
     this.fox = { paid: -1, visits: 0, drinks: 0, tips: 0, bought: 0, vip: -1 };
+    this.dt = { round: -1, shots: 0, seen: false };
     this.npcs = []; this.pickups = []; this.projectiles = [];
     this.stats = { punches: 0, koGiven: 0, koTaken: 0, skimmed: 0, shifts: 0, rip: 0,
                    crimesSeen: 0, cuffsEscaped: 0, spent: 0, earned: 0 };
@@ -94,6 +97,11 @@ export class Game {
       for (const b of BUILDINGS) s.push({ x: b.x, y: STRIP_Y.roofTop, w: b.w, h: STRIP_Y.base - STRIP_Y.roofTop, door: b.key });
       s.push({ x: GARAGE.x, y: GARAGE.y, w: GARAGE.w, h: GARAGE.h, door: 'garage' });
       s.push({ x: FOXHOLE.x, y: FOXHOLE.y, w: FOXHOLE.w, h: FOXHOLE.h, door: 'foxhole' });
+      // downtown row + the courthouse + the water tower's four legs
+      for (const b of DOWNTOWN) s.push({ x: b.x, y: DT_Y.roofTop, w: b.w, h: DT_Y.base - DT_Y.roofTop, door: b.key });
+      s.push({ ...COURTHOUSE });
+      for (const [lx, ly] of [[-38, 0], [30, 0], [-38, 66], [30, 66]])
+        s.push({ x: WATER_TOWER.x + lx, y: WATER_TOWER.y + ly, w: 8, h: 8 });
       for (const p of EXTERIOR_PROPS) {
         if (p.kind === 'pumps') s.push({ x: p.x, y: p.y, w: p.w, h: p.h });
         if (p.kind === 'dumpster') s.push({ x: p.x, y: p.y, w: p.w, h: p.h });
@@ -120,6 +128,9 @@ export class Game {
         s.push({ ...it.stage });                                                       // the stage is a platform
         s.push({ x: 470, y: 250, w: 150, h: 46 }, { x: 90, y: 320, w: 130, h: 44 });   // booths
       }
+      if (room === 'splitlip') s.push({ ...it.pool }, { x: 70, y: 300, w: 140, h: 44 });        // felt + a booth
+      if (room === 'daybreak') s.push({ x: 120, y: 250, w: 200, h: 60 }, { x: 440, y: 260, w: 140, h: 56 }); // communal table, rep table
+      if (room === 'pawn') s.push({ x: 60, y: 220, w: 130, h: 120 }, { x: 240, y: 250, w: 120, h: 50 });     // shelf island, case
     }
     this.solidsCache[room] = s;
     return s;
@@ -185,7 +196,8 @@ export class Game {
           x: spot[0] + this.ri(-24, 24), y: spot[1] + this.ri(-16, 16),
           outfitKey: this.pick(grp.outfits), drunk: grp.drunk ? this.chance(grp.drunk) : false,
         });
-        if (n.drunk) n.pool = 'drunk';
+        if (grp.pool) n.pool = grp.pool;              // a spot can bring its own voice
+        else if (n.drunk) n.pool = 'drunk';
         else if (this.isLate) n.pool = 'townie_late';
         if (n.tourist) n.pool = 'tourist';
         this.npcs.push(n);
@@ -220,6 +232,21 @@ export class Game {
     if (this.block === 0 || this.block >= 3) {
       this.npcs.push(this._mkNpc({ ...NAMED.bev, key: 'bev', x: 560, y: 95, room: 'garage', static: true, pool: 'bev' }));
     }
+    // Downtown staff + the Fairview reps colonising Daybreak's corner table
+    if (this.isOpen('splitlip')) {
+      this.npcs.push(this._mkNpc({ ...NAMED.sal, key: 'sal', x: 200, y: 108, room: 'splitlip', static: true, pool: 'sal' }));
+      for (let i = 0; i < 2 + (this.block >= 2 ? 1 : 0); i++) {
+        this.npcs.push(this._mkNpc({ x: 160 + i * 90, y: 220 + (i % 2) * 60, room: 'splitlip',
+          outfitKey: this.pick(['flannel', 'greasy', 'camo']), drunk: this.chance(0.5 + this.block * 0.15), pool: 'splitlip_reg' }));
+      }
+    }
+    if (this.isOpen('pawn')) this.npcs.push(this._mkNpc({ ...NAMED.vern, key: 'vern', x: 500, y: 106, room: 'pawn', static: true, pool: 'vern' }));
+    if (this.isOpen('daybreak')) {
+      this.npcs.push(this._mkNpc({ ...NAMED.madison, key: 'madison', x: 320, y: 106, room: 'daybreak', static: true, pool: 'madison' }));
+      this.npcs.push(this._mkNpc({ arch: 'average', outfit: { shirt: '#3a4048', pants: '#2e3138' }, hat: 'none',
+        x: 500, y: 300, room: 'daybreak', static: true, pool: 'fairview_rep', name: 'Fairview' }));
+      this.npcs.push(this._mkNpc({ outfitKey: 'tourist', x: 150, y: 300, room: 'daybreak', pool: 'tourist' }));
+    }
     // The Foxhole: staff, stage, and a floor of regulars who'd rather be here
     if (this.isOpen('foxhole')) {
       this.npcs.push(this._mkNpc({ ...NAMED.dee, key: 'dee', x: 595, y: 104, room: 'foxhole', static: true, pool: 'dee' }));
@@ -241,7 +268,7 @@ export class Game {
 
     // cops
     if (this.block === 1) this._spawnCop('tapp', [[500, 505], [1300, 505], [1900, 508], [1000, 1060]]);
-    if (this.block >= 2) this._spawnCop('brill', [[1880, 508], [1100, 505], [520, 508], [900, 1060], [1500, 1060]]);
+    if (this.block >= 2) this._spawnCop('brill', [[1880, 508], [1100, 505], [520, 508], [900, 1060], [700, 2145], [1400, 2148], [1500, 1060]]);
     if (this.heatStage() >= 3) { this._spawnCop('tapp', [[600, 700]]); this._spawnCop('brill', [[1600, 700]]); }
     // debt collector
     if (this.player.debt > 0 && this.day >= 5 && this.block >= 2 && !this.reggieSpawned) {
@@ -264,6 +291,7 @@ export class Game {
   endBlock(reason) {
     if (this.over) return;
     this.blockT = 0;
+    this.dt.shots = 0;          // the stomach resets on the hour, roughly
     this.block++;
     const last = this.blocksToday - 1 + this.bonusBlocks;
     if (this.block > last) return this.endDay();
@@ -762,6 +790,100 @@ export class Game {
     return { ok: true, msg: `−$${T.foxVipCost}. The curtain closes.\n\nLater: you're in the gravel lot, warmer, calmer, poorer, and no wiser. Somebody put your jacket back on you. The night went somewhere without you and left you the receipt.` };
   }
 
+  // ── DOWNTOWN ──────────────────────────────────────────────────────────────
+  slBeer() {
+    if (this.room !== 'splitlip') return { ok: false };
+    if (!this._spend(T.slBeer)) return { ok: false, msg: 'Sal doesn\'t even look up. Broke men have a sound.' };
+    this.player.hp = Math.min(this.player.hpMax, this.player.hp + 6);
+    return { ok: true, msg: `−$${T.slBeer}. Cold, honest, and slightly hostile. The house style.` };
+  }
+
+  // Well whiskey. Past the second one, your stomach starts drafting a statement.
+  slShot() {
+    if (this.room !== 'splitlip') return { ok: false };
+    if (!this._spend(T.slShot)) return { ok: false, msg: 'Three dollars. You are short of THREE dollars. Sal pours himself one in your honor.' };
+    this.dt.shots++;
+    if (this.dt.shots > 2 && this.chance((this.dt.shots - 2) * T.hurlBase)) {
+      this.player.hp = Math.max(1, this.player.hp - 3);
+      this.dt.shots = 0;
+      this.fx('hurl', this.player.x, this.player.y, {});
+      this.sfx('yell');
+      return { ok: true, hurled: true, msg: this.pick(BARKS.hurl) };
+    }
+    this.player.hp = Math.min(this.player.hpMax, this.player.hp + 3);
+    return { ok: true, msg: `−$${T.slShot}. It tastes like a lawnmower learned regret. Shot ${this.dt.shots} settles in anyway.` };
+  }
+
+  // Buy the room a round: the Lip's whole social contract in one transaction.
+  slRound() {
+    if (this.room !== 'splitlip') return { ok: false };
+    if (this.dt.round === this.day) return { ok: false, msg: 'Sal: "Once a day, big spender. This ain\'t the Bluffs and you ain\'t your check."' };
+    if (!this._spend(T.slRound)) return { ok: false, msg: 'You offer the room a round you cannot pay for. The room, kindly, pretends it never happened.' };
+    this.dt.round = this.day;
+    this.heat = Math.max(0, this.heat - T.slRoundHeat);
+    this.say('Sal', 'ROUND ON THE KID. Act like you\'ve been loved before, you animals.', 200, 90);
+    return { ok: true, msg: `−$${T.slRound}. The room roars. For one round of well whiskey these people would carry you out of a fire, feet first, but still.` };
+  }
+
+  slLayLow() {
+    if (this.room !== 'splitlip') return { ok: false };
+    const before = this.heat;
+    this.heat = Math.max(0, this.heat - T.slHeatDecay);
+    this.endBlock('nursed one at the Lip');
+    return { ok: true, msg: `You nurse one beer for two hours like a professional. Heat ${Math.round(before)} → ${Math.round(this.heat)}. This room talks, though. It always talks.` };
+  }
+
+  cueGrab() {
+    if (this.room !== 'splitlip') return { ok: false };
+    if (this.player.held) return { ok: false, msg: 'Your hands are full. The rack judges you anyway.' };
+    this.player.held = { kind: 'cue', dur: WEAPONS.cue.dur };
+    return { ok: true, msg: 'You take a house cue. Warped, sticky, perfect. If it leaves the building, you bought it — house rule, in blood.' };
+  }
+
+  latte() {
+    if (this.room !== 'daybreak') return { ok: false };
+    if (!this._spend(T.latteCost)) return { ok: false, msg: 'Nine dollars. Madison\'s face does genuine grief on your behalf.' };
+    this.player.hp = Math.min(this.player.hpMax, this.player.hp + T.latteHeal);
+    this.stats.lattes = (this.stats.lattes || 0) + 1;
+    return { ok: true, msg: `−$${T.latteCost}. It's... it's really good. You hate that it's good. You drink it where nobody from the Lip can see you.` };
+  }
+
+  overhear() {
+    if (this.room !== 'daybreak') return { ok: false };
+    if (!this.scheme.hear) {
+      this._schemeCheck('hear');
+      return { ok: true, msg: 'The Fairview table, not quietly: "—game store\'s the holdout. Old man\'s got a back room full of \'97 stock he thinks is a pension—" You stir your water like it\'s a job.' };
+    }
+    return { ok: true, msg: `The reps again: "${this.pick(BARKS.fairview_rep)}"` };
+  }
+
+  pawnFence() {
+    const s = this.scheme;
+    if (this.room !== 'pawn' || s.inCar <= 0) return { ok: false, msg: 'Vern squints at your empty hands. "Come back with a story, kid."' };
+    const n = s.inCar, take = T.pawnCrate * n;
+    s.inCar = 0; s.sold += n; s.cash += take; s.holding = false;
+    this._earn(take);
+    this._schemeCheck('fence');
+    return { ok: true, msg: `${n} crate${n === 1 ? '' : 's'} → $${take}, flat, no questions. Vern: "I never saw you, you never saw the owl see you."` };
+  }
+
+  pawnBuy(what) {
+    if (this.room !== 'pawn') return { ok: false };
+    if (what === 'bat') {
+      if (!this._spend(T.pawnBat)) return { ok: false, msg: 'Eighteen bucks. Vern: "The bat stays in the family till then."' };
+      if (this.player.held) this.throwHeld();
+      this.player.held = { kind: 'bat', dur: WEAPONS.bat.dur };
+      return { ok: true, msg: `−$${T.pawnBat}. A Louisville with somebody's initials burned in it and one story Vern won't tell.` };
+    }
+    if (what === 'crowbar') {
+      if (this.player.inv.crowbar) return { ok: false, msg: 'You have one. Vern respects a man with his own iron.' };
+      if (!this._spend(T.pawnCrowbar)) return { ok: false, msg: 'Twenty-six. The convenience tax is for not having to look Earl in the eye.' };
+      this.player.inv.crowbar = true; this._schemeCheck('tools');
+      return { ok: true, msg: `−$${T.pawnCrowbar}. Vern wraps it in newspaper like a fish. "For the look of the thing."` };
+    }
+    return { ok: false };
+  }
+
   // ── Rolling a body ────────────────────────────────────────────────────────
   // The payoff combat never had. It's also the meanest thing in the prototype, so it
   // bills you twice: heat now (robbery, not a scuffle) and a grudge that gets up later.
@@ -972,6 +1094,10 @@ export class Game {
       foxEnter: () => this.enterFoxhole(), foxDrink: () => this.foxDrink(),
       foxTip: () => this.foxTip(arg), foxInfo: () => this.foxBuyInfo(),
       foxVip: () => this.foxVip(), foxLayLow: () => this.foxLayLow(),
+      slBeer: () => this.slBeer(), slShot: () => this.slShot(), slRound: () => this.slRound(),
+      slLayLow: () => this.slLayLow(), cueGrab: () => this.cueGrab(),
+      latte: () => this.latte(), overhear: () => this.overhear(),
+      pawnFence: () => this.pawnFence(), pawnBuy: () => this.pawnBuy(arg),
       shiftAuto: () => this.doShiftAuto(arg || 0), endBlock: () => { this.endBlock(arg || 'waited'); return { ok: true }; },
       brawlAuto: () => this.brawlAuto(arg || 2), heistTripAuto: () => this.heistTripAuto(),
       exitShopCheck: () => { this.exitShopCheck(); return { ok: true }; },
@@ -994,6 +1120,9 @@ export class Game {
       case 'gamebarn': return block <= 2;
       case 'cashking': return block >= 1;
       case 'foxhole': return block >= 2;      // evening and late only, obviously
+      case 'splitlip': return block >= 1;     // Sal opens for the lunch drinkers. Community service.
+      case 'daybreak': return block <= 2;     // closes at dark; they're not from here
+      case 'pawn': return block <= 2;
       default: return true;
     }
   }
@@ -1007,6 +1136,9 @@ export class Game {
       gamebarn: 'Locked. The sign flips to CLOSED at dark. Gary sleeps above the shop, allegedly.',
       cashking: 'Roxy isn\'t in yet. The glass is doing its job in the meantime.',
       foxhole: 'Dark. The fox sign\'s off and Moose\'s truck is gone. Doors at six, same as it\'s been since the eighties.',
+      splitlip: 'Sal opens at noon. Before that he\'s in there alone, mopping, and nobody needs to see a man commune with that floor.',
+      daybreak: 'Closed. The chairs are upside down on the tables like they\'re surrendering. Nine dollars, and they\'re scared of the dark.',
+      pawn: 'The cage is down. Vern sleeps above the shop with the owl and, allegedly, the good jewelry.',
     }[key] || 'Closed.';
   }
 
@@ -1033,6 +1165,10 @@ export class Game {
     else if (b) { this.player.x = b.x + b.w / 2; this.player.y = STRIP_Y.base + 30; }
     else if (this.room === 'garage') { this.player.x = GARAGE.door.x + 20; this.player.y = GARAGE.y - 26; }
     else if (this.room === 'foxhole') { this.player.x = FOXHOLE.door.x; this.player.y = FOXHOLE.door.y + 24; }
+    else {
+      const dtb = DOWNTOWN.find(d => d.key === this.room);
+      if (dtb) { this.player.x = dtb.x + dtb.w * ((dtb.face && dtb.face.doorAt) || 0.5); this.player.y = DT_Y.base + 28; }
+    }
     this.room = 'ext';
     this.gameBarnDark = false;
     if (wasShop) this.exitShopCheck();
@@ -1096,6 +1232,12 @@ export class Game {
       p._crateSeen = true;
       this.addHeat(T.heatCrime.heistSeen * 0.6, 0, 'seen hauling');
       this.alert('Somebody clocked the crate. The word "FUNSTATION" is now moving through Hopewell at group-chat speed.', 'bad');
+    }
+
+    // first trip past the tracks gets a title card
+    if (this.room === 'ext' && !this.dt.seen && p.y > RAIL_Y + 60) {
+      this.dt.seen = true;
+      this.alert('DOWNTOWN — eleven storefronts, four with a pulse. The interstate said no in \'74 and the fonts never recovered.', 'scheme');
     }
 
     // dog

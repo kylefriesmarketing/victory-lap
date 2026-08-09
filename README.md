@@ -105,6 +105,23 @@ Uses the portable Node at `C:\Users\kylef\tools\node` (not on PATH).
   The doc's fence is untouched and permanent: adults only, fade-to-black, no slurs,
   no cruelty without a punchline. Crude is the water table, not a district.
 
+- **M1.5 — DOWNTOWN** ✅ (2026-08-06)
+  The world grows south: 2200×1500 → 2200×2400. Across the rail spur (the train that
+  never stops finally has rails, plus a buckshot-riddled crossbuck) and the vacant
+  band (foundation slabs of the downtown that used to keep going, the FREE (STILL)
+  couch, the water tower reading H O P _ W E L _) lies **Main Street**: THE SPLIT LIP
+  (dive bar — cheap beer, well whiskey with a real hurl roll past shot two, buy-the-
+  room-a-round for −12 heat once a day, free house cues, the bathroom of legend),
+  LOANSTAR PAWN (Vern fences crates flat $55 no-questions — a coward's third fence —
+  and sells the bat), DAYBREAK COFFEE (the Fairview beachhead, operating: $9 lattes,
+  and eavesdropping the rep table is a THIRD route into the scheme), four dead
+  storefronts spanning three generations of giving up, and the courthouse square with
+  its half-mast flag nobody remembers the reason for. New cast: Sal, Vern, Madison,
+  the Fairview reps, and the splitlip_reg pool — the filthiest poetry in the game.
+  Brill's evening route now sweeps Main Street; ambient population fills both drags.
+  ⚠️ The facade painter is parameterized now — `_paintBuilding(c, b, Y, alley)` —
+  one painter, two rows, don't fork it.
+
 ## What's deliberately NOT in Phase 1 (per the roadmap — don't "fix" these)
 
 - No Hopeless Tech, classes, GPA, or majors (Phase 2).

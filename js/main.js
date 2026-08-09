@@ -3,8 +3,8 @@
 // The sim never touches this file's DOM; this file never reaches into sim internals
 // except through game.act / documented fields.
 
-import { Game, soakRun, T, BUILDINGS, GARAGE, FOXHOLE, INTERIORS, STRIP_Y, BARKS, SCHEME,
-         ENDINGS, BLOCK_NAMES, DAY_NAMES, NAMED } from './game.js';
+import { Game, soakRun, T, BUILDINGS, GARAGE, FOXHOLE, DOWNTOWN, DT_Y, WATER_TOWER, COURTHOUSE,
+         INTERIORS, STRIP_Y, BARKS, SCHEME, ENDINGS, BLOCK_NAMES, DAY_NAMES, NAMED } from './game.js';
 import { Renderer } from './render.js';
 import { Sfx } from './audio.js';
 
@@ -219,6 +219,28 @@ function interactables() {
       if (n.key === 'peanut') add(n.x, n.y, 50, 'Talk to Peanut', () => { const r = g.act('talkPeanut'); renderer.bark('Peanut', r.text, n.x, n.y); });
       else if (n.key === 'chuck' || n.key === 'tanner') add(n.x, n.y, 44, `${n.name} (Alumni, loud)`, () => renderer.bark(n.name, uiPick(BARKS[n.key]), n.x, n.y));
     }
+    // DOWNTOWN doors + furniture
+    for (const b of DOWNTOWN) {
+      const dx = b.x + b.w * ((b.face && b.face.doorAt) || 0.5), dy = DT_Y.base + 6;
+      if (b.dead) {
+        add(dx, dy, 44, b.label, () => feed(b.dead === 'fairview'
+          ? '"ANOTHER FAIRVIEW OPPORTUNITY." It spreads. Like the buffet\'s grease fire, but with fonts.'
+          : 'Papered glass. Behind it, a room where a business used to stand and now dust practices standing.', 'warn'));
+        continue;
+      }
+      if (g.isOpen(b.key)) add(dx, dy, 46, `Enter ${b.label}`, () => result(g.act('enter', b.key)));
+      else add(dx, dy, 46, `${b.label} — closed`, () => result(g.act('enter', b.key)));
+    }
+    add(WATER_TOWER.x, WATER_TOWER.y + 40, 70, 'The water tower (H O P _ W E L _)', () =>
+      feed('The E fell in \'98 and the L followed it out of solidarity. Climbing it is a Hopewell rite of passage and a Hopewell obituary.', 'ok'));
+    add(COURTHOUSE.x + COURTHOUSE.w / 2, COURTHOUSE.y - 20, 70, 'The courthouse (read the docket)', () =>
+      feed(g.heatStage() >= 2
+        ? 'Thursday\'s docket, posted behind glass. Your name has a little star next to it. The star means "again."'
+        : 'Thursday\'s docket: two DUIs, a fence dispute, and a man suing his own brother over a smoker. The town phone book, with worse fonts.', 'warn'));
+    add(1240, 1700, 56, 'The free couch (it has seen things)', () =>
+      feed('It\'s been rained on. It is still free. Somewhere out there is a man who believes he is coming back for it.', 'ok'));
+    add(700, 2340, 50, 'The memorial rock', () =>
+      feed('"TO OUR BOYS." No war specified. Covers everything, that way. Somebody\'s left a fresh beer on it, which is the correct sacrament.', 'ok'));
     // a body on the ground is an opportunity now and a problem in about thirty seconds
     const body = g.rollableNear();
     if (body) add(body.x, body.y, 44, `Go through ${body.name ? body.name + "'s" : 'his'} pockets`, () => result(g.act('roll')));
@@ -308,6 +330,54 @@ function interactables() {
       { label: `Become furniture (heat −${T.foxHeatDecay})`, go: () => result(g.act('foxLayLow')) },
     ]));
     add(380, IT.h - 24, 60, 'Out to the gravel', () => result(g.act('leave')));
+  } else if (g.room === 'splitlip') {
+    const IT = INTERIORS.splitlip;
+    add(IT.counter.x + IT.counter.w / 2, IT.counter.y + 40, 64, 'Sal, at the taps', () => showChoice(
+      'The bar.', 'Sal pours, Sal listens, Sal forgets professionally.', [
+      { label: `Beer — $${T.slBeer}`, go: () => result(g.act('slBeer')) },
+      { label: `Well whiskey — $${T.slShot} (your funeral)`, go: () => {
+          const r = result(g.act('slShot'));
+          if (r.hurled) renderer.bark(null, 'The Lip applauds. Sal slides you a water like a eulogy.', g.player.x, g.player.y - 20);
+        } },
+      { label: `Buy the room a round — $${T.slRound} (heat −${T.slRoundHeat})`, go: () => result(g.act('slRound')) },
+      { label: 'Just talk', go: () => renderer.bark('Sal', uiPick(BARKS.sal), IT.counter.x + 130, IT.counter.y + 20) },
+    ]));
+    add(IT.pool.x + IT.pool.w / 2, IT.pool.y + IT.pool.h + 20, 60, 'The pool table (burned, beloved)', () =>
+      feed('The felt has a burn shaped like Ohio. House rules are chalked on the wall and two of them are just names with lines through them.', 'ok'));
+    add(646, 220, 50, 'The cue rack', () => result(g.act('cueGrab')));
+    add(682, 90, 50, 'The bathroom (ABANDON HOPE)', () =>
+      feed('You crack the door. The smell has a texture. Something in there waves at a regular. You close the door and choose dignity, barely.', 'warn'));
+    add(85, 355, 46, 'The jukebox (out of order since \'09)', () =>
+      feed('Behind the glass: "ACHY BREAKY HEART," queued since 2009, waiting like a landmine.', 'ok'));
+    add(IT.w / 2, IT.h - 24, 60, 'Back to Main Street', () => result(g.act('leave')));
+  } else if (g.room === 'daybreak') {
+    const IT = INTERIORS.daybreak;
+    add(IT.counter.x + IT.counter.w / 2, IT.counter.y + 40, 62, 'Madison, at the register', () => showChoice(
+      'Daybreak.', 'It smells like cedar and venture capital.', [
+      { label: `Latte — $${T.latteCost} (nine dollars. NINE.)`, go: () => result(g.act('latte')) },
+      { label: 'Just talk', go: () => renderer.bark('Madison', uiPick(BARKS.madison), IT.counter.x + 120, IT.counter.y + 20) },
+    ]));
+    add(510, 288, 56, 'The Fairview table (eavesdrop)', () => {
+      const r = result(g.act('overhear'));
+      if (r.ok && g.scheme.hear) { updateScheme(); }
+    });
+    add(150, 280, 46, 'The communal table', () =>
+      feed('A sign says COMMUNITY TABLE. Two laptops, zero community. A local sits at the end like a hostage with a scone.', 'warn'));
+    add(IT.w / 2, IT.h - 24, 60, 'Back out (take the cup, hide the cup)', () => result(g.act('leave')));
+  } else if (g.room === 'pawn') {
+    const IT = INTERIORS.pawn;
+    add(IT.counter.x + IT.counter.w / 2, IT.counter.y + 40, 64, 'Vern, behind the cage', () => showChoice(
+      'Loanstar.', `Vern looks at you like an appraisal. ${g.scheme.inCar > 0 ? `He has, somehow, already counted your trunk.` : ''}`, [
+      g.scheme.inCar > 0 ? { label: `Fence the crates — $${T.pawnCrate} each, flat, no faces`, go: () => result(g.act('pawnFence')) } : null,
+      { label: `The bat — $${T.pawnBat}`, go: () => result(g.act('pawnBuy', 'bat')) },
+      !p.inv.crowbar ? { label: `A crowbar — $${T.pawnCrowbar} (Earl's is cheaper; Earl asks questions)`, go: () => result(g.act('pawnBuy', 'crowbar')) } : null,
+      { label: 'Just talk', go: () => renderer.bark('Vern', uiPick(BARKS.vern), IT.counter.x + 120, IT.counter.y + 20) },
+    ].filter(Boolean)));
+    add(300, 290, 50, 'The ring case (rows by decade)', () =>
+      feed('Front row\'s the nineties: big stones, big hopes. Prices drop as the rows get newer. There\'s a sticky note that just says "ASK ABOUT PAIRS."', 'warn'));
+    add(600, 100, 46, 'The owl (not for sale)', () =>
+      feed('The owl has seen Vern cry and it stays where the leverage is. It watches you the way the camera at Wing Barn wishes it could.', 'ok'));
+    add(IT.w / 2, IT.h - 24, 60, 'Back to Main Street', () => result(g.act('leave')));
   } else if (g.room === 'garage') {
     add(120, 95, 60, 'The cot (sleep — ends the day)', () => showChoice('Sleep?', 'The rest of today goes with it. Heat cools double here — the Flats wouldn\'t give a cop directions to a fire.', [
       { label: 'Sleep. Let the town forget your face a little.', go: () => result(g.act('sleep')) }]));
