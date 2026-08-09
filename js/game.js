@@ -4,13 +4,13 @@
 
 import {
   TUNING as T, WEAPONS, WORLD, BUILDINGS, ALLEY_GAPS, STRIP_Y, EXTERIOR_PROPS, GARAGE, FOXHOLE,
-  DOWNTOWN, DT_Y, RAIL_Y, WATER_TOWER, COURTHOUSE, MAIN_ST,
+  DOWNTOWN, DT_Y, RAIL_Y, WATER_TOWER, COURTHOUSE, MAIN_ST, WORKS,
   WEAPON_SPAWNS, INTERIORS, ARCHETYPES, OUTFITS, NAMED, POPULATION, SPOTS,
   BARKS, SCHEME, ENDINGS, BLOCK_NAMES, DAY_NAMES, WEATHER_KINDS, MENU, RIP,
 } from './data.js';
 
 export { T, WEAPONS, WORLD, BUILDINGS, ALLEY_GAPS, STRIP_Y, EXTERIOR_PROPS, GARAGE, FOXHOLE,
-         DOWNTOWN, DT_Y, RAIL_Y, WATER_TOWER, COURTHOUSE, MAIN_ST, INTERIORS,
+         DOWNTOWN, DT_Y, RAIL_Y, WATER_TOWER, COURTHOUSE, MAIN_ST, WORKS, INTERIORS,
          ARCHETYPES, OUTFITS, NAMED, BARKS, SCHEME, ENDINGS, BLOCK_NAMES, DAY_NAMES, MENU, RIP };
 
 let _eid = 1;
@@ -48,7 +48,7 @@ export class Game {
     if (this.knewWindow) { this.scheme.hear = true; this.scheme.case = true; }
     if (this.knewDrop) this.scheme.window = true;
     this.fox = { paid: -1, visits: 0, drinks: 0, tips: 0, bought: 0, vip: -1 };
-    this.dt = { round: -1, shots: 0, seen: false };
+    this.dt = { round: -1, shots: 0, seen: false, pallet: -1, worksSeen: false };
     this.npcs = []; this.pickups = []; this.projectiles = [];
     this.stats = { punches: 0, koGiven: 0, koTaken: 0, skimmed: 0, shifts: 0, rip: 0,
                    crimesSeen: 0, cuffsEscaped: 0, spent: 0, earned: 0 };
@@ -102,6 +102,14 @@ export class Game {
       s.push({ ...COURTHOUSE });
       for (const [lx, ly] of [[-38, 0], [30, 0], [-38, 66], [30, 66]])
         s.push({ x: WATER_TOWER.x + lx, y: WATER_TOWER.y + ly, w: 8, h: 8 });
+      // Cassidy Works: the plant, the hall, the gate shack, the containers, the boxcars
+      s.push({ ...WORKS.plant });
+      s.push({ x: WORKS.hall.x, y: WORKS.hall.y, w: WORKS.hall.w, h: WORKS.hall.h, door: 'unionhall' });
+      s.push({ ...WORKS.gate });
+      s.push({ ...WORKS.dockOffice });
+      for (const [cx2, cy2, cw, chh] of [[2480, 1160, 130, 60], [2840, 1120, 150, 64], [3040, 1300, 130, 60], [2660, 1300, 110, 56]])
+        s.push({ x: cx2, y: cy2, w: cw, h: chh });   // container stacks
+      for (const bx of WORKS.boxcars) s.push({ x: bx, y: RAIL_Y - 36, w: 220, h: 64 });
       for (const p of EXTERIOR_PROPS) {
         if (p.kind === 'pumps') s.push({ x: p.x, y: p.y, w: p.w, h: p.h });
         if (p.kind === 'dumpster') s.push({ x: p.x, y: p.y, w: p.w, h: p.h });
@@ -232,6 +240,13 @@ export class Game {
     if (this.block === 0 || this.block >= 3) {
       this.npcs.push(this._mkNpc({ ...NAMED.bev, key: 'bev', x: 560, y: 95, room: 'garage', static: true, pool: 'bev' }));
     }
+    // Cassidy Works: Denny in the hall (always — spite), Gus walking his loop
+    this.npcs.push(this._mkNpc({ ...NAMED.denny, key: 'denny', x: 150, y: 96, room: 'unionhall', static: true, pool: 'denny' }));
+    const gus = this._mkNpc({ ...NAMED.gus, key: 'gus', x: 2400, y: 1150, hp: 80, pool: 'gus',
+      route: [[2400, 1150], [3000, 1130], [3180, 1300], [2700, 1430], [2380, 1300]] });
+    gus.cop = false; gus.persistent = false;
+    this.npcs.push(gus);
+
     // Downtown staff + the Fairview reps colonising Daybreak's corner table
     if (this.isOpen('splitlip')) {
       this.npcs.push(this._mkNpc({ ...NAMED.sal, key: 'sal', x: 200, y: 108, room: 'splitlip', static: true, pool: 'sal' }));
@@ -790,6 +805,70 @@ export class Game {
     return { ok: true, msg: `−$${T.foxVipCost}. The curtain closes.\n\nLater: you're in the gravel lot, warmer, calmer, poorer, and no wiser. Somebody put your jacket back on you. The night went somewhere without you and left you the receipt.` };
   }
 
+  // ── CASSIDY WORKS ─────────────────────────────────────────────────────────
+  dockShift() {
+    const p = this.player;
+    if (this.block !== 2) return { ok: false, msg: 'One shift running, and it\'s the evening one. The dock keeps plant hours, not yours.' };
+    if (p.hp < T.dockMinHp) return { ok: false, msg: 'The window slides shut. "Denny says no broken men on the dock. Union rule. Go eat something."' };
+    this._earn(T.dockPay);
+    p.hp = Math.max(1, p.hp - T.dockHpCost);
+    this.stats.dockShifts = (this.stats.dockShifts || 0) + 1;
+    this.endBlock('humped freight');
+    return { ok: true, msg: `Two hours of lifting things that outweigh your ambitions. +$${T.dockPay} cash, and your back files a grievance with Local 448.` };
+  }
+
+  // The fell-off-the-truck pallet: one per day, somewhere in the yard, and Gus
+  // knows every pallet BY WEIGHT. Time his loop or feed his ledger.
+  palletToday() {
+    const i = (this.seed + this.day * 7) % WORKS.pallets.length;
+    return WORKS.pallets[i];
+  }
+
+  palletGrab() {
+    const p = this.player;
+    if (this.room !== 'ext') return { ok: false };
+    if (this.dt.pallet === this.day) return { ok: false, msg: 'Nothing else fell off a truck today. Trucks are careful on Wednesdays, or whatever day this is.' };
+    const gus = this.npcs.find(n => n.key === 'gus' && !n.ko);
+    if (gus && Math.hypot(gus.x - p.x, gus.y - p.y) < T.gusCatchRange) {
+      this.dt.pallet = this.day;   // the day's chance is BLOWN — Gus re-counts everything
+      this.addHeat(6, 0, 'Gus wrote you up');
+      this.say('Gus', this.pick(BARKS.gus_caught), gus.x, gus.y);
+      return { ok: false, caught: true, msg: 'Gus materializes out of the yard like he IS the yard. The box stays. Your name enters the ledger, underlined.' };
+    }
+    this.dt.pallet = this.day;
+    p.inv.freight = (p.inv.freight || 0) + 1;
+    this.stats.freight = (this.stats.freight || 0) + 1;
+    this.sfx('trunk');
+    return { ok: true, msg: 'One box of "assorted" slides off the pallet and into your jacket, which is now a warehouse. It fell. Everyone agrees it fell.' };
+  }
+
+  fenceFreight(where) {
+    const p = this.player;
+    const n = p.inv.freight || 0;
+    if (n <= 0) return { ok: false };
+    const per = where === 'vern' ? T.freightVern : T.freightRoxy;
+    if (where === 'vern' && this.room !== 'pawn') return { ok: false };
+    if (where !== 'vern' && this.room !== 'cashking') return { ok: false };
+    p.inv.freight = 0;
+    this._earn(per * n);
+    return { ok: true, msg: `${n} box${n === 1 ? '' : 'es'} of assorted → $${per * n}. ${where === 'vern' ? 'Vern doesn\'t even open them. "Assorted\'s assorted."' : 'Roxy: "Falling off trucks. In THIS economy. Somebody should look into gravity."'}` };
+  }
+
+  hallCoffee() {
+    if (this.room !== 'unionhall') return { ok: false };
+    if (!this._spend(T.hallCoffee)) return { ok: false, msg: 'You cannot afford the fifty-cent coffee. Denny watches you not afford it. This is the worst moment of your week.' };
+    this.player.hp = Math.min(this.player.hpMax, this.player.hp + 3);
+    return { ok: true, msg: '−50¢ in the honor box. The coffee tastes like the building: old, bitter, and still standing.' };
+  }
+
+  hallLayLow() {
+    if (this.room !== 'unionhall') return { ok: false };
+    const before = this.heat;
+    this.heat = Math.max(0, this.heat - T.hallHeatDecay);
+    this.endBlock('sat with the union');
+    return { ok: true, msg: `Two hours of folding chairs and forty-year-old grievances. Heat ${Math.round(before)} → ${Math.round(this.heat)}. Nobody in this hall answers questions. They've all BEEN questions.` };
+  }
+
   // ── DOWNTOWN ──────────────────────────────────────────────────────────────
   slBeer() {
     if (this.room !== 'splitlip') return { ok: false };
@@ -1098,6 +1177,9 @@ export class Game {
       slLayLow: () => this.slLayLow(), cueGrab: () => this.cueGrab(),
       latte: () => this.latte(), overhear: () => this.overhear(),
       pawnFence: () => this.pawnFence(), pawnBuy: () => this.pawnBuy(arg),
+      dockShift: () => this.dockShift(), palletGrab: () => this.palletGrab(),
+      fenceFreight: () => this.fenceFreight(arg), hallCoffee: () => this.hallCoffee(),
+      hallLayLow: () => this.hallLayLow(),
       shiftAuto: () => this.doShiftAuto(arg || 0), endBlock: () => { this.endBlock(arg || 'waited'); return { ok: true }; },
       brawlAuto: () => this.brawlAuto(arg || 2), heistTripAuto: () => this.heistTripAuto(),
       exitShopCheck: () => { this.exitShopCheck(); return { ok: true }; },
@@ -1123,6 +1205,7 @@ export class Game {
       case 'splitlip': return block >= 1;     // Sal opens for the lunch drinkers. Community service.
       case 'daybreak': return block <= 2;     // closes at dark; they're not from here
       case 'pawn': return block <= 2;
+      case 'unionhall': return true;          // lit out of spite. ALWAYS lit. That's the point.
       default: return true;
     }
   }
@@ -1165,6 +1248,7 @@ export class Game {
     else if (b) { this.player.x = b.x + b.w / 2; this.player.y = STRIP_Y.base + 30; }
     else if (this.room === 'garage') { this.player.x = GARAGE.door.x + 20; this.player.y = GARAGE.y - 26; }
     else if (this.room === 'foxhole') { this.player.x = FOXHOLE.door.x; this.player.y = FOXHOLE.door.y + 24; }
+    else if (this.room === 'unionhall') { this.player.x = WORKS.hall.door.x; this.player.y = WORKS.hall.door.y + 26; }
     else {
       const dtb = DOWNTOWN.find(d => d.key === this.room);
       if (dtb) { this.player.x = dtb.x + dtb.w * ((dtb.face && dtb.face.doorAt) || 0.5); this.player.y = DT_Y.base + 28; }
@@ -1239,6 +1323,10 @@ export class Game {
       this.dt.seen = true;
       this.alert('DOWNTOWN — eleven storefronts, four with a pulse. The interstate said no in \'74 and the fonts never recovered.', 'scheme');
     }
+    if (this.room === 'ext' && !this.dt.worksSeen && p.x > 2280 && p.y < 1600) {
+      this.dt.worksSeen = true;
+      this.alert('CASSIDY WORKS — nine hundred jobs once. One shift now. The freight still comes through, and nobody counts it like they used to.', 'scheme');
+    }
 
     // dog
     if (this.room === 'ext' && !this.dogCalm) {
@@ -1280,6 +1368,21 @@ export class Game {
     const dToP = Math.hypot(p.x - n.x, p.y - n.y);
 
     if (n.cop) return this._updateCop(n, dt, dToP);
+
+    // civilian route-walkers (Gus): patrol the loop, slower than a cop, older than the yard
+    if (n.route && n.state === 'idle') {
+      const w = n.route[n.wpt];
+      const dx = w[0] - n.x, dy = w[1] - n.y, d = Math.hypot(dx, dy);
+      if (d < 12) n.wpt = (n.wpt + 1) % n.route.length;
+      else { n.x += (dx / d) * 46 * dt; n.y += (dy / d) * 46 * dt; n.facing = Math.atan2(dy, dx); }
+      n.barkT -= dt;
+      if (n.barkT <= 0 && dToP < 200 && this.chance(0.5)) {
+        n.barkT = this.rr(16, 30);
+        this.say(n.name, this.pick(BARKS[n.pool] || BARKS.townie_idle), n.x, n.y);
+      } else if (n.barkT <= 0) n.barkT = this.rr(10, 20);
+      this.collide(n, 12);
+      return;
+    }
 
     switch (n.state) {
       case 'idle': {

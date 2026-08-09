@@ -64,6 +64,7 @@ export class Sfx {
       train:    () => { this.tone(196, 1.6, 'sawtooth', 0.025, 0); this.tone(233, 1.6, 'sawtooth', 0.025); this.tone(311, 1.6, 'sawtooth', 0.02); },
       sip:      () => this.noise(0.12, 0.05, 900, 3),
       bus:      () => { this.tone(80, 1.2, 'sawtooth', 0.06, 20); this.noise(0.9, 0.05, 500, 1, 0.1); },
+      shifthorn:() => { this.tone(174, 1.8, 'sawtooth', 0.045, 8); this.tone(220, 1.8, 'sawtooth', 0.035); this.noise(1.4, 0.02, 300, 1, 0.1); },
     };
     if (S[name]) S[name]();
   }
@@ -155,6 +156,12 @@ export class Sfx {
       bed(56, 'triangle', 0.02, 2.1, 0.01);                // bass through a wall
       bed(112, 'triangle', 0.008, 2.1, 0.005);
       hiss(0.012, 300);
+      return;
+    }
+    if (kind === 'in:unionhall') {
+      bed(96, 'triangle', 0.011, 0.3, 0.005);              // fluorescents Denny replaces himself
+      every(8000, 16000, () => this.noise(0.2, 0.02, 600, 1.4));         // a folding chair, adjusting
+      every(15000, 30000, () => this.tone(1400, 0.06, 'sine', 0.012));   // the urn, percolating out of spite
       return;
     }
     if (kind === 'in:garage') {

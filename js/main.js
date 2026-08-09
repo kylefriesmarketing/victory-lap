@@ -4,7 +4,7 @@
 // except through game.act / documented fields.
 
 import { Game, soakRun, T, BUILDINGS, GARAGE, FOXHOLE, DOWNTOWN, DT_Y, WATER_TOWER, COURTHOUSE,
-         INTERIORS, STRIP_Y, BARKS, SCHEME, ENDINGS, BLOCK_NAMES, DAY_NAMES, NAMED } from './game.js';
+         WORKS, INTERIORS, STRIP_Y, BARKS, SCHEME, ENDINGS, BLOCK_NAMES, DAY_NAMES, NAMED } from './game.js';
 import { Renderer } from './render.js';
 import { Sfx } from './audio.js';
 
@@ -94,6 +94,8 @@ function weatherLine(w) {
 
 function onBlock() {
   ambience();
+  // the shift horn: if you're anywhere near the plant, the block change IS the horn
+  if (game && game.room === 'ext' && game.player.x > 2100) sfx.play('shifthorn');
   const lines = {
     1: 'AFTERNOON — the town with its makeup off.',
     2: 'EVENING — the neon wakes up. So does everybody worth avoiding.',
@@ -231,6 +233,23 @@ function interactables() {
       if (g.isOpen(b.key)) add(dx, dy, 46, `Enter ${b.label}`, () => result(g.act('enter', b.key)));
       else add(dx, dy, 46, `${b.label} — closed`, () => result(g.act('enter', b.key)));
     }
+    // CASSIDY WORKS
+    add(WORKS.hall.door.x, WORKS.hall.door.y + 10, 50, 'Union Hall — Local 448 (the lights are on)', () => result(g.act('enter', 'unionhall')));
+    add(WORKS.dockOffice.x + WORKS.dockOffice.w / 2, WORKS.dockOffice.y + WORKS.dockOffice.h + 8, 54,
+      g.block === 2 ? `The dock window — evening shift, $${T.dockPay} cash` : 'The dock window (hiring: evenings, backs)',
+      () => showChoice('The dock.', 'Two hours of freight. Cash, no camera, no skim — the dock pays in money and takes it out of your spine.', [
+        { label: `Work it — $${T.dockPay}, and your back pays ${T.dockHpCost}`, go: () => result(g.act('dockShift')) }]));
+    const pal = g.palletToday();
+    if (g.dt.pallet !== g.day) add(pal[0], pal[1], 48, 'A pallet that "fell off a truck" (allegedly)', () => {
+      const r = result(g.act('palletGrab'));
+      if (r.caught) sfx.play('yell');
+    });
+    add(WORKS.gate.x + 35, WORKS.gate.y + 80, 56, 'The plant gate', () =>
+      feed('The barrier arm is down. It is always down. A clipboard hangs in the shack with one name on today\'s shift, and the name has a coffee ring through it.', 'ok'));
+    for (const bx of WORKS.boxcars) add(bx + 110, 1490, 60, 'The boxcars (STENCH · DEBRA · YOLO, crossed out)', () =>
+      feed('Tagged by locals with names like STENCH and DEBRA. DEBRA\'s got real linework, honestly. DEBRA cares.', 'ok'));
+    add(3340, 990, 60, 'The town line ("LEAVING HOPEWELL — why though?")', () =>
+      feed('Past the sign the shoulder just gets thinner until it isn\'t a road anymore. You could walk it. People have. They all came back or they never called, and nobody knows which is worse.', 'warn'));
     add(WATER_TOWER.x, WATER_TOWER.y + 40, 70, 'The water tower (H O P _ W E L _)', () =>
       feed('The E fell in \'98 and the L followed it out of solidarity. Climbing it is a Hopewell rite of passage and a Hopewell obituary.', 'ok'));
     add(COURTHOUSE.x + COURTHOUSE.w / 2, COURTHOUSE.y - 20, 70, 'The courthouse (read the docket)', () =>
@@ -278,6 +297,11 @@ function interactables() {
       { label: 'Ask about the rates', go: () => renderer.bark('Roxy', BARKS.roxy[1], 180, 120) },
     ].filter(Boolean)));
     add(440, 145, 60, 'WINDOW 2 — "goods"', () => {
+      if ((p.inv.freight || 0) > 0 && g.scheme.inCar <= 0) {
+        showChoice('Window 2.', `${p.inv.freight} box${p.inv.freight > 1 ? 'es' : ''} of "assorted." Roxy has opinions about gravity.`, [
+          { label: `Sell the freight — $${T.freightRoxy} each`, go: () => result(g.act('fenceFreight', 'roxy')) }]);
+        return;
+      }
       if (g.scheme.inCar <= 0) { renderer.bark('Roxy', 'Window 2 is for sellers. You\'re a browser.', 440, 120); return; }
       showChoice('Window 2.', `${g.scheme.inCar} crate${g.scheme.inCar > 1 ? 's' : ''} in the beater. Roxy's already counted them somehow.`, [
         { label: `Fence now — $${T.crateFenceBase}/crate`, go: () => result(g.act('fence', false)) },
@@ -369,6 +393,7 @@ function interactables() {
     add(IT.counter.x + IT.counter.w / 2, IT.counter.y + 40, 64, 'Vern, behind the cage', () => showChoice(
       'Loanstar.', `Vern looks at you like an appraisal. ${g.scheme.inCar > 0 ? `He has, somehow, already counted your trunk.` : ''}`, [
       g.scheme.inCar > 0 ? { label: `Fence the crates — $${T.pawnCrate} each, flat, no faces`, go: () => result(g.act('pawnFence')) } : null,
+      (p.inv.freight || 0) > 0 ? { label: `The "assorted" boxes — $${T.freightVern} each`, go: () => result(g.act('fenceFreight', 'vern')) } : null,
       { label: `The bat — $${T.pawnBat}`, go: () => result(g.act('pawnBuy', 'bat')) },
       !p.inv.crowbar ? { label: `A crowbar — $${T.pawnCrowbar} (Earl's is cheaper; Earl asks questions)`, go: () => result(g.act('pawnBuy', 'crowbar')) } : null,
       { label: 'Just talk', go: () => renderer.bark('Vern', uiPick(BARKS.vern), IT.counter.x + 120, IT.counter.y + 20) },
@@ -378,6 +403,16 @@ function interactables() {
     add(600, 100, 46, 'The owl (not for sale)', () =>
       feed('The owl has seen Vern cry and it stays where the leverage is. It watches you the way the camera at Wing Barn wishes it could.', 'ok'));
     add(IT.w / 2, IT.h - 24, 60, 'Back to Main Street', () => result(g.act('leave')));
+  } else if (g.room === 'unionhall') {
+    const IT = INTERIORS.unionhall;
+    add(IT.counter.x + 35, IT.counter.y + 20, 56, 'The urn (50¢, honor box)', () => result(g.act('hallCoffee')));
+    add(150, 130, 54, 'Denny', () => renderer.bark('Denny', uiPick(BARKS.denny), 150, 112));
+    add(450, 150, 56, 'The grievance board (oldest: 1986)', () =>
+      feed('Nine active grievances. The top one is about ventilation and the bottom one is about the twentieth century. Denny\'s handwriting doesn\'t age.', 'ok'));
+    add(200, 320, 56, 'A folding chair (sit with the union)', () => showChoice('Sit a while?',
+      'Burns the rest of the block. Nobody in this hall answers questions — they\'ve all BEEN questions.', [
+      { label: `Sit. Listen. Cool off (heat −${T.hallHeatDecay})`, go: () => result(g.act('hallLayLow')) }]));
+    add(IT.w / 2, IT.h - 24, 60, 'Back to the yard', () => result(g.act('leave')));
   } else if (g.room === 'garage') {
     add(120, 95, 60, 'The cot (sleep — ends the day)', () => showChoice('Sleep?', 'The rest of today goes with it. Heat cools double here — the Flats wouldn\'t give a cop directions to a fire.', [
       { label: 'Sleep. Let the town forget your face a little.', go: () => result(g.act('sleep')) }]));
@@ -589,6 +624,7 @@ function updateHud() {
   if (p.inv.rip) chips.push(`⚡×${p.inv.rip}`);
   if (p.inv.jerky) chips.push(`🥩×${p.inv.jerky}`);
   if (p.inv.crowbar) chips.push('🔧 crowbar');
+  if (p.inv.freight) chips.push(`📦 assorted×${p.inv.freight}`);
   if (g.scheme.inCar) chips.push(`🚗 ${g.scheme.inCar} crate${g.scheme.inCar > 1 ? 's' : ''}`);
   if (p.debt) chips.push(`💸 owe $${p.debt}`);
   if (p.ripToday) chips.push('🫨 ripped');

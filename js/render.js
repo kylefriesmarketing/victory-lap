@@ -3,7 +3,7 @@
 // View-only: free to use Math.random. Never touches sim state.
 
 import { T, WORLD, BUILDINGS, ALLEY_GAPS, STRIP_Y, EXTERIOR_PROPS, GARAGE, FOXHOLE,
-         DOWNTOWN, DT_Y, RAIL_Y, WATER_TOWER, COURTHOUSE, MAIN_ST, INTERIORS,
+         DOWNTOWN, DT_Y, RAIL_Y, WATER_TOWER, COURTHOUSE, MAIN_ST, WORKS, INTERIORS,
          ARCHETYPES, NAMED } from './game.js';
 
 const PAL = {
@@ -258,6 +258,7 @@ export class Renderer {
     this._paintGarage(c);
     this._paintFoxhole(c);
     this._paintDowntown(c);
+    this._paintWorks(c);
     // south houses (set dressing)
     for (const h of [[760, 1200, 180, 140, '#6d5a4a'], [1000, 1220, 160, 120, '#5a5d52'], [1250, 1200, 200, 140, '#7a6a55'], [1550, 1230, 170, 120, '#615549']]) {
       c.fillStyle = h[4]; c.fillRect(h[0], h[1], h[2], h[3]);
@@ -637,6 +638,145 @@ export class Renderer {
     c.fillStyle = 'rgba(201,178,138,0.6)'; c.fillRect(688, 2334, 24, 12);
   }
 
+  // ── CASSIDY WORKS: the plant that made the town, half of it still trying ──
+  _paintWorks(c) {
+    const P = WORKS.plant;
+    // the campus apron: cracked concrete, oil ghosts of nine hundred parked trucks
+    c.fillStyle = '#565350'; c.fillRect(2240, 60, WORLD.w - 2240, 1440);
+    scatter(60, 601, (rnd) => {
+      c.fillStyle = rnd() < 0.5 ? '#5f5c58' : '#4b4845'; c.globalAlpha = 0.4 + rnd() * 0.3;
+      c.fillRect(2260 + rnd() * 1100, 80 + rnd() * 1380, 60 + rnd() * 180, 40 + rnd() * 100);
+    });
+    c.globalAlpha = 1;
+    scatter(40, 602, (rnd) => {
+      const x = 2300 + rnd() * 1000, y = 700 + rnd() * 700;
+      const gr = c.createRadialGradient(x, y, 2, x, y, 16 + rnd() * 20);
+      gr.addColorStop(0, PAL.oil); gr.addColorStop(1, 'rgba(20,18,22,0)');
+      c.fillStyle = gr; c.beginPath(); c.ellipse(x, y, 16 + rnd() * 22, 7 + rnd() * 10, 0, 0, 7); c.fill();
+    });
+    // the road runs INTO the plant — that's the whole point of the road
+    c.fillStyle = '#3c3a38'; c.fillRect(2240, 920, WORKS.gate.x - 2240 + 30, 120);
+    c.strokeStyle = 'rgba(201,178,138,0.30)'; c.lineWidth = 3; c.setLineDash([26, 22]);
+    c.beginPath(); c.moveTo(2240, 980); c.lineTo(WORKS.gate.x, 980); c.stroke(); c.setLineDash([]); c.lineWidth = 1;
+    c.fillStyle = 'rgba(232,220,195,0.14)'; c.font = 'bold 30px Impact, Arial'; c.textAlign = 'center';
+    c.save(); c.translate(2560, 1000); c.fillText('PLANT  TRAFFIC  ONLY', 0, 0); c.restore();
+    // weeds through every expansion joint: the yard is going back to prairie, slowly
+    c.strokeStyle = 'rgba(24,22,20,0.4)';
+    for (let jx = 2320; jx < WORLD.w; jx += 140) { c.beginPath(); c.moveTo(jx, 80); c.lineTo(jx, 900); c.stroke(); }
+    for (let jx = 2320; jx < WORLD.w; jx += 140) { c.beginPath(); c.moveTo(jx, 1060); c.lineTo(jx, 1470); c.stroke(); }
+    scatter(120, 603, (rnd) => { c.fillStyle = rnd() < 0.6 ? '#57604a' : '#6b5d43'; c.fillRect(2280 + rnd() * 1080, 80 + rnd() * 1380, 3, 2 + rnd() * 4); });
+
+    // THE PLANT: long shed, sawtooth roof, the ghost of its own name
+    c.fillStyle = '#5c5852'; c.fillRect(P.x, P.y, P.w, P.h);
+    for (let sx = P.x; sx < P.x + P.w; sx += 115) {          // sawtooth: teeth of the old economy
+      c.fillStyle = '#514d47'; c.fillRect(sx, P.y, 115, 60);
+      c.fillStyle = 'rgba(140,170,190,0.30)';
+      c.beginPath(); c.moveTo(sx + 8, P.y + 8); c.lineTo(sx + 60, P.y + 8); c.lineTo(sx + 44, P.y + 46); c.lineTo(sx + 8, P.y + 46); c.fill();
+    }
+    c.fillStyle = 'rgba(0,0,0,0.25)'; c.fillRect(P.x, P.y + 60, P.w, 8);
+    scatter(50, 604, (rnd) => { c.fillStyle = `rgba(30,26,22,${0.1 + rnd() * 0.2})`; c.fillRect(P.x + rnd() * P.w, P.y + 70 + rnd() * (P.h - 90), 20 + rnd() * 60, 6 + rnd() * 20); });
+    scatter(20, 605, (rnd) => { c.fillStyle = 'rgba(122,64,40,0.4)'; c.fillRect(P.x + rnd() * P.w, P.y + 64 + rnd() * 30, 3, 20 + rnd() * 60); }); // rust weep
+    c.fillStyle = 'rgba(232,220,195,0.16)'; c.font = 'bold 42px Impact, Arial'; c.textAlign = 'center';
+    c.fillText('CASSIDY WORKS', P.x + P.w / 2, P.y + 300);   // the ghost sign, sun-eaten
+    c.font = 'bold 12px Arial'; c.fillStyle = 'rgba(232,220,195,0.12)';
+    c.fillText('EST. 1921 — "THE TOWN THAT WORKS"', P.x + P.w / 2, P.y + 324);
+    // loading dock along the south face: bays, bumpers, one truck forever backing in
+    c.fillStyle = '#3e3b38'; c.fillRect(P.x + 40, P.y + P.h, P.w - 80, 46);
+    for (let bx = P.x + 70; bx < P.x + P.w - 100; bx += 130) {
+      c.fillStyle = '#2a2724'; c.fillRect(bx, P.y + P.h, 74, 40);
+      c.fillStyle = '#c9a227'; c.fillRect(bx, P.y + P.h + 40, 74, 5);
+    }
+    // THE STACKS — one still smoking, which is the whole town's pulse in one image
+    for (const st of WORKS.stacks) {
+      c.fillStyle = '#4e4a44'; c.fillRect(st.x - 17, 8, 34, P.y + 40);
+      c.fillStyle = '#443f39'; c.fillRect(st.x - 20, 4, 40, 12);
+      for (let ry = 30; ry < P.y + 30; ry += 34) { c.strokeStyle = 'rgba(0,0,0,0.25)'; c.beginPath(); c.moveTo(st.x - 17, ry); c.lineTo(st.x + 17, ry); c.stroke(); }
+      c.fillStyle = 'rgba(200,60,50,0.55)';
+      c.fillRect(st.x - 17, 20, 34, 5); c.fillRect(st.x - 17, 44, 34, 5);   // aircraft stripes, faded
+    }
+
+    // THE GATE: guard shack, barrier arm, the sign that promises a future in the past tense
+    const G = WORKS.gate;
+    c.fillStyle = '#6a655c'; c.fillRect(G.x, G.y, G.w, G.h);
+    c.fillStyle = 'rgba(180,210,230,0.3)'; c.fillRect(G.x + 8, G.y + 20, G.w - 16, 30);
+    c.fillStyle = 'rgba(0,0,0,0.25)'; c.fillRect(G.x, G.y, G.w, 8);
+    c.save(); c.translate(G.x - 4, G.y + 130); c.rotate(-0.06);
+    c.fillStyle = '#c9302a'; c.fillRect(-120, -5, 120, 10);
+    c.fillStyle = '#e8dcc3'; for (let i = 0; i < 4; i++) c.fillRect(-116 + i * 30, -5, 14, 10);
+    c.restore();
+    c.fillStyle = '#e8e4dc'; c.fillRect(G.x - 150, G.y - 60, 190, 44);
+    c.strokeStyle = 'rgba(0,0,0,0.3)'; c.strokeRect(G.x - 150, G.y - 60, 190, 44);
+    c.fillStyle = '#2e3a4c'; c.font = 'bold 10px Arial'; c.textAlign = 'center';
+    c.fillText('CASSIDY WORKS', G.x - 55, G.y - 44);
+    c.font = '7px Arial'; c.fillStyle = 'rgba(46,58,76,0.8)';
+    c.fillText('A PROUD PARTNER IN HOPEWELL\'S FUTURE', G.x - 55, G.y - 33);
+    c.font = 'italic 6px Georgia'; c.fillStyle = 'rgba(46,58,76,0.5)';
+    c.fillText('(sign older than the future)', G.x - 55, G.y - 24);
+
+    // THE UNION HALL: small, square, and the lights are ON. They are always on.
+    const H = WORKS.hall;
+    c.fillStyle = '#5a5148'; c.fillRect(H.x, H.y, H.w, H.h);
+    c.fillStyle = 'rgba(0,0,0,0.22)'; c.fillRect(H.x, H.y, H.w, 10);
+    c.fillStyle = 'rgba(255,214,140,0.35)';
+    c.fillRect(H.x + 20, H.y + H.h - 46, 34, 26); c.fillRect(H.x + H.w - 54, H.y + H.h - 46, 34, 26); // LIT windows, spite-powered
+    c.fillStyle = '#2a2622'; c.fillRect(H.door.x - 16, H.y + H.h - 34, 32, 34);
+    c.fillStyle = '#c9a227'; c.fillRect(H.x + 14, H.y + 16, H.w - 28, 26);
+    c.fillStyle = '#2a2622'; c.font = 'bold 9px Arial'; c.textAlign = 'center';
+    c.fillText('I.B.C.W. LOCAL 448', H.x + H.w / 2, H.y + 28);
+    c.font = '6px Arial'; c.fillText('EST 1934 · STILL HERE · STILL PAYING THE ELECTRIC', H.x + H.w / 2, H.y + 37);
+
+    // dock office: a window with a clipboard behind it
+    const D = WORKS.dockOffice;
+    c.fillStyle = '#655f55'; c.fillRect(D.x, D.y, D.w, D.h);
+    c.fillStyle = 'rgba(180,210,230,0.35)'; c.fillRect(D.x + 12, D.y + 18, D.w - 24, 26);
+    c.fillStyle = 'rgba(232,220,195,0.7)'; c.font = 'bold 6px Arial';
+    c.fillText('DOCK WINDOW', D.x + D.w / 2, D.y + 12);
+    c.fillText('HIRING (EVENINGS) (BACKS)', D.x + D.w / 2, D.y + 58);
+
+    // container stacks — the yard's skyline — and the pallet rows Gus knows by weight
+    const CONT = [[2480, 1160, 130, 60, '#7a4a3a'], [2840, 1120, 150, 64, '#4a6a5a'], [3040, 1300, 130, 60, '#5a5a7a'], [2660, 1300, 110, 56, '#7a6a3a']];
+    for (const [cx2, cy2, cw, chh, col] of CONT) {
+      c.fillStyle = col; c.fillRect(cx2, cy2, cw, chh);
+      c.fillStyle = 'rgba(0,0,0,0.28)'; c.fillRect(cx2, cy2, cw, 10);
+      for (let rx = cx2 + 8; rx < cx2 + cw; rx += 14) { c.strokeStyle = 'rgba(0,0,0,0.2)'; c.beginPath(); c.moveTo(rx, cy2 + 10); c.lineTo(rx, cy2 + chh); c.stroke(); }
+      scatter(6, cx2, (rnd) => { c.fillStyle = 'rgba(122,64,40,0.5)'; c.fillRect(cx2 + rnd() * cw, cy2 + rnd() * chh, 4 + rnd() * 10, 2 + rnd() * 5); });
+    }
+    for (const [px, py] of WORKS.pallets) {
+      c.fillStyle = '#7a6a4a'; c.fillRect(px - 22, py - 14, 44, 28);
+      c.strokeStyle = 'rgba(0,0,0,0.35)'; c.strokeRect(px - 22, py - 14, 44, 28);
+      for (let i = -1; i <= 1; i++) { c.strokeStyle = 'rgba(0,0,0,0.25)'; c.beginPath(); c.moveTo(px - 22, py + i * 8); c.lineTo(px + 22, py + i * 8); c.stroke(); }
+      c.fillStyle = 'rgba(232,220,195,0.5)'; c.fillRect(px - 14, py - 20, 28, 6);   // shrink wrap glint
+    }
+    // BOXCARS on the spur, tagged by locals with names like STENCH and DEBRA
+    for (const bx of WORKS.boxcars) {
+      c.fillStyle = 'rgba(0,0,0,0.3)'; c.fillRect(bx - 6, RAIL_Y + 24, 232, 8);
+      c.fillStyle = ['#6a4438', '#4a5568', '#5c5044'][WORKS.boxcars.indexOf(bx) % 3];
+      c.fillRect(bx, RAIL_Y - 36, 220, 60);
+      c.fillStyle = 'rgba(0,0,0,0.25)'; c.fillRect(bx, RAIL_Y - 36, 220, 9);
+      c.fillStyle = '#2a2724'; c.fillRect(bx + 88, RAIL_Y - 28, 44, 48);           // slider door
+      c.strokeStyle = 'rgba(0,0,0,0.3)'; c.strokeRect(bx + 88, RAIL_Y - 28, 44, 48);
+      c.fillStyle = ['rgba(214,90,160,0.55)', 'rgba(120,200,160,0.5)', 'rgba(230,200,90,0.5)'][WORKS.boxcars.indexOf(bx) % 3];
+      c.font = 'bold 15px Impact, Arial'; c.textAlign = 'center';
+      c.fillText(['STENCH', 'DEBRA', 'YOLO (crossed out)'][WORKS.boxcars.indexOf(bx) % 3], bx + 46, RAIL_Y + 2);
+      c.fillStyle = 'rgba(232,220,195,0.35)'; c.font = '6px Arial';
+      c.fillText('CASSIDY 4400 SERIES', bx + 170, RAIL_Y + 14);
+    }
+    // chain-link along the yard's west edge with the one hole everyone uses
+    c.strokeStyle = 'rgba(160,160,168,0.45)'; c.lineWidth = 1.5;
+    for (let fy = 1090; fy < 1460; fy += 10) { c.beginPath(); c.moveTo(2290, fy); c.lineTo(2300, fy + 10); c.stroke(); }
+    c.strokeStyle = 'rgba(160,160,168,0.7)'; c.beginPath(); c.moveTo(2290, 1090); c.lineTo(2290, 1250); c.moveTo(2290, 1330); c.lineTo(2290, 1460); c.stroke();
+    c.lineWidth = 1;   // the gap at 1250–1330: "maintenance access," per everyone
+
+    // the far edge: where Hopewell simply stops
+    c.save(); c.translate(WORLD.w - 60, 990); c.rotate(-0.03);
+    c.fillStyle = '#2e4632'; c.fillRect(-120, -34, 150, 46);
+    c.strokeStyle = 'rgba(232,220,195,0.5)'; c.strokeRect(-120, -34, 150, 46);
+    c.fillStyle = '#e8dcc3'; c.font = 'bold 9px Arial'; c.textAlign = 'center';
+    c.fillText('LEAVING HOPEWELL', -45, -18);
+    c.font = 'italic 7px Georgia'; c.fillText('why though?', -45, -6);
+    c.restore();
+  }
+
   _paintProp(c, p) {
     if (p.kind === 'pumps') {
       c.fillStyle = '#55524c'; c.fillRect(p.x, p.y, p.w, p.h);
@@ -916,6 +1056,35 @@ export class Renderer {
       c.fillStyle = '#6a5a3a'; c.beginPath(); c.ellipse(600, 90, 12, 16, 0, 0, 7); c.fill(); // the owl
       c.fillStyle = '#c9a227'; c.beginPath(); c.arc(596, 84, 2, 0, 7); c.arc(604, 84, 2, 0, 7); c.fill();
     }
+    if (room === 'unionhall') {
+      // linoleum the color of weak coffee, waxed monthly for forty years by the same man
+      c.fillStyle = '#8a8272'; c.fillRect(0, 0, it.w, it.h);
+      for (let x = 0; x < it.w; x += 40) for (let y = 0; y < it.h; y += 40)
+        if ((x + y) % 80 === 0) { c.fillStyle = 'rgba(110,100,84,0.4)'; c.fillRect(x, y, 40, 40); }
+      const k = it.counter;
+      c.fillStyle = '#6e5a3a'; c.fillRect(k.x, k.y, k.w, k.h);                       // the urn table
+      c.fillStyle = '#a8a49c'; c.fillRect(k.x + 20, k.y - 24, 30, 26);               // the urn itself
+      c.fillStyle = '#7a7468'; c.fillRect(k.x + 30, k.y - 30, 10, 8);
+      c.fillStyle = 'rgba(232,220,195,0.7)'; c.font = '6px Arial'; c.textAlign = 'center';
+      c.fillText('50¢ — HONOR BOX', k.x + 90, k.y + 30);
+      c.fillText('(SHORTED TWICE IN 40 YRS)', k.x + 90, k.y + 38);
+      for (let r = 0; r < 3; r++) for (let ch = 0; ch < 6; ch++) {                    // folding chairs, congregation of ghosts
+        c.fillStyle = '#5a5a62'; c.fillRect(120 + ch * 66, 180 + r * 54, 30, 8);
+        c.fillStyle = '#4a4a52'; c.fillRect(124 + ch * 66, 188 + r * 54, 22, 18);
+      }
+      c.fillStyle = '#c9a227'; c.fillRect(100, 30, 360, 34);                          // THE BANNER
+      c.fillStyle = '#2a2622'; c.font = 'bold 11px Georgia';
+      c.fillText('LOCAL 448 — FORTY YEARS OF ALMOST', 280, 51);
+      c.fillStyle = '#6e5a3a'; c.fillRect(370, 100, 160, 90);                         // grievance board
+      scatter(9, 451, (rnd) => { c.fillStyle = 'rgba(240,232,210,0.8)'; c.fillRect(376 + rnd() * 130, 106 + rnd() * 66, 18, 14); });
+      c.fillStyle = 'rgba(42,38,34,0.7)'; c.font = '5px Arial';
+      c.fillText('GRIEVANCES (ACTIVE)', 450, 112);
+      c.fillText('oldest: 1986', 450, 186);
+      // photo wall: nine hundred men in rows, then fewer, then fewer
+      for (let i = 0; i < 4; i++) { c.fillStyle = 'rgba(200,190,170,0.5)'; c.fillRect(60 + i * 40, 300, 32, 24); }
+      c.fillStyle = 'rgba(42,38,34,0.6)'; c.font = '5px Georgia';
+      c.fillText("'52  '74  '96  '18 — same wall, thinner rows", 140, 338);
+    }
     if (room === 'garage') {
       F(60, 60, 120, 50, '#7a6a5a'); c.fillStyle = '#b8a890'; c.fillRect(66, 66, 108, 20); // cot
       F(460, 60, 120, 70, '#6e5a3a'); // shelves
@@ -1006,6 +1175,13 @@ export class Renderer {
     }
 
     if (room === 'ext') this._streetTraffic(c, dt, late, g);
+
+    // the one living smokestack: the town's pulse, in coal-grey
+    if (room === 'ext' && Math.random() < dt * 5) {
+      const st = WORKS.stacks[0];
+      this.parts.push({ x: st.x + rr(-6, 6), y: 14, vx: rr(4, 18), vy: rr(-14, -6), g: -6,
+        r: rr(4, 9), c: 'rgba(120,116,112,0.16)', t: 0, dur: rr(2.4, 4) });
+    }
 
     // entity shadows (sun-skewed by block)
     const sunSkew = [[-14, 5], [3, 7], [16, 6], [0, 4], [0, 4]][blockIdx] || [0, 4];
@@ -1268,6 +1444,17 @@ export class Renderer {
         pool(FOXHOLE.door.x, FOXHOLE.door.y + 20, 120, 0.9);
         glow(FOXHOLE.door.x, FOXHOLE.door.y - 6, 34, 'rgba(255,226,170,A)', 0.5);
         glow(FOXHOLE.door.x, FOXHOLE.door.y + 30, 90, 'rgba(255,120,150,A)', 0.10);
+        // CASSIDY WORKS at night: sodium yard lights — ORANGE, a different town out here —
+        // and the union hall's windows, on out of spite, visible from the road
+        for (const [yx, yy] of [[2520, 1120], [2900, 1200], [3160, 1360]]) {
+          pool(yx, yy, 170, 0.95);
+          glow(yx, yy - 40, 40, 'rgba(255,160,60,A)', 0.4);
+          glow(yx, yy + 20, 110, 'rgba(255,150,60,A)', 0.12);
+        }
+        pool(WORKS.hall.x + WORKS.hall.w / 2, WORKS.hall.y + WORKS.hall.h - 20, 110, 0.85);
+        glow(WORKS.hall.x + 37, WORKS.hall.y + WORKS.hall.h - 33, 26, 'rgba(255,214,140,A)', 0.4);
+        glow(WORKS.hall.x + WORKS.hall.w - 37, WORKS.hall.y + WORKS.hall.h - 33, 26, 'rgba(255,214,140,A)', 0.4);
+        pool(WORKS.gate.x + 35, WORKS.gate.y + 40, 100, 0.8);   // the gate shack's bulb
         // DOWNTOWN at night: the Lip's red neon, Vern's gold, the courthouse flag light
         // that stays on for a flag nobody's lowered properly since March
         glow(380, DT_Y.facadeTop - 14 + 16, 110, 'rgba(255,90,80,A)', 0.36);      // Split Lip neon
@@ -1332,6 +1519,10 @@ export class Renderer {
       pool(it.counter.x + it.counter.w / 2, it.counter.y + 24, 150, this.tubeDim ? 0.55 : 0.85);
       pool(220, 200, 160, 0.6);
       glow(300, 275, 50, 'rgba(180,210,240,A)', 0.10);                    // the ring case, lit like evidence
+    } else if (room === 'unionhall') {
+      const it = INTERIORS.unionhall;
+      pool(it.w / 2, it.h / 2, 280, this.tubeDim ? 0.7 : 0.9);            // every tube works. Denny replaces them HIMSELF
+      glow(it.counter.x + 35, it.counter.y - 16, 30, 'rgba(255,200,120,A)', 0.14); // the urn, warm since 1984
     } else {
       // interiors: warm pools over counters, fluorescent flicker at Wing Barn
       const it = INTERIORS[room];

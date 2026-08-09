@@ -122,6 +122,24 @@ Uses the portable Node at `C:\Users\kylef\tools\node` (not on PATH).
   ⚠️ The facade painter is parameterized now — `_paintBuilding(c, b, Y, alley)` —
   one painter, two rows, don't fork it.
 
+- **M1.6 — CASSIDY WORKS** ✅ (2026-08-06)
+  The world grows east: 2200 → 3400 wide. The plant district from the design doc —
+  sawtooth-roofed works with the CASSIDY WORKS ghost sign, two stacks (one still
+  smoking: the town's pulse in coal-grey, live particles), the gate with its barrier
+  arm and "A PROUD PARTNER IN HOPEWELL'S FUTURE (sign older than the future)",
+  boxcars on the spur tagged STENCH · DEBRA · YOLO (crossed out), sodium yard lights
+  at night (ORANGE — a different color temperature than downtown, on purpose), and
+  the LEAVING HOPEWELL (why though?) sign at the town line. Two new hustles: the
+  **dock shift** (evenings only, $52 cash, costs 5 hp — "your back files a
+  grievance", refused below 25 hp by union rule) and the **fell-off-a-truck pallet**
+  (one per day, seeded position, Gus knows every pallet BY WEIGHT — his 250px
+  sightline turns it into timing stealth; caught = day blown + ledger entry). Freight
+  fences at Roxy ($26) or Vern ($20). The **Union Hall (Local 448)** is always open —
+  lit out of spite — with Denny (forty years of grievances), 50¢ honor-box coffee,
+  and the second-best lay-low in the game (−16). The shift horn sounds block changes
+  when you're near the plant. Denny and Gus join the cast; Gus is the first civilian
+  route-walker (patrol logic now exists outside cops).
+
 ## What's deliberately NOT in Phase 1 (per the roadmap — don't "fix" these)
 
 - No Hopeless Tech, classes, GPA, or majors (Phase 2).

@@ -67,6 +67,15 @@ export const TUNING = {
   pawnCrate: 55,              // Vern's flat rate: no faces, no questions, no haggling
   pawnBat: 18,
   pawnCrowbar: 26,            // pricier than Earl's; convenience tax for the south side
+  // ── CASSIDY WORKS ────────────────────────────────────────────────────────
+  dockPay: 52,                // one evening shift, cash, no camera, no skim — just your spine
+  dockHpCost: 5,              // your back files a grievance
+  dockMinHp: 25,              // Denny won't let a broken man on the dock
+  freightRoxy: 26,            // what a fell-off-the-truck box brings at window 2
+  freightVern: 20,            // Vern rounds your dignity down, as is tradition
+  hallHeatDecay: 16,          // nobody in the hall answers questions; they've all BEEN questions
+  hallCoffee: 0.5,            // union coffee. fifty cents. tastes like the building
+  gusCatchRange: 250,         // if Gus can see the pallet, the pallet stays fell-on
   // heat
   heatStage: { noticed: 15, named: 40, wanted: 70 },
   heatMax: 100,
@@ -129,7 +138,22 @@ export const WEAPONS = {
   crowbar:{ dmg: [16, 22], range: 42, dur: 30, kb: 210, label: 'the crowbar' },
 };
 
-export const WORLD = { w: 2200, h: 2400 };
+export const WORLD = { w: 3400, h: 2400 };
+
+// ── CASSIDY WORKS ─────────────────────────────────────────────────────────────
+// The plant. Half-dead, one shift running, union hall lit out of spite (the
+// design doc's own words). Freight comes through that nobody counts carefully —
+// which in this economy is a job posting.
+export const WORKS = {
+  plant:   { x: 2380, y: 120, w: 920, h: 440 },     // the main works: sawtooth roof, two stacks
+  stacks:  [ { x: 2600, smoking: true }, { x: 2960, smoking: false } ],
+  hall:    { x: 2240, y: 620, w: 200, h: 160, door: { x: 2330, y: 780 } },  // LOCAL 448
+  gate:    { x: 3290, y: 900, w: 70, h: 160 },      // guard shack + the barrier arm
+  dockOffice: { x: 2340, y: 1110, w: 90, h: 70 },   // a window, a clipboard, a ledger of backs
+  yard:    { x: 2300, y: 1090, w: 1000, h: 380 },   // containers, pallets, the sodium lights
+  pallets: [ [2560, 1200], [2760, 1330], [2980, 1180], [3120, 1340], [2620, 1400] ],
+  boxcars: [ 2420, 2760, 3080 ],                    // parked on the spur, tagged by locals
+};
 
 // ── DOWNTOWN ──────────────────────────────────────────────────────────────────
 // The old core, south of the rail spur the interstate was supposed to replace.
@@ -277,6 +301,9 @@ export const INTERIORS = {
   pawn:     { w: 680, h: 400, label: 'Loanstar Pawn & Gold',
     counter: { x: 380, y: 110, w: 240, h: 56 },
     props: ['cage', 'guitarWall', 'ringCase', 'weedWhackers', 'emptyGunCase', 'owl'] },
+  unionhall:{ w: 560, h: 360, label: 'Union Hall — Local 448',
+    counter: { x: 60, y: 100, w: 180, h: 50 },          // the urn table
+    props: ['coffeeUrn', 'foldingChairs', 'grievanceBoard', 'banner', 'photoWall'] },
 };
 
 // ---------------------------------------------------------------------------
@@ -347,6 +374,11 @@ export const NAMED = {
             silhouette: 'reading glasses on a chain, loupe in the shirt pocket, zero illusions' },
   madison:{ name: 'Madison', role: 'Daybreak barista', arch: 'wiry', outfit: { shirt: '#e8e4dc', pants: '#3a3e44' }, hat: 'bun',
             silhouette: 'clean apron, transplant posture, apologizing in advance' },
+  // ── Cassidy Works ─────────────────────────────────────────────────────────
+  denny:  { name: 'Denny', role: 'Local 448 steward', arch: 'broad', outfit: { shirt: '#4a5568', pants: '#3a3632' }, hat: 'trucker',
+            silhouette: 'forty years of grievances, filed in order, none resolved' },
+  gus:    { name: 'Gus', role: 'yard security', arch: 'tall', outfit: { shirt: '#5a5548', pants: '#44403a' }, hat: 'cap',
+            silhouette: 'walks the yard like it owes him a pension. It does.' },
 };
 
 // ambient population per block: [count, archetype pool, outfit pool, where]
@@ -354,17 +386,20 @@ export const POPULATION = {
   morning:  [ { n: 3, spots: 'bus',   outfits: ['hivis','greasy','denim'] },
               { n: 2, spots: 'qwik',  outfits: ['denim','flannel'] },
               { n: 2, spots: 'walk',  outfits: ['denim','camo'] },
-              { n: 2, spots: 'dtwalk',outfits: ['denim','hivis'] } ],
+              { n: 2, spots: 'dtwalk',outfits: ['denim','hivis'] },
+              { n: 2, spots: 'works', outfits: ['hivis','greasy'], pool: 'dockhand' } ],
   afternoon:[ { n: 4, spots: 'walk',  outfits: ['denim','flannel','camo'] },
               { n: 2, spots: 'buffet',outfits: ['greasy','denim'] },
               { n: 1, spots: 'walk',  outfits: ['tourist'] },
               { n: 2, spots: 'dtwalk',outfits: ['denim','flannel'] },
-              { n: 1, spots: 'square',outfits: ['camo'], pool: 'courthouse_idle' } ],
+              { n: 1, spots: 'square',outfits: ['camo'], pool: 'courthouse_idle' },
+              { n: 2, spots: 'works', outfits: ['hivis','greasy'], pool: 'dockhand' } ],
   evening:  [ { n: 3, spots: 'lot',   outfits: ['flannel','denim','camo'] },
               { n: 2, spots: 'buffet',outfits: ['denim','hivis'] },
               { n: 2, spots: 'qwik',  outfits: ['flannel','greasy'] },
               { n: 1, spots: 'walk',  outfits: ['tourist2'] },
-              { n: 2, spots: 'dtbar', outfits: ['flannel','greasy'], drunk: 0.4, pool: 'splitlip_reg' } ],
+              { n: 2, spots: 'dtbar', outfits: ['flannel','greasy'], drunk: 0.4, pool: 'splitlip_reg' },
+              { n: 2, spots: 'works', outfits: ['hivis'], pool: 'dockhand' } ],
   late:     [ { n: 3, spots: 'lot',   outfits: ['flannel','camo','greasy'], drunk: 0.6 },
               { n: 2, spots: 'qwik',  outfits: ['denim','greasy'], drunk: 0.3 },
               { n: 2, spots: 'dtbar', outfits: ['greasy','denim'], drunk: 0.8, pool: 'splitlip_reg' } ],
@@ -380,6 +415,8 @@ export const SPOTS = {
   dtbar: [ [330, 2160], [400, 2170], [290, 2180] ],
   dtwalk:[ [600, 2145], [1000, 2150], [1300, 2148], [800, 2270] ],
   square:[ [640, 2320], [1260, 2330], [960, 2360] ],
+  // the Works: dockhands by the bays, smokers by the hall
+  works: [ [2500, 1150], [2700, 1240], [2900, 1160], [2380, 830] ],
 };
 
 // ---------------------------------------------------------------------------
@@ -677,6 +714,31 @@ export const BARKS = {
     "—the pawn guy'll sell. They always sell. You just find the number where his dignity rounds down—",
     "—call it 'The Lip.' Heritage signage, new everything. People LOVE a scar if you frame it—",
     "—game store's the holdout. Old man's sitting on prime frontage like it's a memory. Memories have carrying costs—",
+  ],
+  // ── CASSIDY WORKS ─────────────────────────────────────────────────────────
+  denny: [
+    "Forty years I've stewarded this local. Started with nine hundred men. We're down to enough for a decent pallbearer rotation.",
+    "The hall stays lit. Company asked why we still pay the electric. I said spite, and they wrote it down, and I signed it.",
+    "Your grandfather worked line six. Good hands, bad lungs, worse poker. You've got his exact face and I'm watching it.",
+    "Fairview sent a man about 'the campus.' The CAMPUS. Son, men lost fingers in that campus.",
+    "Coffee's fifty cents, honor box. The honor box has been shorted twice in forty years and both men confessed WITHIN THE WEEK. That's the hall.",
+    "You want dock work, talk to the window. You want justice, get in line behind me — I've been in it since '86.",
+  ],
+  gus: [
+    "Yard's private property, kid. So's my patience, and you're trespassing on both.",
+    "I know every pallet in this yard by weight. By WEIGHT. Don't test the fat old man, it never goes the way you think.",
+    "Forty-one years I watched this yard. The yard doesn't know. You think a yard knows? It'd break its heart.",
+    "Company cut my pension in '09 and asked me to guard what's left. And I DO. Figure that one out and get back to me.",
+  ],
+  gus_caught: [
+    "PUT IT DOWN. — Thank you. Now get out before I remember your grandmother's phone number, which I do.",
+    "Nope. That one fell off a truck INTO MY LEDGER. Walk away, kid, my whistle's louder than your excuse.",
+  ],
+  dockhand: [
+    "Third generation on this dock. My kid says he wants a computer job. GOOD. I mean that. GOOD.",
+    "The horn used to mean four thousand guys moving at once. Now it's basically an alarm clock for me and God.",
+    "Lifted wrong in '19 and my spine's been freelance ever since.",
+    "One shift running. ONE. This place used to eat three shifts and ask for a fourth, man.",
   ],
   courthouse_idle: [
     "The docket's posted Thursdays. It's the town phone book with worse fonts.",
