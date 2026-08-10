@@ -90,6 +90,21 @@ export const TUNING = {
   daFridayBonus: 1.5,         // the DA's Friday: the Bluffs' drop night
   clubDrink: 12,              // a club soda at the club, because you don't belong here
   bluffsRepMult: 1.35,        // Bluffs scores are worth more Cred: they're a STORY
+  // ── HOPELESS TECH ────────────────────────────────────────────────────────
+  // The doc: campus is a no-carry zone with metal detectors at every entrance,
+  // "installed after the Welding program kept eating the building's copper wiring,
+  // and now sensitive enough to catch a belt buckle." Campus play stays fists.
+  aidPayout: 180,             // the disbursement. The single biggest legal payday in the game.
+  aidNeedsClass: 2,           // …and you have to have SHOWN UP twice to see a cent of it
+  classSecs: 22,              // one session of anything, in blocks-of-time terms
+  shopToolName: 'pry bar',    // welding class output: your own iron, made not bought
+  polosHassleHeat: 5,         // the Polo Shirts can't arrest you. They can telephone.
+  polosCartRage: 11,          // …unless you touch the cart. Never touch the cart.
+                              // ⚠️ 26 put you at WANTED off one golf cart once the
+                              // crowd multiplier hit it. It's a misdemeanour of the
+                              // heart, not a manhunt.
+  libHeatDecay: 12,           // nobody has ever been arrested in a library
+  gymPay: 26,                 // spotting the meatheads for beer money
   // heat
   heatStage: { noticed: 15, named: 40, wanted: 70 },
   heatMax: 100,
@@ -179,6 +194,35 @@ export const BLUFFS = {
       daHouse: true, blurb: 'Elected embarrassment. Golfs off his caseload every Friday.' },
   ],
   docks: [ 300, 660, 1050, 1440, 1830 ],
+};
+
+// ── HOPEWELL TECHNICAL & COMMUNITY COLLEGE ────────────────────────────────────
+// The sign says "Hopewell Tech." Everyone alive says HOPELESS. A quad, an admin
+// building with a broken clock, a gym, and one weirdly nice building donated by a
+// rich alumnus who fled the state mid-indictment and needed the write-off.
+// It sits in the empty southeast: east of downtown, south of the plant, fronting
+// the east end of Main Street — which is exactly where a commuter college goes.
+export const HTCC = {
+  bounds: { x: 1880, y: 1560, w: 1470, h: 560 },
+  quad:   { x: 2180, y: 1740, w: 780, h: 300 },
+  lot:    { x: 1900, y: 1960, w: 250, h: 150 },      // commuter parking. everyone commutes.
+  buildings: [
+    { key: 'admin',   name: 'Chalmers Hall (admin)', x: 1960, y: 1580, w: 300, h: 150,
+      door: { x: 2110, y: 1730 }, clock: true,
+      blurb: 'The clock stopped at 4:20 in 2011 and became a tradition instead of a repair.' },
+    { key: 'shop',    name: 'the Trades Annex',      x: 2360, y: 1570, w: 320, h: 140,
+      door: { x: 2520, y: 1710 },
+      blurb: 'Welding, HVAC, and the smell of a building that earns its keep.' },
+    { key: 'gym',     name: 'the gym',               x: 2790, y: 1580, w: 260, h: 150,
+      door: { x: 2920, y: 1730 },
+      blurb: 'Home of the Fighting Prairie Dogs. 0–11. The banner still goes up.' },
+    { key: 'barrows', name: 'the Barrows Center',    x: 3080, y: 1590, w: 250, h: 170,
+      door: { x: 3205, y: 1760 }, donated: true,
+      blurb: 'Glass, stone, and a donor whose name is still on it and whose address is sealed.' },
+    { key: 'library', name: 'the library',           x: 2300, y: 2000, w: 280, h: 110,
+      door: { x: 2440, y: 2000 },
+      blurb: 'Two floors, four students, and the best heating on campus.' },
+  ],
 };
 
 // What's inside a Bluffs house. Values are what a FENCE pays, not what it's worth —
@@ -375,6 +419,15 @@ export const INTERIORS = {
   // ⚠️ ONE parameterised interior serves all five Bluffs houses — they differ by
   // tier (dressing + loot), not by floorplan. Five hand-painted mansions would be
   // five times the paint for a room you're in for forty seconds with a clock running.
+  shop:     { w: 700, h: 400, label: 'the Trades Annex',
+    counter: { x: 60, y: 110, w: 190, h: 50 },
+    props: ['weldingBays', 'sparkCurtains', 'steelRack', 'safetyPoster', 'dunnsDesk'] },
+  aid:      { w: 620, h: 380, label: 'Chalmers Hall — financial aid',
+    counter: { x: 200, y: 110, w: 240, h: 54 },
+    props: ['queueRope', 'chairRow', 'takeANumber', 'brochureRack', 'brokenClock'] },
+  library:  { w: 660, h: 380, label: 'the library',
+    counter: { x: 70, y: 100, w: 170, h: 50 },
+    props: ['stacks', 'studyCarrels', 'microficheNobodyUses', 'radiator'] },
   house:    { w: 720, h: 440, label: 'somebody\'s house',
     spots: { drawer: [560, 120], dresser: [440, 130], office: [130, 130],
              closet: [620, 250], garage: [140, 340], trophy: [340, 100] },
@@ -461,6 +514,13 @@ export const NAMED = {
             silhouette: 'golf polo, county seal, the confidence of the never-audited' },
   bunny:  { name: 'Bunny Marchetti', role: 'Bluffs', arch: 'wiry', outfit: { shirt: '#e8b8c8', pants: '#f0ead8' }, hat: 'bun',
             silhouette: 'sunglasses indoors, tennis skirt, has never once been told no' },
+  // ── Hopeless Tech ─────────────────────────────────────────────────────────
+  trevor: { name: 'Trevor', role: 'Campus Safety', arch: 'wiry', outfit: { shirt: '#3d5a3d', pants: '#3a3e44' }, hat: 'cap',
+            silhouette: 'polo tucked into cargo shorts, radio he has never needed' },
+  pettig: { name: 'Ms. Pettigrew', role: 'financial aid', arch: 'short', outfit: { shirt: '#7a6a8a', pants: '#3a3a42' }, hat: 'bun',
+            silhouette: 'cardigan, lanyard, and the only real power on this campus' },
+  dunn:   { name: 'Dunn', role: 'welding instructor', arch: 'broad', outfit: { shirt: '#8a5a33', pants: '#4a4438' }, hat: 'trucker',
+            silhouette: 'forearm scars, safety glasses on his hat, thirty years of other people\'s sons' },
 };
 
 // ambient population per block: [count, archetype pool, outfit pool, where]
@@ -796,6 +856,51 @@ export const BARKS = {
     "—the pawn guy'll sell. They always sell. You just find the number where his dignity rounds down—",
     "—call it 'The Lip.' Heritage signage, new everything. People LOVE a scar if you frame it—",
     "—game store's the holdout. Old man's sitting on prime frontage like it's a memory. Memories have carrying costs—",
+  ],
+  // ── HOPELESS TECH ─────────────────────────────────────────────────────────
+  // The doc calls the Polo Shirts "an entire comedy ecosystem." Four guys, one
+  // golf cart, unlimited self-regard — and the joke is always that they have
+  // exactly as much authority as you agree to give them.
+  trevor: [
+    "Campus Safety. That's SAFETY, not security — security implies we could stop something.",
+    "I can't detain you. I want to be real clear that I can't. But I CAN describe you, at length, to a real officer.",
+    "You got a student ID? ...You do? Huh. Damn. Okay. Carry on then. Enjoy your— carry on.",
+    "That's the cart. Do not sit on the cart. Do not LEAN on the cart. Michael leaned on the cart in March.",
+    "Four of us. Two hundred acres. One cart. You do the math and then feel bad for me.",
+    "I'm doing this two years then applying to HPD. Brill says the list is long. Brill says the list is ALWAYS long.",
+  ],
+  trevor_cart: [
+    "HEY! HEY. THAT'S THE CART. GET OFF THE— I'M CALLING SOMEBODY WHO CAN CARE ABOUT THIS.",
+    "Nope. Nope nope nope. That cart is county property and I am EMOTIONALLY ATTACHED to it.",
+  ],
+  pettig: [
+    "Disbursement is week four and week twelve. It is not week whenever-you-need-it. I have heard every version of that sentence.",
+    "You have to attend. I know. I KNOW. But the form has a box and the box has a number and the number has to be above zero.",
+    "Half this campus is here for the check, sweetheart. I'm not judging. I process the check. I'm just saying I can count.",
+    "Your file is thick for a man who's completed nine credits. That's not an insult, it's a filing complaint.",
+    "You want the money AND the dignity? Pick one, come back Thursday, and bring the form.",
+  ],
+  dunn: [
+    "Hands where I can see 'em, glasses on, and if you burn yourself I'm not writing it up because then it happened.",
+    "Thirty years I've taught other people's sons to make a thing that holds. Some of 'em even wanted to.",
+    "You've got hands. That's not nothing — most of what comes through here has thumbs and a phone.",
+    "Make your own bar. Buy one and it's a receipt with your name on it. Make one and it's just STEEL, son.",
+    "The detectors? That was us. Program kept eating the copper out of the walls. Now it beeps at a belt buckle and I think that's funny as hell.",
+    "You quit, you quit. Everybody quits. Just don't tell me you're coming back if you're not.",
+  ],
+  campus_idle: [
+    "I'm thirty-four and I'm in Intro to Anything. Don't look at me like that, my back went out at the plant.",
+    "Financial aid hit and I bought tires. TIRES. That's the most adult thing I've ever done and I hated it.",
+    "Nursing cohort's brutal. Half of 'em cry in the stairwell. The OTHER half already work nights.",
+    "This is my fourth major. I'm not lost, I'm THOROUGH.",
+    "They put in a whole building with GLASS and the parking lot's still gravel. Priorities, man.",
+    "Everybody calls it Hopeless. Even the DEAN calls it Hopeless. He said it at orientation.",
+    "The vending machine takes your dollar and thinks about it. Just thinks about it. Forever.",
+  ],
+  detector: [
+    "The detector goes off like it found uranium. A work-study kid looks up, deeply unbothered.",
+    "BEEP. Everyone in the lobby looks. Nobody in the lobby cares. This happens forty times a day.",
+    "It shrieks. You are, briefly, the most interesting thing on this campus.",
   ],
   // ── CASSIDY WORKS ─────────────────────────────────────────────────────────
   denny: [

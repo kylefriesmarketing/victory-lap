@@ -158,6 +158,25 @@ export class Sfx {
       hiss(0.012, 300);
       return;
     }
+    if (kind === 'in:shop') {
+      hiss(0.03, 900);                                     // extraction fans, always
+      bed(104, 'sawtooth', 0.01, 0.6, 0.005);
+      every(3000, 7000, () => this.noise(0.35, 0.035, 2800, 0.7));   // an arc struck somewhere
+      every(9000, 18000, () => this.tone(90, 0.25, 'square', 0.02, -20)); // steel set down on steel
+      return;
+    }
+    if (kind === 'in:aid') {
+      bed(120, 'sawtooth', 0.009, 0.9, 0.004);             // the ballast of a hundred forms
+      every(6000, 14000, () => this.tone(880, 0.07, 'square', 0.02));  // NOW SERVING
+      every(11000, 22000, () => this.noise(0.2, 0.015, 1200, 1.5));    // a printer, thinking
+      return;
+    }
+    if (kind === 'in:library') {
+      bed(72, 'triangle', 0.011, 0.2, 0.004);              // radiator + hush
+      every(12000, 26000, () => this.noise(0.5, 0.012, 260, 1));       // the radiator knocking
+      every(18000, 34000, () => this.tone(1500, 0.03, 'sine', 0.006)); // one cough, two floors up
+      return;
+    }
     if (kind === 'in:house') {
       bed(44, 'sine', 0.016, 0.15, 0.006);                 // a big empty house has a LOW hum
       hiss(0.008, 240);

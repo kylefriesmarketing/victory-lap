@@ -178,6 +178,37 @@ Uses the portable Node at `C:\Users\kylef\tools\node` (not on PATH).
   ⚠️ ONE parameterised `house` interior serves all five — they differ by tier and
   loot, not floorplan. Don't hand-paint five mansions for a 40-second room.
 
+- **M1.8 — HOPELESS TECH (the sixth and final district)** ✅ (2026-08-06)
+  All six of the design doc's districts now exist. HTCC sits in the empty southeast,
+  east of downtown and south of the plant, fronting Main Street — where a commuter
+  college goes. The quad (crossed paths plus the diagonal desire line they were
+  meant to prevent, and the Class of 1994 Memorial Fountain, dry since the ’09
+  budget), Chalmers Hall with the clock **stopped at 4:20 since 2011**, the Trades
+  Annex, the gym (GO PRAIRIE DOGS · 0–11 · the banner still goes up), the **Barrows
+  Center** — glass and stone, matching nothing else on campus, "gift of D. Barrows
+  ’78, current address sealed" — the library, the gravel commuter lot, and the sign
+  somebody has corrected to **HOPELESS**.
+
+  **The campus rule is the doc's, enforced in one place:** metal detectors at every
+  entrance, no-carry, "sensitive enough to catch a belt buckle." Walk into any campus
+  building holding a weapon and Campus Safety confiscates it, permanently, plus a
+  little heat. That makes the whole district a fists-and-wits zone by construction.
+  ⚠️ The crowbar is **stashed in the hedge and returned on exit**, never confiscated —
+  a first pass hard-refused entry while you carried iron, which is a dead end, since
+  the scheme needs the crowbar and the disbursement needs the aid office.
+
+  **Real money, legally, for the first time:** attend two welding sessions and Ms.
+  Pettigrew disburses **$180** — the biggest legal sum in the game, gated on
+  attendance rather than need, which is exactly the doc's joke. And welding class
+  outputs a **pry bar** — your own iron, made not bought, a free fourth route to the
+  scheme's `tools` stage. Plus the library lay-low (−12) and spotting at the gym.
+
+  **The Polo Shirts** are in: Trevor patrols the quad, can't arrest anybody, and
+  telephones somebody who can if he catches you carrying. And you can sit on the
+  cart. You should not sit on the cart.
+  ⚠️ cart rage is 11, not 26 — at 26 the crowd multiplier put you at WANTED off one
+  golf cart. It's a misdemeanour of the heart.
+
 ## What's deliberately NOT in Phase 1 (per the roadmap — don't "fix" these)
 
 - No Hopeless Tech, classes, GPA, or majors (Phase 2).

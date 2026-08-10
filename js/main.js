@@ -4,7 +4,7 @@
 // except through game.act / documented fields.
 
 import { Game, soakRun, T, BUILDINGS, GARAGE, FOXHOLE, DOWNTOWN, DT_Y, WATER_TOWER, COURTHOUSE,
-         WORKS, BLUFFS, LOOT, SEARCH_SPOTS, INTERIORS, STRIP_Y, BARKS, SCHEME, ENDINGS,
+         WORKS, BLUFFS, LOOT, SEARCH_SPOTS, HTCC, INTERIORS, STRIP_Y, BARKS, SCHEME, ENDINGS,
          BLOCK_NAMES, DAY_NAMES, NAMED } from './game.js';
 import { Renderer } from './render.js';
 import { Sfx } from './audio.js';
@@ -234,6 +234,28 @@ function interactables() {
       if (g.isOpen(b.key)) add(dx, dy, 46, `Enter ${b.label}`, () => result(g.act('enter', b.key)));
       else add(dx, dy, 46, `${b.label} — closed`, () => result(g.act('enter', b.key)));
     }
+    // ── HOPELESS TECH ──
+    for (const b of HTCC.buildings) {
+      const enterable = ['admin', 'shop', 'library'].includes(b.key);
+      const warn = p.held ? ' ⚠ the detector will eat that' : '';
+      add(b.door.x, b.door.y + 14, 48,
+        enterable ? `${b.name}${warn}` : b.name,
+        () => {
+          const r = result(g.act('enterCampus', b.key));
+          if (r.tookWeapon) { updateHud(); sfx.play('yell'); }
+        });
+    }
+    add(HTCC.buildings[2].door.x - 60, HTCC.buildings[2].door.y + 30, 54,
+      `Spot the meatheads at the gym — $${T.gymPay}`,
+      () => showChoice('The gym.', 'Two Alumni are working out and narrating it entirely in numbers. They need a third pair of hands.', [
+        { label: `Spot for them — $${T.gymPay}`, go: () => result(g.act('gymSpot')) }]));
+    add(HTCC.quad.x + HTCC.quad.w * 0.5, HTCC.quad.y + HTCC.quad.h * 0.52, 56,
+      'The Class of 1994 Memorial Fountain (dry)', () =>
+      feed('Dry since the ’09 budget. There are three coins and a vape in the basin. Somebody still made a wish over a dead fountain, which is the most Hopewell act of faith there is.', 'ok'));
+    const cartN = g.npcs.find(n => n.key === 'trevor' && !n.ko);
+    if (cartN) add(cartN.x + 42, cartN.y + 14, 46, 'The cart (do NOT sit on the cart)', () => showChoice(
+      'The cart.', 'Electric. Eleven miles an hour. County property. Trevor is emotionally attached to it in a way that is genuinely moving and completely insane.', [
+      { label: 'Sit on the cart', go: () => { const r = result(g.act('touchCart')); if (r.ok) sfx.play('yell'); } }]));
     // ── THE BLUFFS ──
     for (const h of BLUFFS.houses) {
       const st = g.houseState(h.key);
@@ -446,6 +468,38 @@ function interactables() {
         () => { const r = result(g.act('searchSpot', sp.key)); if (r.refused) sfx.play('crack'); updateHud(); });
     }
     add(IT.w / 2, IT.h - 22, 70, 'OUT — back across the lawn', () => { result(g.act('leaveHouse')); updateHud(); });
+  } else if (g.room === 'shop') {
+    const IT = INTERIORS.shop;
+    add(150, 130, 56, 'Dunn', () => renderer.bark('Dunn', uiPick(BARKS.dunn), 150, 112));
+    add(422, 175, 60, g.htcc.classToday === g.day ? 'The bay you already used today' : `Take the bench — a session (${T.classSecs}s)`,
+      () => showChoice('Welding.', 'Glasses on, hands where he can see them. It costs you time on the clock and gives you something no shop sells you.', [
+        { label: 'Pull a bead', go: () => { const r = result(g.act('attendClass')); if (r.ok) { updateScheme(); updateHud(); sfx.play('crack'); } } }]));
+    add(130, 300, 56, 'The scrap rack (take what you can use)', () =>
+      feed('Offcuts, stock ends, and a hand-lettered sign that means it. Everything in this building was made by somebody who needed it to exist.', 'ok'));
+    add(490, 280, 50, 'DAYS WITHOUT INCIDENT: 2', () =>
+      feed('It has said 2 for as long as anyone can remember. Nobody resets it up and nobody resets it down. It is a 2 in the way the water tower is missing an E.', 'ok'));
+    add(IT.w / 2, IT.h - 24, 60, 'Out to the quad', () => result(g.act('leave')));
+  } else if (g.room === 'aid') {
+    const IT = INTERIORS.aid, st = g.aidStatus();
+    add(IT.counter.x + IT.counter.w / 2, IT.counter.y + 36, 64,
+      st.paid ? 'The window (already disbursed)' : st.eligible ? `THE WINDOW — claim $${T.aidPayout}` : `The window (attendance ${st.attended}/${st.need})`,
+      () => showChoice('Financial aid.', st.eligible
+        ? `The box on the form has a number in it. Ms. Pettigrew has already found your file.`
+        : `Disbursement needs ${st.need} class sessions on the sheet. You have ${st.attended}. She is not being unkind; she is being a form.`, [
+        st.eligible && !st.paid ? { label: `Take the disbursement — $${T.aidPayout}`, go: () => { result(g.act('claimAid')); updateHud(); } } : null,
+        { label: 'Just talk', go: () => renderer.bark('Ms. Pettigrew', uiPick(BARKS.pettig), IT.counter.x + 120, IT.counter.y + 16) },
+      ].filter(Boolean)));
+    add(550, 100, 48, 'TAKE A NUMBER (now serving 3, in the machine 41)', () =>
+      feed('You pull 41. The display says 3. A man two chairs down has been here since a previous administration and has made peace with it.', 'warn'));
+    add(IT.w / 2, IT.h - 24, 60, 'Out to the quad', () => result(g.act('leave')));
+  } else if (g.room === 'library') {
+    const IT = INTERIORS.library;
+    add(615, 330, 56, 'The radiator corner (sit out the block)', () => showChoice('The library.',
+      'Two floors, four students, and the best heating on campus. Nobody in the history of Hopewell has been arrested in this building.', [
+      { label: `Sit at a carrel (heat −${T.libHeatDecay})`, go: () => result(g.act('libLayLow')) }]));
+    add(450, 130, 60, 'The stacks', () =>
+      feed('Local history, two shelves of law, and a whole run of trade manuals with Dunn\'s handwriting in the margins of every one.', 'ok'));
+    add(IT.w / 2, IT.h - 24, 60, 'Out to the quad', () => result(g.act('leave')));
   } else if (g.room === 'unionhall') {
     const IT = INTERIORS.unionhall;
     add(IT.counter.x + 35, IT.counter.y + 20, 56, 'The urn (50¢, honor box)', () => result(g.act('hallCoffee')));

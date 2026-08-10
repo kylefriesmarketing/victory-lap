@@ -3,7 +3,7 @@
 // View-only: free to use Math.random. Never touches sim state.
 
 import { T, WORLD, BUILDINGS, ALLEY_GAPS, STRIP_Y, EXTERIOR_PROPS, GARAGE, FOXHOLE,
-         DOWNTOWN, DT_Y, RAIL_Y, WATER_TOWER, COURTHOUSE, MAIN_ST, WORKS, BLUFFS, INTERIORS,
+         DOWNTOWN, DT_Y, RAIL_Y, WATER_TOWER, COURTHOUSE, MAIN_ST, WORKS, BLUFFS, HTCC, INTERIORS,
          ARCHETYPES, NAMED } from './game.js';
 
 const PAL = {
@@ -259,6 +259,7 @@ export class Renderer {
     this._paintFoxhole(c);
     this._paintDowntown(c);
     this._paintWorks(c);
+    this._paintCampus(c);
     this._paintBluffs(c);
     // south houses (set dressing)
     for (const h of [[760, 1200, 180, 140, '#6d5a4a'], [1000, 1220, 160, 120, '#5a5d52'], [1250, 1200, 200, 140, '#7a6a55'], [1550, 1230, 170, 120, '#615549']]) {
@@ -778,6 +779,113 @@ export class Renderer {
     c.restore();
   }
 
+  // ── HOPELESS TECH: a campus that is mostly parking ────────────────────────
+  _paintCampus(c) {
+    const B = HTCC.bounds, Q = HTCC.quad;
+    // the grounds: institutional grass, mown by somebody paid to mow, not to care
+    c.fillStyle = '#4a5a3e'; c.fillRect(B.x, B.y, B.w, B.h);
+    scatter(280, 801, (rnd) => { c.fillStyle = rnd() < 0.5 ? '#516243' : '#44553a'; c.fillRect(B.x + rnd() * B.w, B.y + rnd() * B.h, 3, 2); });
+
+    // THE QUAD: crossed paths, and the desire line straight across the middle that
+    // the paths were supposed to prevent
+    c.fillStyle = '#8a8578'; c.fillRect(Q.x, Q.y + Q.h * 0.45, Q.w, 26);
+    c.fillRect(Q.x + Q.w * 0.42, Q.y, 26, Q.h);
+    c.strokeStyle = 'rgba(30,26,22,0.20)'; c.lineWidth = 22; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(Q.x + 30, Q.y + Q.h - 20); c.lineTo(Q.x + Q.w - 40, Q.y + 30); c.stroke();
+    c.lineCap = 'butt'; c.lineWidth = 1;
+    // the fountain that has been off since a budget meeting
+    c.fillStyle = '#7a7468'; c.beginPath(); c.ellipse(Q.x + Q.w * 0.5, Q.y + Q.h * 0.52, 44, 26, 0, 0, 7); c.fill();
+    c.fillStyle = '#5f5a50'; c.beginPath(); c.ellipse(Q.x + Q.w * 0.5, Q.y + Q.h * 0.52, 34, 18, 0, 0, 7); c.fill();
+    scatter(20, 802, (rnd) => { c.fillStyle = rnd() < 0.5 ? '#57604a' : '#6b5d43'; c.fillRect(Q.x + Q.w * 0.5 - 30 + rnd() * 60, Q.y + Q.h * 0.52 - 14 + rnd() * 28, 3, 3); });
+    c.fillStyle = 'rgba(232,220,195,0.5)'; c.font = 'bold 7px Georgia'; c.textAlign = 'center';
+    c.fillText('CLASS OF 1994 MEMORIAL FOUNTAIN', Q.x + Q.w * 0.5, Q.y + Q.h * 0.52 + 40);
+    c.fillStyle = 'rgba(232,220,195,0.3)'; c.font = 'italic 6px Georgia';
+    c.fillText('(dry since the ’09 budget)', Q.x + Q.w * 0.5, Q.y + Q.h * 0.52 + 49);
+
+    // the commuter lot — because everybody here commutes, and it's still gravel
+    const L = HTCC.lot;
+    c.fillStyle = '#5f5a52'; c.fillRect(L.x, L.y, L.w, L.h);
+    scatter(140, 803, (rnd) => { c.fillStyle = `rgba(${130 + rnd() * 50 | 0},${124 + rnd() * 44 | 0},${112 + rnd() * 38 | 0},0.45)`; c.fillRect(L.x + rnd() * L.w, L.y + rnd() * L.h, 2, 2); });
+    for (let i = 0; i < 3; i++) this._paintCar(c, { x: L.x + 16, y: L.y + 14 + i * 46, w: 90, h: 34 });
+
+    // BUILDINGS
+    for (const b of HTCC.buildings) {
+      const donated = b.donated;
+      c.fillStyle = 'rgba(20,24,20,0.26)'; c.fillRect(b.x + 8, b.y + 10, b.w, b.h);
+      // the donated building is GLASS AND STONE and matches nothing else here
+      c.fillStyle = donated ? '#c8ccd2' : '#9a8f7e';
+      c.fillRect(b.x, b.y, b.w, b.h);
+      c.fillStyle = 'rgba(0,0,0,0.22)'; c.fillRect(b.x, b.y, b.w, 12);
+      if (donated) {
+        c.fillStyle = 'rgba(150,190,215,0.5)'; c.fillRect(b.x + 12, b.y + 24, b.w - 24, b.h - 60);
+        for (let mx = b.x + 12; mx < b.x + b.w - 12; mx += 32) { c.strokeStyle = 'rgba(255,255,255,0.35)'; c.beginPath(); c.moveTo(mx, b.y + 24); c.lineTo(mx, b.y + b.h - 36); c.stroke(); }
+      } else {
+        scatter(26, b.x, (rnd) => { c.fillStyle = `rgba(30,26,22,${0.06 + rnd() * 0.12})`; c.fillRect(b.x + rnd() * b.w, b.y + 16 + rnd() * (b.h - 30), 14 + rnd() * 40, 5 + rnd() * 12); });
+        for (let wx = b.x + 18; wx < b.x + b.w - 30; wx += 46) {          // institutional window grid
+          c.fillStyle = 'rgba(40,55,68,0.75)'; c.fillRect(wx, b.y + 34, 28, 30);
+          c.fillStyle = 'rgba(255,255,255,0.06)'; c.fillRect(wx, b.y + 34, 28, 8);
+        }
+      }
+      // door
+      c.fillStyle = '#2f2a26'; c.fillRect(b.door.x - 18, b.y + b.h - 26, 36, 26);
+      c.fillStyle = '#c9a227'; c.fillRect(b.door.x + 9, b.y + b.h - 15, 3, 5);
+      // the metal detector, drawn at the door, because it is the campus's whole rule
+      if (['admin', 'shop', 'library'].includes(b.key)) {
+        c.fillStyle = '#8a8f96'; c.fillRect(b.door.x - 24, b.y + b.h, 5, 20); c.fillRect(b.door.x + 19, b.y + b.h, 5, 20);
+        c.fillStyle = '#5a6068'; c.fillRect(b.door.x - 24, b.y + b.h, 48, 4);
+        c.fillStyle = 'rgba(200,60,50,0.7)'; c.fillRect(b.door.x - 2, b.y + b.h + 2, 4, 3);
+      }
+      // signage
+      c.textAlign = 'center';
+      c.fillStyle = donated ? '#3a4048' : 'rgba(232,220,195,0.8)';
+      c.font = 'bold 10px Georgia';
+      c.fillText(b.name.replace(/^the /, '').toUpperCase(), b.x + b.w / 2, b.y + 24);
+      // …and the admin clock, stopped at 4:20 since 2011 and now a tradition
+      if (b.clock) {
+        const cx = b.x + b.w / 2, cy = b.y + b.h - 58;
+        c.fillStyle = '#e8dcc3'; c.beginPath(); c.arc(cx, cy, 17, 0, 7); c.fill();
+        c.strokeStyle = '#5a5044'; c.lineWidth = 2; c.beginPath(); c.arc(cx, cy, 17, 0, 7); c.stroke();
+        c.strokeStyle = '#2a2622'; c.lineWidth = 2.4;
+        c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx - 9, cy - 5); c.stroke();     // 4-ish
+        c.lineWidth = 1.8;
+        c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx + 4, cy + 11); c.stroke();    // …20
+        c.lineWidth = 1;
+        c.fillStyle = 'rgba(232,220,195,0.55)'; c.font = 'italic 6px Georgia';
+        c.fillText('stopped 2011 · nobody has asked', cx, cy + 30);
+      }
+      if (donated) {
+        c.fillStyle = '#3a4048'; c.font = '600 7px "Segoe UI", Arial';
+        c.fillText('THE BARROWS CENTER FOR APPLIED LEARNING', b.x + b.w / 2, b.y + 38);
+        c.fillStyle = 'rgba(58,64,72,0.55)'; c.font = 'italic 6px Georgia';
+        c.fillText('gift of D. Barrows ’78 — current address sealed', b.x + b.w / 2, b.y + b.h - 12);
+      }
+      if (b.key === 'gym') {   // 0–11, and the banner still goes up
+        c.fillStyle = '#7a3a2e'; c.fillRect(b.x + 22, b.y + 76, b.w - 44, 20);
+        c.fillStyle = '#e8dcc3'; c.font = 'bold 8px Impact, Arial';
+        c.fillText('GO PRAIRIE DOGS', b.x + b.w / 2, b.y + 90);
+        c.fillStyle = 'rgba(232,220,195,0.4)'; c.font = '6px Arial';
+        c.fillText('0–11 · WAIT TILL NEXT YEAR (est. 1961)', b.x + b.w / 2, b.y + 106);
+      }
+    }
+
+    // THE SIGN at the campus entrance, with the name nobody uses
+    c.save(); c.translate(B.x + 60, B.y + B.h - 40); c.rotate(-0.02);
+    c.fillStyle = '#5a4a38'; c.fillRect(-6, -4, 200, 8);
+    c.fillStyle = '#e8e4dc'; c.fillRect(0, -44, 188, 42);
+    c.strokeStyle = '#8a7a62'; c.strokeRect(0, -44, 188, 42);
+    c.fillStyle = '#3a4a38'; c.font = 'bold 11px Georgia'; c.textAlign = 'center';
+    c.fillText('HOPEWELL TECH', 94, -28);
+    c.fillStyle = 'rgba(58,74,56,0.75)'; c.font = '6.5px Georgia';
+    c.fillText('TECHNICAL & COMMUNITY COLLEGE', 94, -18);
+    c.fillStyle = 'rgba(58,74,56,0.45)'; c.font = 'italic 6px Georgia';
+    c.fillText('"YOUR FUTURE STARTS HERE" · est. 1961', 94, -8);
+    c.restore();
+    // somebody has, inevitably, corrected the sign
+    c.save(); c.translate(B.x + 154, B.y + B.h - 66); c.rotate(-0.06);
+    c.fillStyle = 'rgba(200,60,50,0.55)'; c.font = 'bold 13px Georgia'; c.textAlign = 'center';
+    c.fillText('HOPELESS', 0, 0); c.restore();
+  }
+
   // ── THE BLUFFS: lake money, and the only lawns in the county ──────────────
   _paintBluffs(c) {
     const W = WORLD.w, B = BLUFFS;
@@ -1180,6 +1288,80 @@ export class Renderer {
       c.fillText('ASK VERN', 565, 264); c.fillText('(VERN SAYS NO)', 565, 274);
       c.fillStyle = '#6a5a3a'; c.beginPath(); c.ellipse(600, 90, 12, 16, 0, 0, 7); c.fill(); // the owl
       c.fillStyle = '#c9a227'; c.beginPath(); c.arc(596, 84, 2, 0, 7); c.arc(604, 84, 2, 0, 7); c.fill();
+    }
+    if (room === 'shop') {
+      c.fillStyle = '#55524a'; c.fillRect(0, 0, it.w, it.h);                        // sealed concrete
+      scatter(120, 811, (rnd) => { c.fillStyle = `rgba(20,18,16,${0.08 + rnd() * 0.2})`; c.fillRect(rnd() * it.w, rnd() * it.h, 10 + rnd() * 40, 5 + rnd() * 14); });
+      scatter(40, 812, (rnd) => { c.fillStyle = 'rgba(60,50,40,0.5)'; c.beginPath(); c.arc(rnd() * it.w, rnd() * it.h, 1 + rnd() * 3, 0, 7); c.fill(); }); // spatter burns
+      const k = it.counter;
+      c.fillStyle = '#4a4438'; c.fillRect(k.x, k.y, k.w, k.h);                       // Dunn's desk
+      c.fillStyle = 'rgba(232,220,195,0.5)'; c.font = '6px Arial'; c.textAlign = 'center';
+      c.fillText('SIGN IN. GLASSES ON. NO EXCEPTIONS.', k.x + k.w / 2, k.y + 32);
+      // welding bays with their curtains
+      for (let i = 0; i < 4; i++) {
+        const bx = 340 + i * 82;
+        c.fillStyle = '#3e3a34'; c.fillRect(bx, 90, 66, 70);
+        c.fillStyle = 'rgba(190,90,70,0.45)'; c.fillRect(bx - 4, 84, 74, 8);        // the orange curtain
+        c.fillStyle = '#6a6258'; c.fillRect(bx + 12, 120, 42, 26);                  // the bench
+        if (i === 1) { c.save(); c.globalCompositeOperation = 'lighter';            // one bay is live
+          c.fillStyle = 'rgba(180,220,255,0.5)'; c.beginPath(); c.arc(bx + 33, 132, 9, 0, 7); c.fill(); c.restore(); }
+      }
+      c.fillStyle = '#6a6258'; c.fillRect(60, 250, 140, 90);                         // the scrap rack
+      for (let i = 0; i < 6; i++) { c.fillStyle = '#8a8578'; c.fillRect(66, 256 + i * 14, 128, 6); }
+      c.fillStyle = 'rgba(232,220,195,0.55)'; c.font = 'bold 6px Arial';
+      c.fillText('SCRAP — TAKE WHAT YOU CAN USE', 130, 352);
+      c.fillStyle = '#c9a227'; c.fillRect(430, 250, 120, 60);                        // the safety poster
+      c.fillStyle = '#2a2622'; c.font = 'bold 7px Arial';
+      c.fillText('DAYS WITHOUT INCIDENT', 490, 268); c.font = 'bold 18px Impact, Arial';
+      c.fillText('2', 490, 292);
+    }
+    if (room === 'aid') {
+      c.fillStyle = '#8a8272'; c.fillRect(0, 0, it.w, it.h);                         // institutional linoleum
+      for (let x = 0; x < it.w; x += 40) for (let y = 0; y < it.h; y += 40)
+        if ((x + y) % 80 === 0) { c.fillStyle = 'rgba(110,102,88,0.35)'; c.fillRect(x, y, 40, 40); }
+      const k = it.counter;
+      c.fillStyle = '#6e6250'; c.fillRect(k.x, k.y, k.w, k.h);
+      c.fillStyle = 'rgba(190,215,230,0.35)'; c.fillRect(k.x, k.y - 40, k.w, 36);    // the window
+      c.fillStyle = 'rgba(0,0,0,0.4)'; c.fillRect(k.x + 90, k.y - 12, 60, 8);        // the slot you speak through
+      c.fillStyle = 'rgba(42,38,34,0.75)'; c.font = 'bold 7px Arial'; c.textAlign = 'center';
+      c.fillText('FINANCIAL AID · WINDOW 1 · WINDOW 1 IS THE ONLY WINDOW', k.x + k.w / 2, k.y + 34);
+      // the queue rope and the chairs of the resigned
+      c.strokeStyle = '#7a3a4a'; c.lineWidth = 3;
+      c.beginPath(); c.moveTo(150, 200); c.lineTo(470, 200); c.stroke(); c.lineWidth = 1;
+      for (let r = 0; r < 2; r++) for (let i = 0; i < 5; i++) {
+        c.fillStyle = '#5a5a62'; c.fillRect(96 + i * 70 + r * 300 * 0, 250 + r * 44, 34, 9);
+        c.fillStyle = '#4a4a52'; c.fillRect(100 + i * 70, 259 + r * 44, 26, 18);
+      }
+      c.fillStyle = '#c9302a'; c.fillRect(520, 60, 60, 44);                          // TAKE A NUMBER
+      c.fillStyle = '#e8dcc3'; c.font = 'bold 7px Arial'; c.fillText('TAKE A', 550, 76);
+      c.font = 'bold 15px Impact, Arial'; c.fillText('NUMBER', 550, 92);
+      c.fillStyle = 'rgba(42,38,34,0.5)'; c.font = 'italic 6px Georgia';
+      c.fillText('now serving: 3   ·   in the machine: 41', 300, 350);
+    }
+    if (room === 'library') {
+      c.fillStyle = '#7a6e5e'; c.fillRect(0, 0, it.w, it.h);                          // carpet tile, warm
+      scatter(90, 821, (rnd) => { c.fillStyle = `rgba(40,34,26,${0.06 + rnd() * 0.12})`; c.fillRect(rnd() * it.w, rnd() * it.h, 20 + rnd() * 40, 10 + rnd() * 16); });
+      for (const sy of [90, 200]) {                                                   // the stacks
+        c.fillStyle = '#5a4a38'; c.fillRect(300, sy, 300, 60);
+        for (let i = 0; i < 26; i++) { c.fillStyle = ['#8a4a3a','#4a6a5a','#7a6a3a','#4a5568','#6a4a6a'][i % 5];
+          c.fillRect(306 + i * 11, sy + 6, 8, 22); }
+        for (let i = 0; i < 26; i++) { c.fillStyle = ['#5a7a4a','#8a5a33','#3a5a7a','#7a3a4a','#6a6a4a'][i % 5];
+          c.fillRect(306 + i * 11, sy + 32, 8, 22); }
+      }
+      const k = it.counter;
+      c.fillStyle = '#6e5a3a'; c.fillRect(k.x, k.y, k.w, k.h);
+      c.fillStyle = 'rgba(232,220,195,0.55)'; c.font = '6px Arial'; c.textAlign = 'center';
+      c.fillText('RETURNS', k.x + k.w / 2, k.y + 32);
+      for (let i = 0; i < 4; i++) {                                                    // study carrels
+        c.fillStyle = '#6a5a46'; c.fillRect(70 + i * 60, 280, 48, 40);
+        c.fillStyle = '#5a4c3a'; c.fillRect(70 + i * 60, 280, 48, 8);
+      }
+      c.fillStyle = '#8a8f96'; c.fillRect(600, 280, 30, 70);                           // the radiator, the real attraction
+      for (let i = 0; i < 6; i++) { c.fillStyle = '#6a7078'; c.fillRect(602, 284 + i * 11, 26, 6); }
+      c.save(); c.globalCompositeOperation = 'lighter';
+      c.fillStyle = 'rgba(255,170,90,0.10)'; c.beginPath(); c.arc(615, 315, 46, 0, 7); c.fill(); c.restore();
+      c.fillStyle = 'rgba(232,220,195,0.4)'; c.font = 'italic 6px Georgia';
+      c.fillText('the best heating on campus, and everyone knows it', 330, 358);
     }
     if (room === 'house') {
       // Wide, pale, and expensive. Deliberately under-decorated: this is a room you
@@ -1607,6 +1789,18 @@ export class Renderer {
         pool(FOXHOLE.door.x, FOXHOLE.door.y + 20, 120, 0.9);
         glow(FOXHOLE.door.x, FOXHOLE.door.y - 6, 34, 'rgba(255,226,170,A)', 0.5);
         glow(FOXHOLE.door.x, FOXHOLE.door.y + 30, 90, 'rgba(255,120,150,A)', 0.10);
+        // HOPELESS at night: parking-lot poles and a couple of lit windows. The
+        // Barrows Center is lit like a corporate lobby because that's what it is.
+        for (const b of HTCC.buildings) {
+          pool(b.door.x, b.y + b.h + 16, 100, 0.62);
+          glow(b.door.x, b.y + b.h - 6, 26, 'rgba(255,226,170,A)', 0.20);
+          if (b.donated) { pool(b.x + b.w / 2, b.y + b.h / 2, 150, 0.7);
+            glow(b.x + b.w / 2, b.y + b.h / 2, 110, 'rgba(200,225,255,A)', 0.20); }
+        }
+        for (const [px, py] of [[HTCC.lot.x + 40, HTCC.lot.y + 20], [HTCC.quad.x + 120, HTCC.quad.y + 250],
+                                [HTCC.quad.x + 640, HTCC.quad.y + 40]]) {
+          pool(px, py, 150, 0.82); glow(px, py - 34, 32, 'rgba(255,190,120,A)', 0.28);
+        }
         // THE BLUFFS at night: warm, tasteful, and sparse — landscape lighting, not
         // streetlights. The whole district glows like it's being photographed.
         for (const h of BLUFFS.houses) {
@@ -1697,6 +1891,21 @@ export class Renderer {
       pool(it.counter.x + it.counter.w / 2, it.counter.y + 24, 150, this.tubeDim ? 0.55 : 0.85);
       pool(220, 200, 160, 0.6);
       glow(300, 275, 50, 'rgba(180,210,240,A)', 0.10);                    // the ring case, lit like evidence
+    } else if (room === 'shop') {
+      const it = INTERIORS.shop;
+      pool(it.w / 2, it.h / 2, 300, 0.85);
+      pool(422, 132, 90, 1.0);                                   // the live bay: hot, blue-white
+      glow(422, 132, 70, 'rgba(190,225,255,A)', 0.20 + (this.tubeDim ? 0.10 : 0));
+      glow(it.counter.x + 80, it.counter.y, 70, 'rgba(255,190,110,A)', 0.10);
+    } else if (room === 'aid') {
+      const it = INTERIORS.aid;
+      pool(it.w / 2, it.h / 2, 320, this.tubeDim ? 0.72 : 0.92);  // fluorescent, unkind, everywhere
+      glow(550, 82, 40, 'rgba(255,80,70,A)', 0.10);
+    } else if (room === 'library') {
+      const it = INTERIORS.library;
+      pool(it.w / 2, it.h / 2, 290, 0.8);
+      pool(615, 315, 110, 0.7);                                   // the radiator corner
+      glow(615, 315, 80, 'rgba(255,170,90,A)', 0.16);
     } else if (room === 'house') {
       // A dark house you are not supposed to be in. Your own light, the lake's glow,
       // and — if a panel is counting — a red pulse that gets faster as it runs out.

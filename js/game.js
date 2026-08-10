@@ -4,14 +4,14 @@
 
 import {
   TUNING as T, WEAPONS, WORLD, BUILDINGS, ALLEY_GAPS, STRIP_Y, EXTERIOR_PROPS, GARAGE, FOXHOLE,
-  DOWNTOWN, DT_Y, RAIL_Y, WATER_TOWER, COURTHOUSE, MAIN_ST, WORKS, BLUFFS, LOOT, SEARCH_SPOTS,
+  DOWNTOWN, DT_Y, RAIL_Y, WATER_TOWER, COURTHOUSE, MAIN_ST, WORKS, BLUFFS, LOOT, SEARCH_SPOTS, HTCC,
   WEAPON_SPAWNS, INTERIORS, ARCHETYPES, OUTFITS, NAMED, POPULATION, SPOTS,
   BARKS, SCHEME, ENDINGS, BLOCK_NAMES, DAY_NAMES, WEATHER_KINDS, MENU, RIP,
 } from './data.js';
 
 export { T, WEAPONS, WORLD, BUILDINGS, ALLEY_GAPS, STRIP_Y, EXTERIOR_PROPS, GARAGE, FOXHOLE,
          DOWNTOWN, DT_Y, RAIL_Y, WATER_TOWER, COURTHOUSE, MAIN_ST, WORKS, BLUFFS, LOOT,
-         SEARCH_SPOTS, INTERIORS,
+         SEARCH_SPOTS, HTCC, INTERIORS,
          ARCHETYPES, OUTFITS, NAMED, BARKS, SCHEME, ENDINGS, BLOCK_NAMES, DAY_NAMES, MENU, RIP };
 
 let _eid = 1;
@@ -51,6 +51,7 @@ export class Game {
     this.fox = { paid: -1, visits: 0, drinks: 0, tips: 0, bought: 0, vip: -1 };
     this.dt = { round: -1, shots: 0, seen: false, pallet: -1, worksSeen: false, bluffsSeen: false };
     this.burg = { in: null, t: 0, spots: [], cased: [], done: [], owner: false, entryQuiet: false };
+    this.htcc = { classes: 0, classToday: -1, aidPaid: false, gymToday: -1, cart: -1, seen: false, stashed: false };
     this.npcs = []; this.pickups = []; this.projectiles = [];
     this.stats = { punches: 0, koGiven: 0, koTaken: 0, skimmed: 0, shifts: 0, rip: 0,
                    crimesSeen: 0, cuffsEscaped: 0, spent: 0, earned: 0 };
@@ -109,6 +110,7 @@ export class Game {
       s.push({ x: WORKS.hall.x, y: WORKS.hall.y, w: WORKS.hall.w, h: WORKS.hall.h, door: 'unionhall' });
       s.push({ ...WORKS.gate });
       s.push({ ...WORKS.dockOffice });
+      for (const b of HTCC.buildings) s.push({ x: b.x, y: b.y, w: b.w, h: b.h, door: b.key });
       // The Bluffs: five houses and the club. The gate arm is NOT solid — the doc
       // says the security is decorative, so the gate is scenery you walk around.
       for (const h of BLUFFS.houses) s.push({ x: h.x, y: h.y, w: h.w, h: h.h, door: h.key });
@@ -144,6 +146,9 @@ export class Game {
         s.push({ x: 470, y: 250, w: 150, h: 46 }, { x: 90, y: 320, w: 130, h: 44 });   // booths
       }
       if (room === 'house') s.push({ x: 250, y: 200, w: 190, h: 70 }, { x: 520, y: 320, w: 150, h: 60 }); // sectional, island
+      if (room === 'shop') s.push({ x: 330, y: 90, w: 320, h: 70 }, { x: 60, y: 250, w: 140, h: 90 });    // bays, steel rack
+      if (room === 'aid') s.push({ x: 90, y: 250, w: 180, h: 60 }, { x: 400, y: 250, w: 150, h: 60 });    // chair rows
+      if (room === 'library') s.push({ x: 300, y: 90, w: 300, h: 60 }, { x: 300, y: 200, w: 300, h: 60 }); // stacks
       if (room === 'splitlip') s.push({ ...it.pool }, { x: 70, y: 300, w: 140, h: 44 });        // felt + a booth
       if (room === 'daybreak') s.push({ x: 120, y: 250, w: 200, h: 60 }, { x: 440, y: 260, w: 140, h: 56 }); // communal table, rep table
       if (room === 'pawn') s.push({ x: 60, y: 220, w: 130, h: 120 }, { x: 240, y: 250, w: 120, h: 50 });     // shelf island, case
@@ -248,6 +253,22 @@ export class Game {
     if (this.block === 0 || this.block >= 3) {
       this.npcs.push(this._mkNpc({ ...NAMED.bev, key: 'bev', x: 560, y: 95, room: 'garage', static: true, pool: 'bev' }));
     }
+    // HOPELESS: the campus population, and the Polo Shirts on their loop
+    if (this.block <= 2) {
+      this.npcs.push(this._mkNpc({ ...NAMED.pettig, key: 'pettig', x: 310, y: 104, room: 'aid', static: true, pool: 'pettig' }));
+      this.npcs.push(this._mkNpc({ ...NAMED.dunn, key: 'dunn', x: 150, y: 102, room: 'shop', static: true, pool: 'dunn' }));
+      for (let i = 0; i < 3; i++) {
+        this.npcs.push(this._mkNpc({ x: HTCC.quad.x + 90 + i * 230 + this.ri(-40, 40),
+          y: HTCC.quad.y + 110 + this.ri(-50, 50), outfitKey: this.pick(['denim', 'hivis', 'flannel', 'greasy']),
+          pool: 'campus_idle' }));
+      }
+      this.npcs.push(this._mkNpc({ x: 2420, y: 2050, room: 'library', outfitKey: 'denim', pool: 'campus_idle' }));
+      const tv = this._mkNpc({ ...NAMED.trevor, key: 'trevor', x: HTCC.quad.x + 60, y: HTCC.quad.y + 250, hp: 55, pool: 'trevor',
+        route: [[HTCC.quad.x + 40, HTCC.quad.y + 250], [HTCC.quad.x + 700, HTCC.quad.y + 240],
+                [HTCC.quad.x + 720, HTCC.quad.y + 60], [HTCC.quad.x + 60, HTCC.quad.y + 70]] });
+      this.npcs.push(tv);
+    }
+
     // The Bluffs: Rand's decorative patrol, the neighbours, and — on Fridays — the
     // DA himself at the club, which is the most reliable tell in the entire game.
     const rand = this._mkNpc({ ...NAMED.rand, key: 'rand', x: 1100, y: BLUFFS.roadY - 20, hp: 60, pool: 'rand',
@@ -834,6 +855,109 @@ export class Game {
     return { ok: true, msg: `−$${T.foxVipCost}. The curtain closes.\n\nLater: you're in the gravel lot, warmer, calmer, poorer, and no wiser. Somebody put your jacket back on you. The night went somewhere without you and left you the receipt.` };
   }
 
+  // ══ HOPELESS TECH ═════════════════════════════════════════════════════════
+  // ⚠️ THE CAMPUS RULE, straight from the design doc: "Hopeless Tech is a no-carry
+  // zone with metal detectors at every entrance — installed after the Welding
+  // program kept eating the building's copper wiring, and now sensitive enough to
+  // catch a belt buckle. Campus play stays fists, wits, and Beef by design."
+  // Every campus door runs through here. Nothing else in the game confiscates.
+  enterCampus(key) {
+    const b = HTCC.buildings.find(x => x.key === key);
+    if (!b) return { ok: false };
+    const room = { admin: 'aid', shop: 'shop', library: 'library' }[key];
+    if (!room) return { ok: false, msg: `${b.name}: locked, or nothing in there for you. ${b.blurb}` };
+    const p = this.player;
+    let msg = '', took = null;
+    if (p.held) {                                  // the detector eats it, every time
+      took = p.held.kind; p.held = null;
+      this.addHeat(4, 0, 'set off a campus detector', true);
+      msg = `${this.pick(BARKS.detector)} Campus Safety takes the ${took} and gives you a numbered claim tag you will never redeem. `;
+      this.sfx('yell');
+    }
+    // ⚠️ The crowbar gets STASHED, never refused. A first pass hard-blocked admin
+    // and the library while you carried iron — which is a dead end, because the
+    // scheme needs the crowbar and the disbursement needs the aid office. Everyone
+    // who has ever carried a tool onto a campus knows where it actually goes.
+    if (p.inv.crowbar) {
+      p.inv.crowbar = false; this.htcc.stashed = true;
+      msg += 'You leave the ' + T.shopToolName + ' in the hedge by the door, the way every trades student in the history of this campus has. ';
+    }
+    this.room = room; this._placeIn(room);
+    this.sfx('doorchime');
+    return { ok: true, tookWeapon: took, msg: msg + b.blurb };
+  }
+
+  // A session of anything. The doc: classes are minigames that feed your build.
+  // Welding's the one that ships in Phase 1, because its output is a TOOL.
+  attendClass() {
+    if (this.room !== 'shop') return { ok: false };
+    if (this.htcc.classToday === this.day) return { ok: false, msg: 'Dunn, without looking up: "You came already. Go be useless somewhere with better light."' };
+    this.htcc.classToday = this.day;
+    this.htcc.classes++;
+    this.blockT += T.classSecs;
+    let msg = `You pull a bead. It's ugly and it holds, which Dunn says is the whole job. Sessions attended: ${this.htcc.classes}.`;
+    // …and the point of showing up: you make your own iron instead of buying it
+    if (!this.player.inv.crowbar) {
+      this.player.inv.crowbar = true;
+      this._schemeCheck('tools');
+      msg += ` On the way out you take a length of stock off the scrap rack and put a hook in it. That's a ${T.shopToolName} now, and it cost you nothing but showing up.`;
+    }
+    if (this.htcc.classes === T.aidNeedsClass) msg += ' Somewhere in Chalmers Hall, a box on a form gets a number in it.';
+    return { ok: true, msg };
+  }
+
+  aidStatus() {
+    return { attended: this.htcc.classes, need: T.aidNeedsClass,
+             paid: this.htcc.aidPaid, eligible: this.htcc.classes >= T.aidNeedsClass && !this.htcc.aidPaid };
+  }
+
+  claimAid() {
+    if (this.room !== 'aid') return { ok: false };
+    const s = this.aidStatus();
+    if (s.paid) return { ok: false, msg: 'Ms. Pettigrew: "It disbursed. You spent it. I watched you decide to spend it from right here."' };
+    if (!s.eligible) return { ok: false, msg: `Ms. Pettigrew turns the monitor a quarter-inch toward you. "Attendance: ${s.attended}. The box needs ${s.need}. The box does not care that you're trying."` };
+    this.htcc.aidPaid = true;
+    this._earn(T.aidPayout);
+    this.stats.aid = 1;
+    return { ok: true, msg: `+$${T.aidPayout}. The single largest legal sum you will touch all week, and it took two mornings of showing up. Nobody in this town will ever let you forget how easy that was, least of all you.` };
+  }
+
+  libLayLow() {
+    if (this.room !== 'library') return { ok: false };
+    const before = this.heat;
+    this.heat = Math.max(0, this.heat - T.libHeatDecay);
+    this.endBlock('sat in the library');
+    return { ok: true, msg: `Two hours at a carrel by the radiator. Heat ${Math.round(before)} → ${Math.round(this.heat)}. Nobody in the history of Hopewell has been arrested in this building.` };
+  }
+
+  gymSpot() {
+    if (this.room !== 'ext') return { ok: false };
+    if (this.htcc.gymToday === this.day) return { ok: false, msg: 'You already spotted for them today. There is a limit to how much of this a man can watch.' };
+    if (this.player.hp < 30) return { ok: false, msg: 'They take one look at you and find somebody else. Fair.' };
+    this.htcc.gymToday = this.day;
+    this._earn(T.gymPay);
+    this.player.stamina = T.staminaMax;
+    return { ok: true, msg: `+$${T.gymPay} cash for spotting two Alumni through a workout narrated entirely in numbers. You leave weirdly loose.` };
+  }
+
+  // The Polo Shirts: four guys, one cart, unlimited self-regard. They cannot
+  // arrest you. They can telephone somebody who can. And you must never, ever
+  // touch the cart.
+  polosHassle(t) {
+    this.addHeat(T.polosHassleHeat, 0, 'Campus Safety made a phone call');
+    this.say('Trevor', this.pick(BARKS.trevor), t.x, t.y);
+  }
+
+  touchCart() {
+    if (this.htcc.cart === this.day) return { ok: false, msg: 'The cart has had enough of you today. So, audibly, has Trevor.' };
+    this.htcc.cart = this.day;
+    this.addHeat(T.polosCartRage, 1, 'sat on the cart');
+    const t = this.npcs.find(n => n.key === 'trevor' && !n.ko);
+    if (t) { t.state = 'aggro'; t.brawler = true; this.say('Trevor', this.pick(BARKS.trevor_cart), t.x, t.y); }
+    this.sfx('yell');
+    return { ok: true, msg: 'You sit on the cart. Somewhere across the quad a man begins running who has not run since 2019.' };
+  }
+
   // ══ THE BLUFFS / BURGLARY ═════════════════════════════════════════════════
   // ⚠️ Salted hash, NOT this.rng — house state must be stable across every call
   // in a day (the UI reads it every frame for tells) and must NOT advance the sim
@@ -1407,6 +1531,9 @@ export class Game {
       dockShift: () => this.dockShift(), palletGrab: () => this.palletGrab(),
       fenceFreight: () => this.fenceFreight(arg), hallCoffee: () => this.hallCoffee(),
       hallLayLow: () => this.hallLayLow(),
+      enterCampus: () => this.enterCampus(arg), attendClass: () => this.attendClass(),
+      claimAid: () => this.claimAid(), libLayLow: () => this.libLayLow(),
+      gymSpot: () => this.gymSpot(), touchCart: () => this.touchCart(),
       caseHouse: () => this.caseHouse(arg), enterHouse: () => this.enterHouse(arg),
       searchSpot: () => this.searchSpot(arg), leaveHouse: () => this.leaveHouse(),
       fenceLoot: () => this.fenceLoot(arg), leakBinder: () => this.leakBinder(),
@@ -1480,6 +1607,15 @@ export class Game {
     else if (this.room === 'garage') { this.player.x = GARAGE.door.x + 20; this.player.y = GARAGE.y - 26; }
     else if (this.room === 'foxhole') { this.player.x = FOXHOLE.door.x; this.player.y = FOXHOLE.door.y + 24; }
     else if (this.room === 'unionhall') { this.player.x = WORKS.hall.door.x; this.player.y = WORKS.hall.door.y + 26; }
+    else if (['shop', 'aid', 'library'].includes(this.room)) {
+      const bk = { shop: 'shop', aid: 'admin', library: 'library' }[this.room];
+      const b = HTCC.buildings.find(x => x.key === bk);
+      if (b) { this.player.x = b.door.x; this.player.y = b.door.y + 24; }
+      if (this.htcc.stashed) {            // …and you pick it back up out of the hedge
+        this.htcc.stashed = false; this.player.inv.crowbar = true;
+        this.alert(`The ${T.shopToolName} is exactly where you left it. Nobody on this campus has ever looked in that hedge.`, 'ok');
+      }
+    }
     else {
       const dtb = DOWNTOWN.find(d => d.key === this.room);
       if (dtb) { this.player.x = dtb.x + dtb.w * ((dtb.face && dtb.face.doorAt) || 0.5); this.player.y = DT_Y.base + 28; }
@@ -1558,6 +1694,11 @@ export class Game {
       this.dt.worksSeen = true;
       this.alert('CASSIDY WORKS — nine hundred jobs once. One shift now. The freight still comes through, and nobody counts it like they used to.', 'scheme');
     }
+    if (this.room === 'ext' && !this.htcc.seen && p.x > HTCC.bounds.x && p.x < HTCC.bounds.x + HTCC.bounds.w
+        && p.y > HTCC.bounds.y && p.y < HTCC.bounds.y + HTCC.bounds.h) {
+      this.htcc.seen = true;
+      this.alert('HOPEWELL TECHNICAL & COMMUNITY COLLEGE — the sign says Hopewell Tech. The dean says Hopeless. You are enrolled here, for the money.', 'scheme');
+    }
     if (this.room === 'ext' && !this.dt.bluffsSeen && p.y > BLUFFS.gateY - 20) {
       this.dt.bluffsSeen = true;
       this.alert('THE BLUFFS — lake money, boat people, and the only nine blocks in this county where a squad car shows up because somebody PAID for it to.', 'scheme');
@@ -1616,7 +1757,16 @@ export class Game {
 
     if (n.cop) return this._updateCop(n, dt, dToP);
 
-    // civilian route-walkers (Gus): patrol the loop, slower than a cop, older than the yard
+    // The Polo Shirts can't arrest anybody, so their entire threat is a phone call —
+    // and they only make it if you're visibly carrying. Catching a man with a chair
+    // leg on a campus with metal detectors is, to Trevor, the biggest day of his year.
+    if (n.key === 'trevor' && !n.ko && p.held && dToP < 190 && (n.hassleT || 0) <= 0) {
+      n.hassleT = 26;
+      this.polosHassle(n);
+    }
+    if (n.hassleT) n.hassleT = Math.max(0, n.hassleT - dt);
+
+    // civilian route-walkers (Gus, Trevor): patrol the loop, slower than a cop
     if (n.route && n.state === 'idle') {
       const w = n.route[n.wpt];
       const dx = w[0] - n.x, dy = w[1] - n.y, d = Math.hypot(dx, dy);
