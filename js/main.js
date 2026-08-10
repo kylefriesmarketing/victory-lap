@@ -4,7 +4,8 @@
 // except through game.act / documented fields.
 
 import { Game, soakRun, T, BUILDINGS, GARAGE, FOXHOLE, DOWNTOWN, DT_Y, WATER_TOWER, COURTHOUSE,
-         WORKS, INTERIORS, STRIP_Y, BARKS, SCHEME, ENDINGS, BLOCK_NAMES, DAY_NAMES, NAMED } from './game.js';
+         WORKS, BLUFFS, LOOT, SEARCH_SPOTS, INTERIORS, STRIP_Y, BARKS, SCHEME, ENDINGS,
+         BLOCK_NAMES, DAY_NAMES, NAMED } from './game.js';
 import { Renderer } from './render.js';
 import { Sfx } from './audio.js';
 
@@ -233,6 +234,30 @@ function interactables() {
       if (g.isOpen(b.key)) add(dx, dy, 46, `Enter ${b.label}`, () => result(g.act('enter', b.key)));
       else add(dx, dy, 46, `${b.label} — closed`, () => result(g.act('enter', b.key)));
     }
+    // ── THE BLUFFS ──
+    for (const h of BLUFFS.houses) {
+      const st = g.houseState(h.key);
+      const cx = h.x + h.w / 2;
+      // from the road: case it. Free, costs seconds, and turns tells into facts.
+      add(cx, h.y + h.h + 66, 58,
+        st.cased ? `${h.name} — cased (${st.occupied ? 'HOME' : 'empty'}${st.alarmed ? ', ALARMED' : ', no alarm'})`
+                 : `Watch ${h.name} from the road (${T.caseSecs}s)`,
+        () => result(g.act('caseHouse', h.key)));
+      // at the door: go in
+      if (!st.done) add(cx, h.y + h.h + 8, 46, `${h.name} — try the ${st.openWindow ? 'lake window' : 'slider'}`, () => {
+        const known = st.cased;
+        showChoice(h.name.replace(/^the /, 'The '), h.blurb + (known
+          ? `\n\nYou watched it: ${st.occupied ? 'SOMEBODY IS HOME.' : 'nobody home.'} ${st.alarmed ? 'The alarm is real.' : 'The alarm sign is a lie.'}`
+          : '\n\nYou have not watched this house. You are about to find out the expensive way.'), [
+          { label: st.openWindow ? 'In through the lake window (quiet, no iron)' : `Pry the slider${p.inv.crowbar ? '' : ' — you have no crowbar'}`,
+            go: () => { const r = result(g.act('enterHouse', h.key)); if (r.ok) { updateHud(); } } },
+        ]);
+      });
+    }
+    add(BLUFFS.club.x + BLUFFS.club.w / 2, BLUFFS.club.y + BLUFFS.club.h + 50, 70,
+      `The club patio — a $${T.clubDrink} club soda`, () => showChoice('Hopewell Lake Club.',
+        'Members and guests only, in theory. Nobody up here has ever once been asked to prove it.', [
+        { label: `Sit on the patio — $${T.clubDrink} (heat −6)`, go: () => result(g.act('clubSoda')) }]));
     // CASSIDY WORKS
     add(WORKS.hall.door.x, WORKS.hall.door.y + 10, 50, 'Union Hall — Local 448 (the lights are on)', () => result(g.act('enter', 'unionhall')));
     add(WORKS.dockOffice.x + WORKS.dockOffice.w / 2, WORKS.dockOffice.y + WORKS.dockOffice.h + 8, 54,
@@ -297,6 +322,11 @@ function interactables() {
       { label: 'Ask about the rates', go: () => renderer.bark('Roxy', BARKS.roxy[1], 180, 120) },
     ].filter(Boolean)));
     add(440, 145, 60, 'WINDOW 2 — "goods"', () => {
+      if ((p.inv.loot || []).length && g.scheme.inCar <= 0) {
+        showChoice('Window 2.', `${p.inv.loot.length} piece${p.inv.loot.length > 1 ? 's' : ''} of somebody else's life. Roxy won't look at any of it — that's the service.`, [
+          { label: 'Sell the lot (full price, no questions)', go: () => { result(g.act('fenceLoot', 'roxy')); updateHud(); } }]);
+        return;
+      }
       if ((p.inv.freight || 0) > 0 && g.scheme.inCar <= 0) {
         showChoice('Window 2.', `${p.inv.freight} box${p.inv.freight > 1 ? 'es' : ''} of "assorted." Roxy has opinions about gravity.`, [
           { label: `Sell the freight — $${T.freightRoxy} each`, go: () => result(g.act('fenceFreight', 'roxy')) }]);
@@ -394,6 +424,8 @@ function interactables() {
       'Loanstar.', `Vern looks at you like an appraisal. ${g.scheme.inCar > 0 ? `He has, somehow, already counted your trunk.` : ''}`, [
       g.scheme.inCar > 0 ? { label: `Fence the crates — $${T.pawnCrate} each, flat, no faces`, go: () => result(g.act('pawnFence')) } : null,
       (p.inv.freight || 0) > 0 ? { label: `The "assorted" boxes — $${T.freightVern} each`, go: () => result(g.act('fenceFreight', 'vern')) } : null,
+      (p.inv.loot || []).length ? { label: `The Bluffs pieces (+10% clean, −${Math.round((1 - T.hotPenalty) * 100)}% anything with a serial)`,
+        go: () => { result(g.act('fenceLoot', 'vern')); updateHud(); } } : null,
       { label: `The bat — $${T.pawnBat}`, go: () => result(g.act('pawnBuy', 'bat')) },
       !p.inv.crowbar ? { label: `A crowbar — $${T.pawnCrowbar} (Earl's is cheaper; Earl asks questions)`, go: () => result(g.act('pawnBuy', 'crowbar')) } : null,
       { label: 'Just talk', go: () => renderer.bark('Vern', uiPick(BARKS.vern), IT.counter.x + 120, IT.counter.y + 20) },
@@ -403,10 +435,25 @@ function interactables() {
     add(600, 100, 46, 'The owl (not for sale)', () =>
       feed('The owl has seen Vern cry and it stays where the leverage is. It watches you the way the camera at Wing Barn wishes it could.', 'ok'));
     add(IT.w / 2, IT.h - 24, 60, 'Back to Main Street', () => result(g.act('leave')));
+  } else if (g.room === 'house') {
+    const IT = INTERIORS.house;
+    for (const sp of SEARCH_SPOTS) {
+      const pos = IT.spots[sp.key]; if (!pos) continue;
+      const done = g.burg.spots.includes(sp.key);
+      const lock = sp.needsCrowbar && !p.inv.crowbar;
+      add(pos[0], pos[1] + 16, 46,
+        done ? `${sp.label} — turned out` : `${sp.label} (${sp.secs}s${lock ? ', needs iron' : ''})`,
+        () => { const r = result(g.act('searchSpot', sp.key)); if (r.refused) sfx.play('crack'); updateHud(); });
+    }
+    add(IT.w / 2, IT.h - 22, 70, 'OUT — back across the lawn', () => { result(g.act('leaveHouse')); updateHud(); });
   } else if (g.room === 'unionhall') {
     const IT = INTERIORS.unionhall;
     add(IT.counter.x + 35, IT.counter.y + 20, 56, 'The urn (50¢, honor box)', () => result(g.act('hallCoffee')));
     add(150, 130, 54, 'Denny', () => renderer.bark('Denny', uiPick(BARKS.denny), 150, 112));
+    if ((p.inv.loot || []).includes('binder')) add(450, 150, 60, '📕 Give Denny the FAIRVIEW — PHASE III binder', () => {
+      const r = result(g.act('leakBinder'));
+      if (r.leaked) { pulse($('hud-scheme')); sfx.play('register'); }
+    });
     add(450, 150, 56, 'The grievance board (oldest: 1986)', () =>
       feed('Nine active grievances. The top one is about ventilation and the bottom one is about the twentieth century. Denny\'s handwriting doesn\'t age.', 'ok'));
     add(200, 320, 56, 'A folding chair (sit with the union)', () => showChoice('Sit a while?',
@@ -618,6 +665,18 @@ function updateHud() {
     lastScanStage = st; lastScanAt = performance.now();
     $('hud-scan-line').textContent = uiPick(BARKS.scanner[st]);
   }
+  // the burglary clock
+  const bg = $('hud-burg');
+  if (g.burg && g.burg.in) {
+    const st = g.houseState(g.burg.in);
+    const max = g.burg.owner ? T.alarmGraceS * 0.5 : st.alarmed ? T.alarmGraceS : T.silentTimerS;
+    const f = Math.max(0, Math.min(1, g.burg.t / max));
+    bg.className = 'on' + (g.burg.t < 15 ? ' hot' : g.burg.t < 30 ? ' warn' : '');
+    $('hud-burg-fill').style.width = `${f * 100}%`;
+    $('hud-burg-label').textContent = g.burg.owner ? 'HE IS ON THE PHONE' : st.alarmed ? 'ALARM — RESPONSE INBOUND' : 'QUIET (FOR NOW)';
+    $('hud-burg-sub').textContent = `${Math.max(0, Math.ceil(g.burg.t))}s · ${(p.inv.loot || []).length} piece${(p.inv.loot || []).length === 1 ? '' : 's'} · ${g.lootWeight()}/${T.bluffsCarryCap} full`;
+  } else bg.className = '';
+
   const chips = [];
   if (p.held) chips.push(`✊ ${p.held.kind}`);
   if (p.carryCrate) chips.push('📦 CRATE');
@@ -625,6 +684,7 @@ function updateHud() {
   if (p.inv.jerky) chips.push(`🥩×${p.inv.jerky}`);
   if (p.inv.crowbar) chips.push('🔧 crowbar');
   if (p.inv.freight) chips.push(`📦 assorted×${p.inv.freight}`);
+  if ((p.inv.loot || []).length) chips.push(`💎 ${p.inv.loot.length} piece${p.inv.loot.length > 1 ? 's' : ''}`);
   if (g.scheme.inCar) chips.push(`🚗 ${g.scheme.inCar} crate${g.scheme.inCar > 1 ? 's' : ''}`);
   if (p.debt) chips.push(`💸 owe $${p.debt}`);
   if (p.ripToday) chips.push('🫨 ripped');

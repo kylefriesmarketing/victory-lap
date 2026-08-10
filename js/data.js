@@ -76,6 +76,20 @@ export const TUNING = {
   hallHeatDecay: 16,          // nobody in the hall answers questions; they've all BEEN questions
   hallCoffee: 0.5,            // union coffee. fifty cents. tastes like the building
   gusCatchRange: 250,         // if Gus can see the pallet, the pallet stays fell-on
+  // ── THE BLUFFS / BURGLARY ────────────────────────────────────────────────
+  // The doc: "high-risk, high-reward burglary biome, and the only district where
+  // the police response is genuinely fast." Every number here serves that sentence.
+  caseSecs: 5,                // watching a house from the street. Free, slow, decisive.
+  alarmGraceS: 50,            // from trip to cruisers ON the lawn. Loud, and short.
+  silentTimerS: 105,          // even unalarmed: somebody's neighbour eventually looks
+  burgHeatEntry: 22,          // B&E up here costs more than anywhere else
+  burgHeatAlarm: 34,          // …and the alarm makes it a different crime entirely
+  burgHeatSeen: 46,           // waking the owner is the worst outcome short of cuffs
+  bluffsCarryCap: 6,          // your jacket is a jacket, not a moving van
+  hotPenalty: 0.62,           // fences pay less for anything with a serial number
+  daFridayBonus: 1.5,         // the DA's Friday: the Bluffs' drop night
+  clubDrink: 12,              // a club soda at the club, because you don't belong here
+  bluffsRepMult: 1.35,        // Bluffs scores are worth more Cred: they're a STORY
   // heat
   heatStage: { noticed: 15, named: 40, wanted: 70 },
   heatMax: 100,
@@ -138,7 +152,61 @@ export const WEAPONS = {
   crowbar:{ dmg: [16, 22], range: 42, dur: 30, kb: 210, label: 'the crowbar' },
 };
 
-export const WORLD = { w: 3400, h: 2400 };
+export const WORLD = { w: 3400, h: 3200 };
+
+// ── THE BLUFFS ────────────────────────────────────────────────────────────────
+// Lake money. Boat people. The country club where the DA golfs off his caseload
+// every Friday. Gates, cameras, private security that's mostly decorative — and
+// the ONLY district where the police response is genuinely fast, because up here
+// they actually pay for it. (All design doc; all implemented below.)
+export const BLUFFS = {
+  gateY: 2470,                       // the "private community" arm you can just walk around
+  roadY: 2600,
+  lakeY: 3010,
+  club: { x: 2340, y: 2660, w: 380, h: 160, door: { x: 2530, y: 2820 } },
+  // Five houses. Each rolls a state per day; the TELLS are how you read it from
+  // the street. That reading IS the skill — this is not a lockpick minigame.
+  houses: [
+    { key: 'kessler', name: 'the Kessler place',   x: 200,  y: 2680, w: 230, h: 150, tier: 1,
+      blurb: 'Boat people. Two jet skis, one marriage.' },
+    { key: 'hoyt',    name: 'the Hoyt house',      x: 560,  y: 2700, w: 250, h: 145, tier: 1,
+      blurb: 'He sold the feed store to Fairview and built THIS.' },
+    { key: 'marchetti',name:'the Marchetti place', x: 940,  y: 2670, w: 270, h: 160, tier: 2,
+      blurb: 'Orthodontist. Four bathrooms. One personality.' },
+    { key: 'delacroix',name:'the OTHER Delacroix', x: 1340, y: 2690, w: 250, h: 150, tier: 2,
+      blurb: 'No relation. Allegedly. Your grandmother goes quiet about it.' },
+    { key: 'da',      name: "the DA's house",      x: 1720, y: 2660, w: 300, h: 170, tier: 3,
+      daHouse: true, blurb: 'Elected embarrassment. Golfs off his caseload every Friday.' },
+  ],
+  docks: [ 300, 660, 1050, 1440, 1830 ],
+};
+
+// What's inside a Bluffs house. Values are what a FENCE pays, not what it's worth —
+// the gap between those two numbers is the entire pawn industry.
+export const LOOT = {
+  jar:      { label: 'a jar of loose foreign coins', v: [6, 16],   w: 1 },
+  laptop:   { label: 'a laptop with a Fairview sticker', v: [55, 95], w: 2 },
+  watch:    { label: 'a watch worth more than your car', v: [80, 160], w: 1, hot: true },
+  jewelry:  { label: 'a fistful of somebody\'s anniversaries', v: [45, 110], w: 1, hot: true },
+  cash:     { label: 'the emergency cash in the sock drawer', v: [40, 120], w: 0 },
+  driver:   { label: 'a signed Nicklaus driver', v: [50, 100], w: 2 },
+  trout:    { label: 'a mounted lake trout (why)', v: [8, 18],  w: 3 },
+  pills:    { label: 'a prescription in somebody else\'s name', v: [30, 70], w: 0, hot: true },
+  silver:   { label: 'the wedding silver, still in the felt', v: [70, 130], w: 3, hot: true },
+  console:  { label: 'a game console still in the box', v: [45, 85], w: 2 },
+  binder:   { label: 'a binder marked FAIRVIEW — PHASE III', v: [0, 0], w: 1, evidence: true },
+  gun:      { label: 'a pistol in a bedside safe — you leave it. That line stays uncrossed.', v: [0, 0], w: 0, refused: true },
+};
+
+// Where you look, what it costs you in seconds, and what it might give up.
+export const SEARCH_SPOTS = [
+  { key: 'drawer',  label: 'the sock drawer',        secs: 4,  pool: ['cash', 'jar', 'pills'] },
+  { key: 'dresser', label: 'the jewelry dish',       secs: 5,  pool: ['jewelry', 'watch', 'jar'] },
+  { key: 'office',  label: 'the office desk',        secs: 6,  pool: ['laptop', 'binder', 'cash'] },
+  { key: 'closet',  label: 'the bedroom safe',       secs: 11, pool: ['watch', 'silver', 'gun'], needsCrowbar: true },
+  { key: 'garage',  label: 'the boat garage',        secs: 7,  pool: ['driver', 'console', 'trout'] },
+  { key: 'trophy',  label: 'the trophy wall',        secs: 4,  pool: ['driver', 'trout'] },
+];
 
 // ── CASSIDY WORKS ─────────────────────────────────────────────────────────────
 // The plant. Half-dead, one shift running, union hall lit out of spite (the
@@ -304,6 +372,13 @@ export const INTERIORS = {
   unionhall:{ w: 560, h: 360, label: 'Union Hall — Local 448',
     counter: { x: 60, y: 100, w: 180, h: 50 },          // the urn table
     props: ['coffeeUrn', 'foldingChairs', 'grievanceBoard', 'banner', 'photoWall'] },
+  // ⚠️ ONE parameterised interior serves all five Bluffs houses — they differ by
+  // tier (dressing + loot), not by floorplan. Five hand-painted mansions would be
+  // five times the paint for a room you're in for forty seconds with a clock running.
+  house:    { w: 720, h: 440, label: 'somebody\'s house',
+    spots: { drawer: [560, 120], dresser: [440, 130], office: [130, 130],
+             closet: [620, 250], garage: [140, 340], trophy: [340, 100] },
+    props: ['sectional', 'islandKitchen', 'lakeWindow', 'artNobodyLooksAt'] },
 };
 
 // ---------------------------------------------------------------------------
@@ -379,6 +454,13 @@ export const NAMED = {
             silhouette: 'forty years of grievances, filed in order, none resolved' },
   gus:    { name: 'Gus', role: 'yard security', arch: 'tall', outfit: { shirt: '#5a5548', pants: '#44403a' }, hat: 'cap',
             silhouette: 'walks the yard like it owes him a pension. It does.' },
+  // ── The Bluffs ────────────────────────────────────────────────────────────
+  rand:   { name: 'Rand', role: 'Bluffs "security"', arch: 'beerbelly', outfit: { shirt: '#3a4a5a', pants: '#2e3a44' }, hat: 'copHat',
+            silhouette: 'a uniform bought online; the cart has no keys and neither does he' },
+  whit:   { name: 'DA Whitcomb', role: 'county DA', arch: 'average', outfit: { shirt: '#e8e4dc', pants: '#5a6a52' }, hat: 'visor',
+            silhouette: 'golf polo, county seal, the confidence of the never-audited' },
+  bunny:  { name: 'Bunny Marchetti', role: 'Bluffs', arch: 'wiry', outfit: { shirt: '#e8b8c8', pants: '#f0ead8' }, hat: 'bun',
+            silhouette: 'sunglasses indoors, tennis skirt, has never once been told no' },
 };
 
 // ambient population per block: [count, archetype pool, outfit pool, where]
@@ -739,6 +821,46 @@ export const BARKS = {
     "The horn used to mean four thousand guys moving at once. Now it's basically an alarm clock for me and God.",
     "Lifted wrong in '19 and my spine's been freelance ever since.",
     "One shift running. ONE. This place used to eat three shifts and ask for a fourth, man.",
+  ],
+  // ── THE BLUFFS ────────────────────────────────────────────────────────────
+  rand: [
+    "Bluffs Patrol. That's a real title. It's on a card. I HAD cards made.",
+    "I'm not a cop. I'm cop-ADJACENT. There's a difference and it's mostly the pension.",
+    "Cart's electric. Does eleven miles an hour and I've never needed more, and that's the tragedy.",
+    "Camera on the Marchetti place hasn't worked since the hail. They know. They pay me instead. I'm cheaper AND worse.",
+    "Twenty-two years HPD wouldn't take me. Now I make double watching a lake nobody swims in.",
+    "You live up here? ...Didn't think so. Nobody who lives up here WALKS.",
+  ],
+  whit: [
+    "The docket's a suggestion, son. A living document. I live it.",
+    "Golf Fridays. Every Friday. It's on the county calendar as 'community outreach' and technically that is TRUE.",
+    "I've dropped four hundred charges in this county and slept every single night like a baby with a trust fund.",
+    "Your name's crossed my desk. Twice. It'll cross again and I'll do the same thing I always do — nothing, expensively.",
+    "Fairview's counsel and I play the back nine together. That's not corruption, that's a SMALL TOWN.",
+  ],
+  bluffs_idle: [
+    "We're not FROM here, we're OF here. There's a difference. — What's the difference? — We have the lake view.",
+    "The town's so charming. I'd never go down there, but it's charming.",
+    "Bought the feed store lot. Gonna do a wellness thing. A wellness CONCEPT.",
+    "Somebody's kid keyed the Range Rover. Down there they'd call that a Tuesday. Up here we call our attorney.",
+    "It's a second home. Well — it's a THIRD home, but the second one doesn't count, it's in Scottsdale.",
+    "Ugh, the plant whistle. You can hear it from the DECK. We're writing letters.",
+  ],
+  club: [
+    "Members and guests only. Are you a guest? Of WHOM, exactly?",
+    "The chef's from Bozeman. BOZEMAN. We flew him in like a witness.",
+    "Dues went up. Everyone screamed. Everyone paid. That's the club.",
+  ],
+  // fired when you're standing in somebody's house and their alarm is counting
+  burg_tense: [
+    "(Somewhere in the house, a panel is beeping about you.)",
+    "(The fridge hums. Your pulse hums louder.)",
+    "(Every second in here is a second of somebody else's life you're spending.)",
+  ],
+  burg_owner: [
+    "WHO'S THERE? I HAVE A— I'M CALLING THE— GERALD, GET THE THING!",
+    "Oh my GOD. Oh my god oh my god — I'm on the phone with them RIGHT NOW—",
+    "You picked the WRONG— no, actually, you picked a fine house, we have great stuff, GET OUT!",
   ],
   courthouse_idle: [
     "The docket's posted Thursdays. It's the town phone book with worse fonts.",

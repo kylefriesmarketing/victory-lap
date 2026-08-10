@@ -140,6 +140,44 @@ Uses the portable Node at `C:\Users\kylef\tools\node` (not on PATH).
   when you're near the plant. Denny and Gus join the cast; Gus is the first civilian
   route-walker (patrol logic now exists outside cops).
 
+- **M1.7 — THE BLUFFS + the burglary system** ✅ (2026-08-06)
+  World 3400×3200. Lake money, boat people, and the doc's promise delivered: "the
+  only district where the police response is genuinely fast, because up here they
+  actually pay for it."
+
+  **The burglary loop is a READING game, not a lockpick minigame.** Each of five
+  houses rolls a daily state from a **salted hash, never `this.rng`** (the UI reads
+  it every frame for tells; it must not advance the sim stream or drift mid-day).
+  The state is broadcast entirely through *painted tells* — car in the drive, lit
+  windows (unmissable at night), packages piled up, sprinklers running unwatched, a
+  cracked lake window. **And the alarm signs LIE**: every alarmed house has one, but
+  so do 40% of unalarmed ones — that's the doc's "security that's mostly decorative"
+  turned into the central mechanic. Casing a house (5s from the road) converts tells
+  into certainty. That gap between reading and knowing IS the skill.
+
+  Entry: the open window (quiet, no tools) or pry the slider (needs iron). Three
+  clock tiers — quiet 105s, alarmed 50s, **owner home 25s and he's already dialling**.
+  Searching is press-your-luck: six spots, each costs its own seconds off the clock,
+  the safe needs a crowbar, carry weight caps you at 6. Run the clock out and two
+  cruisers arrive *without sirens, which is how you know they were already close.*
+
+  **The DA golfs off his caseload every Friday** (doc, verbatim) — so on Friday his
+  house is guaranteed empty, his alarm is always real, and he's standing at the club
+  where you can see him. That's the Bluffs' drop night, and it rhymes with the Game
+  Barn job by design.
+
+  Loot fences differently by fence: Roxy pays full and never looks; **Vern has a
+  loupe and a ledger, so serial numbers cost you 38%** (verified: same four pieces,
+  $366 vs $292). The FAIRVIEW — PHASE III binder is worthless to both — give it to
+  Denny at the union hall instead for +REP and forty years of phone calls.
+  ⚠️ A pistol in a bedside safe is a **refused** loot type — you find it, you leave
+  it, it can never enter inventory. The doc's gun stance, enforced in data.
+  ⚠️ `addHeat(..., wired=true)` bypasses the empty-street discount for machine
+  witnesses. Without it an alarm at 3 a.m. cost 9 heat instead of 34 and the whole
+  district was free. Alarms don't care if anyone's watching.
+  ⚠️ ONE parameterised `house` interior serves all five — they differ by tier and
+  loot, not floorplan. Don't hand-paint five mansions for a 40-second room.
+
 ## What's deliberately NOT in Phase 1 (per the roadmap — don't "fix" these)
 
 - No Hopeless Tech, classes, GPA, or majors (Phase 2).

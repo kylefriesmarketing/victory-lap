@@ -4,13 +4,14 @@
 
 import {
   TUNING as T, WEAPONS, WORLD, BUILDINGS, ALLEY_GAPS, STRIP_Y, EXTERIOR_PROPS, GARAGE, FOXHOLE,
-  DOWNTOWN, DT_Y, RAIL_Y, WATER_TOWER, COURTHOUSE, MAIN_ST, WORKS,
+  DOWNTOWN, DT_Y, RAIL_Y, WATER_TOWER, COURTHOUSE, MAIN_ST, WORKS, BLUFFS, LOOT, SEARCH_SPOTS,
   WEAPON_SPAWNS, INTERIORS, ARCHETYPES, OUTFITS, NAMED, POPULATION, SPOTS,
   BARKS, SCHEME, ENDINGS, BLOCK_NAMES, DAY_NAMES, WEATHER_KINDS, MENU, RIP,
 } from './data.js';
 
 export { T, WEAPONS, WORLD, BUILDINGS, ALLEY_GAPS, STRIP_Y, EXTERIOR_PROPS, GARAGE, FOXHOLE,
-         DOWNTOWN, DT_Y, RAIL_Y, WATER_TOWER, COURTHOUSE, MAIN_ST, WORKS, INTERIORS,
+         DOWNTOWN, DT_Y, RAIL_Y, WATER_TOWER, COURTHOUSE, MAIN_ST, WORKS, BLUFFS, LOOT,
+         SEARCH_SPOTS, INTERIORS,
          ARCHETYPES, OUTFITS, NAMED, BARKS, SCHEME, ENDINGS, BLOCK_NAMES, DAY_NAMES, MENU, RIP };
 
 let _eid = 1;
@@ -48,7 +49,8 @@ export class Game {
     if (this.knewWindow) { this.scheme.hear = true; this.scheme.case = true; }
     if (this.knewDrop) this.scheme.window = true;
     this.fox = { paid: -1, visits: 0, drinks: 0, tips: 0, bought: 0, vip: -1 };
-    this.dt = { round: -1, shots: 0, seen: false, pallet: -1, worksSeen: false };
+    this.dt = { round: -1, shots: 0, seen: false, pallet: -1, worksSeen: false, bluffsSeen: false };
+    this.burg = { in: null, t: 0, spots: [], cased: [], done: [], owner: false, entryQuiet: false };
     this.npcs = []; this.pickups = []; this.projectiles = [];
     this.stats = { punches: 0, koGiven: 0, koTaken: 0, skimmed: 0, shifts: 0, rip: 0,
                    crimesSeen: 0, cuffsEscaped: 0, spent: 0, earned: 0 };
@@ -107,6 +109,11 @@ export class Game {
       s.push({ x: WORKS.hall.x, y: WORKS.hall.y, w: WORKS.hall.w, h: WORKS.hall.h, door: 'unionhall' });
       s.push({ ...WORKS.gate });
       s.push({ ...WORKS.dockOffice });
+      // The Bluffs: five houses and the club. The gate arm is NOT solid — the doc
+      // says the security is decorative, so the gate is scenery you walk around.
+      for (const h of BLUFFS.houses) s.push({ x: h.x, y: h.y, w: h.w, h: h.h, door: h.key });
+      s.push({ x: BLUFFS.club.x, y: BLUFFS.club.y, w: BLUFFS.club.w, h: BLUFFS.club.h });
+      s.push({ x: 0, y: BLUFFS.lakeY, w: WORLD.w, h: WORLD.h - BLUFFS.lakeY });   // the lake says no
       for (const [cx2, cy2, cw, chh] of [[2480, 1160, 130, 60], [2840, 1120, 150, 64], [3040, 1300, 130, 60], [2660, 1300, 110, 56]])
         s.push({ x: cx2, y: cy2, w: cw, h: chh });   // container stacks
       for (const bx of WORKS.boxcars) s.push({ x: bx, y: RAIL_Y - 36, w: 220, h: 64 });
@@ -136,6 +143,7 @@ export class Game {
         s.push({ ...it.stage });                                                       // the stage is a platform
         s.push({ x: 470, y: 250, w: 150, h: 46 }, { x: 90, y: 320, w: 130, h: 44 });   // booths
       }
+      if (room === 'house') s.push({ x: 250, y: 200, w: 190, h: 70 }, { x: 520, y: 320, w: 150, h: 60 }); // sectional, island
       if (room === 'splitlip') s.push({ ...it.pool }, { x: 70, y: 300, w: 140, h: 44 });        // felt + a booth
       if (room === 'daybreak') s.push({ x: 120, y: 250, w: 200, h: 60 }, { x: 440, y: 260, w: 140, h: 56 }); // communal table, rep table
       if (room === 'pawn') s.push({ x: 60, y: 220, w: 130, h: 120 }, { x: 240, y: 250, w: 120, h: 50 });     // shelf island, case
@@ -240,6 +248,22 @@ export class Game {
     if (this.block === 0 || this.block >= 3) {
       this.npcs.push(this._mkNpc({ ...NAMED.bev, key: 'bev', x: 560, y: 95, room: 'garage', static: true, pool: 'bev' }));
     }
+    // The Bluffs: Rand's decorative patrol, the neighbours, and — on Fridays — the
+    // DA himself at the club, which is the most reliable tell in the entire game.
+    const rand = this._mkNpc({ ...NAMED.rand, key: 'rand', x: 1100, y: BLUFFS.roadY - 20, hp: 60, pool: 'rand',
+      route: [[400, BLUFFS.roadY - 20], [1200, BLUFFS.roadY - 10], [2100, BLUFFS.roadY - 20], [1200, BLUFFS.roadY + 30]] });
+    this.npcs.push(rand);
+    for (let i = 0; i < 2; i++) {
+      this.npcs.push(this._mkNpc({ x: 700 + i * 900 + this.ri(-60, 60), y: BLUFFS.roadY + this.ri(-24, 24),
+        outfitKey: this.pick(['tourist', 'tourist2']), pool: 'bluffs_idle' }));
+    }
+    if (this.block >= 1 && this.block <= 2) {
+      this.npcs.push(this._mkNpc({ ...NAMED.bunny, key: 'bunny', x: BLUFFS.club.x - 40, y: BLUFFS.club.y + 190, pool: 'bluffs_idle' }));
+      // FRIDAY: he golfs off his caseload. Seeing him here is how you know.
+      if (this.day === 4) this.npcs.push(this._mkNpc({ ...NAMED.whit, key: 'whit',
+        x: BLUFFS.club.x + 90, y: BLUFFS.club.y + 195, static: true, pool: 'whit' }));
+    }
+
     // Cassidy Works: Denny in the hall (always — spite), Gus walking his loop
     this.npcs.push(this._mkNpc({ ...NAMED.denny, key: 'denny', x: 150, y: 96, room: 'unionhall', static: true, pool: 'denny' }));
     const gus = this._mkNpc({ ...NAMED.gus, key: 'gus', x: 2400, y: 1150, hp: 80, pool: 'gus',
@@ -651,13 +675,18 @@ export class Game {
   }
 
   // ---- heat ---------------------------------------------------------------
-  addHeat(base, extraWitnesses = 0, why = '') {
+  // `wired` = the witness is a MACHINE (an alarm panel, a camera, a phone already
+  // dialling). It does not care whether a human was standing there, so the
+  // empty-street discount must NOT apply — without this, tripping a Bluffs alarm at
+  // 3 a.m. cost 9 heat instead of 34, which made the whole district free.
+  addHeat(base, extraWitnesses = 0, why = '', wired = false) {
     // A crowd makes it worse; an empty alley at 3am makes it cheap. Without a floor
     // below 1.0 there's no "do it where nobody's looking," which is the whole fantasy.
     // ⚠️ Discount the empty alley WITHOUT discounting the crowd — a first pass used
     // 1+(w-2)*0.5 and quietly halved every heat gain in the game (BUSTED fell 8→2/64).
     const w = this.countWitnesses() + extraWitnesses;
-    let mult = w <= 0 ? 0.25 : w === 1 ? 0.6 : Math.min(2.5, 1.2 + (w - 2) * 0.6);
+    let mult = wired ? Math.max(1, w <= 1 ? 1 : 1.2 + (w - 2) * 0.6)
+             : w <= 0 ? 0.25 : w === 1 ? 0.6 : Math.min(2.5, 1.2 + (w - 2) * 0.6);
     if (this.heatStage() >= 2) mult *= T.namedGainMult;
     if (this.weather === 'rain') mult *= 0.8; // cops stay in the car
     this.heat = Math.min(T.heatMax, this.heat + base * mult);
@@ -803,6 +832,204 @@ export class Game {
     this.endBlock('the back room');
     // Fade to black. The design doc: "the camera has manners even when nobody else does."
     return { ok: true, msg: `−$${T.foxVipCost}. The curtain closes.\n\nLater: you're in the gravel lot, warmer, calmer, poorer, and no wiser. Somebody put your jacket back on you. The night went somewhere without you and left you the receipt.` };
+  }
+
+  // ══ THE BLUFFS / BURGLARY ═════════════════════════════════════════════════
+  // ⚠️ Salted hash, NOT this.rng — house state must be stable across every call
+  // in a day (the UI reads it every frame for tells) and must NOT advance the sim
+  // stream. Same trick as Age of Toys' encounter variants.
+  _h(...parts) {
+    let h = 2166136261 >>> 0;
+    const s = parts.join('|');
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+    return (h >>> 0) / 4294967296;
+  }
+
+  houseState(key) {
+    const h = BLUFFS.houses.find(x => x.key === key);
+    if (!h) return null;
+    const R = (salt) => this._h(this.seed, this.day, key, salt);
+    const done = this.burg.done.includes(key);
+    // THE DA'S FRIDAY: he golfs off his caseload every Friday (design doc, verbatim).
+    // That is the Bluffs' drop night — a known, learnable, once-a-week window.
+    const daFriday = h.daHouse && this.day === 4;
+    const occupied = done ? false : daFriday ? false : R('occ') < (h.daHouse ? 0.55 : 0.45);
+    const alarmed = h.daHouse ? true : R('alm') < (h.tier === 2 ? 0.45 : 0.25);
+    // …and here is the doc's "security that's mostly decorative", as a MECHANIC:
+    // every alarmed house has a sign, but so do 40% of the unalarmed ones. The
+    // sign is not information. Casing is information.
+    const sign = alarmed || R('sgn') < 0.40;
+    const openWindow = R('win') < 0.30;
+    return {
+      key, def: h, occupied, alarmed, sign, openWindow, done, daFriday,
+      packages: !occupied && R('pkg') < 0.5,          // away for DAYS. the best tell.
+      car: occupied ? R('car') > 0.12 : R('car') < 0.15,  // …and the tell that lies
+      sprinklers: R('spr') < 0.35,
+      cased: this.burg.cased.includes(key + '|' + this.day),
+    };
+  }
+
+  caseHouse(key) {
+    const st = this.houseState(key);
+    if (!st) return { ok: false };
+    if (st.cased) return { ok: true, msg: 'You already watched this one today. Nothing has changed except your nerve.' };
+    this.burg.cased.push(key + '|' + this.day);
+    this.blockT += T.caseSecs;
+    const bits = [];
+    bits.push(st.occupied ? 'Somebody\'s home — you can see the TV strobing off the ceiling.' : 'Nobody home. Not a light, not a shadow, not a sound.');
+    bits.push(st.alarmed ? 'And the panel by the door has a live green light. It\'s real.' : 'The alarm sign is a lie. There\'s no panel. There never was.');
+    if (st.openWindow) bits.push('The lake-side window is cracked open for the breeze. Rich people trust the lake.');
+    return { ok: true, cased: true, msg: `You stand across the road and watch ${st.def.name} for a while. ${bits.join(' ')}` };
+  }
+
+  canBurgle(key) {
+    const st = this.houseState(key);
+    if (!st || st.done) return false;
+    return st.openWindow || this.player.inv.crowbar;
+  }
+
+  enterHouse(key) {
+    const st = this.houseState(key);
+    if (!st) return { ok: false };
+    if (st.done) return { ok: false, msg: 'You already emptied this one. There is nothing in there now but somebody\'s bad week.' };
+    if (!st.openWindow && !this.player.inv.crowbar) return { ok: false, msg: 'Every door up here is solid and every window is latched. You need iron, or you need a house that trusts the lake.' };
+    this.room = 'house';
+    this.burg.in = key;
+    this.burg.spots = [];
+    this.burg.entryQuiet = st.openWindow;
+    this.burg.owner = st.occupied;
+    this._placeIn('house');
+    // The clock. Alarmed = loud and short. Unalarmed = long, but a neighbour is
+    // still a clock. Occupied = the owner IS the alarm, and he's already dialling.
+    if (st.occupied) {
+      this.burg.t = T.alarmGraceS * 0.5;
+      this.addHeat(T.burgHeatSeen, 1, 'woke the owner of a Bluffs house', true);
+      this.say('Owner', this.pick(BARKS.burg_owner), this.player.x, this.player.y - 20);
+      this.sfx('yell');
+    } else if (st.alarmed) {
+      this.burg.t = T.alarmGraceS;
+      this.addHeat(T.burgHeatAlarm, 0, 'tripped a Bluffs alarm', true);
+      this.sfx('yell');
+    } else {
+      this.burg.t = T.silentTimerS;
+      this.addHeat(T.burgHeatEntry, 0, 'broke into a Bluffs house', true);
+    }
+    this.sfx(st.openWindow ? 'pickup' : 'pry');
+    const how = st.openWindow ? 'The lake window slides up like it was waiting for you.'
+                              : 'The slider gives with a crack that the whole lake hears.';
+    const clock = st.occupied ? 'SOMEBODY IS HOME. He is on the phone. GO.'
+                : st.alarmed ? 'A panel starts beeping in a hallway you cannot see. Fifty seconds, give or take.'
+                : 'Silence. The expensive kind. Nobody knows yet — but somebody always eventually looks out a window.';
+    return { ok: true, msg: `${how} ${clock}` };
+  }
+
+  lootWeight() { return (this.player.inv.loot || []).reduce((a, k) => a + (LOOT[k] ? LOOT[k].w : 1), 0); }
+
+  searchSpot(spotKey) {
+    if (this.room !== 'house' || !this.burg.in) return { ok: false };
+    const sp = SEARCH_SPOTS.find(s => s.key === spotKey);
+    if (!sp) return { ok: false };
+    if (this.burg.spots.includes(spotKey)) return { ok: false, msg: 'You already turned that one out. It\'s a mess and it\'s empty.' };
+    if (sp.needsCrowbar && !this.player.inv.crowbar) return { ok: false, msg: 'Bolted, keyed, and beyond your fingernails. That one wants iron.' };
+    if (this.lootWeight() >= T.bluffsCarryCap) return { ok: false, msg: 'Your jacket is a jacket, not a moving van. You\'re full.' };
+    this.burg.spots.push(spotKey);
+    this.burg.t -= sp.secs;                       // every drawer costs you clock
+    const st = this.houseState(this.burg.in);
+    const tier = st.def.tier;
+    // tier 3 (the DA) rolls twice and keeps the better find
+    const roll = () => sp.pool[Math.floor(this.rng() * sp.pool.length)];
+    let key = roll();
+    if (tier >= 2 && this.rng() < 0.45) { const alt = roll(); if ((LOOT[alt].v[1] || 0) > (LOOT[key].v[1] || 0)) key = alt; }
+    const item = LOOT[key];
+    // ⚠️ The one thing you never take. Design doc: firearms are a line, not a slot.
+    if (item.refused) return { ok: true, refused: true, msg: `${sp.label}: ${item.label}` };
+    if (item.evidence) {
+      this.player.inv.loot = this.player.inv.loot || [];
+      this.player.inv.loot.push(key);
+      return { ok: true, msg: `${sp.label}: ${item.label}. Worth nothing to a fence. Worth something to somebody with a grievance board.` };
+    }
+    this.player.inv.loot = this.player.inv.loot || [];
+    this.player.inv.loot.push(key);
+    this.stats.burgled = (this.stats.burgled || 0) + 1;
+    this.sfx('pickup');
+    return { ok: true, item: key, msg: `${sp.label}: ${item.label}.` };
+  }
+
+  leaveHouse() {
+    const key = this.burg.in;
+    if (!key) return { ok: false };
+    const st = this.houseState(key);
+    const clean = this.burg.t > 0;
+    if ((this.player.inv.loot || []).length) this.burg.done.push(key);
+    this.burg.in = null; this.burg.t = 0;
+    this.room = 'ext';
+    const h = st.def;
+    this.player.x = h.x + h.w / 2; this.player.y = h.y + h.h + 26;
+    if (clean) return { ok: true, msg: 'Out the way you came, across a lawn that has never once been walked on by somebody who needed money.' };
+    return { ok: true, late: true, msg: 'You come out into headlights.' };
+  }
+
+  // Fast, because up here they pay for fast.
+  _bluffsResponse() {
+    const key = this.burg.in;
+    const st = key ? this.houseState(key) : null;
+    this.burg.t = 0;
+    this.addHeat(30, 1, 'Bluffs response');
+    this.alert('Two cruisers come up the lake road without sirens, which is how you know they were already close.', 'bad');
+    this.sfx('siren');
+    const hx = st ? st.def.x + st.def.w / 2 : this.player.x;
+    const hy = st ? st.def.y + st.def.h + 40 : this.player.y;
+    if (this.room === 'house') { this.room = 'ext'; this.burg.in = null; this.player.x = hx; this.player.y = hy; }
+    this.heat = Math.max(this.heat, T.heatStage.wanted + 6);
+    this._heatStageSeen = 3;
+    this._spawnCop('tapp', [[hx - 60, hy + 20]]);
+    this._spawnCop('brill', [[hx + 60, hy + 30]]);
+    for (const n of this.npcs) if (n.cop) { n.state = 'chase'; n.x = hx + this.ri(-70, 70); n.y = hy + this.ri(10, 50); }
+  }
+
+  fenceLoot(where) {
+    const p = this.player;
+    const loot = p.inv.loot || [];
+    if (!loot.length) return { ok: false, msg: 'You have nothing on you worth a counter\'s time.' };
+    let take = 0, n = 0, kept = [];
+    for (const k of loot) {
+      const it = LOOT[k];
+      if (it.evidence) { kept.push(k); continue; }         // paper doesn't sell
+      let v = this.ri(it.v[0], it.v[1]);
+      // Vern keeps a ledger and a loupe, so serial numbers cost you. Roxy's window 2
+      // has never asked a question in its life.
+      if (where === 'vern' && it.hot) v = Math.round(v * T.hotPenalty);
+      if (where === 'vern' && !it.hot) v = Math.round(v * 1.1);
+      take += v; n++;
+    }
+    p.inv.loot = kept;
+    if (!n) return { ok: false, msg: where === 'vern' ? 'Vern flips through the binder once. "I sell things. This is a THING TO KNOW. Not my aisle."' : 'Roxy: "Paper? Sweetheart, I got a whole drawer of paper and none of it spends."' };
+    this._earn(take);
+    this.stats.lootCash = (this.stats.lootCash || 0) + take;
+    const line = where === 'vern'
+      ? 'Vern turns each piece under the loupe, says a number, and does not move off it. "Serial numbers are a lifestyle choice, son."'
+      : 'Roxy doesn\'t look at any of it. That\'s the service you\'re paying for.';
+    return { ok: true, msg: `${n} piece${n === 1 ? '' : 's'} → $${take}. ${line}` };
+  }
+
+  // The binder is the only loot that isn't money. Denny has waited forty years.
+  leakBinder() {
+    const p = this.player;
+    const loot = p.inv.loot || [];
+    if (!loot.includes('binder')) return { ok: false };
+    if (this.room !== 'unionhall') return { ok: false, msg: 'This wants a room with a grievance board in it.' };
+    p.inv.loot = loot.filter(k => k !== 'binder');
+    this.meta.rep += 2;
+    this.stats.leaked = 1;
+    this.alert('Denny reads two pages, sits down, and reads them again. "Phase THREE. They\'ve got the hall on here, son. The HALL." He starts making calls he\'s been waiting forty years to make.', 'scheme');
+    return { ok: true, leaked: true, msg: 'You gave Fairview\'s homework to the one man in this county who reads everything and forgets nothing. +REP, and no money at all, and it was worth it.' };
+  }
+
+  clubSoda() {
+    if (this.room !== 'ext') return { ok: false };
+    if (!this._spend(T.clubDrink)) return { ok: false, msg: 'Twelve dollars for a club soda. You do not have twelve dollars, and everyone on the patio can somehow tell.' };
+    this.heat = Math.max(0, this.heat - 6);
+    return { ok: true, msg: `−$${T.clubDrink}. You sit on the patio like you belong. Nobody asks. Up here, confidence is the only membership card that scans.` };
   }
 
   // ── CASSIDY WORKS ─────────────────────────────────────────────────────────
@@ -1180,6 +1407,10 @@ export class Game {
       dockShift: () => this.dockShift(), palletGrab: () => this.palletGrab(),
       fenceFreight: () => this.fenceFreight(arg), hallCoffee: () => this.hallCoffee(),
       hallLayLow: () => this.hallLayLow(),
+      caseHouse: () => this.caseHouse(arg), enterHouse: () => this.enterHouse(arg),
+      searchSpot: () => this.searchSpot(arg), leaveHouse: () => this.leaveHouse(),
+      fenceLoot: () => this.fenceLoot(arg), leakBinder: () => this.leakBinder(),
+      clubSoda: () => this.clubSoda(),
       shiftAuto: () => this.doShiftAuto(arg || 0), endBlock: () => { this.endBlock(arg || 'waited'); return { ok: true }; },
       brawlAuto: () => this.brawlAuto(arg || 2), heistTripAuto: () => this.heistTripAuto(),
       exitShopCheck: () => { this.exitShopCheck(); return { ok: true }; },
@@ -1326,6 +1557,22 @@ export class Game {
     if (this.room === 'ext' && !this.dt.worksSeen && p.x > 2280 && p.y < 1600) {
       this.dt.worksSeen = true;
       this.alert('CASSIDY WORKS — nine hundred jobs once. One shift now. The freight still comes through, and nobody counts it like they used to.', 'scheme');
+    }
+    if (this.room === 'ext' && !this.dt.bluffsSeen && p.y > BLUFFS.gateY - 20) {
+      this.dt.bluffsSeen = true;
+      this.alert('THE BLUFFS — lake money, boat people, and the only nine blocks in this county where a squad car shows up because somebody PAID for it to.', 'scheme');
+    }
+
+    // ⚠️ THE BURGLARY CLOCK. Runs in the SIM so it survives the hidden-tab path
+    // and so leaving the room can't dodge it. When it hits zero, they're already here.
+    if (this.burg.in) {
+      this.burg.t -= dt;
+      this.burg.barkT = (this.burg.barkT || 0) - dt;
+      if (this.burg.barkT <= 0 && this.burg.t > 0) {
+        this.burg.barkT = this.rr(7, 13);
+        this.say(null, this.pick(BARKS.burg_tense), p.x, p.y);
+      }
+      if (this.burg.t <= 0) this._bluffsResponse();
     }
 
     // dog

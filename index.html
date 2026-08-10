@@ -92,6 +92,20 @@
   #hud-scheme.pulse { animation: schemepulse 1.2s 2; }
   @keyframes schemepulse { 50% { transform: rotate(1.2deg) scale(1.08); background: #fff3d0; } }
 
+  /* The burglary clock. Centre-top, unmissable, and it turns red because the whole
+     Bluffs system is a press-your-luck and the player must FEEL the seconds. */
+  #hud-burg { display: none; position: absolute; top: 96px; left: 50%; transform: translateX(-50%);
+    width: min(420px, 46vw); background: rgba(12,10,14,0.92); border: 1px solid #4a3a3a;
+    border-radius: 4px; padding: 7px 12px 9px; text-align: center; }
+  #hud-burg.on { display: block; }
+  #hud-burg-label { font-family: 'Courier New', monospace; font-size: 10px; letter-spacing: 3px; color: #d0a060; }
+  #hud-burg-bar { height: 9px; background: #1c1410; border-radius: 4px; overflow: hidden; margin: 5px 0 3px; }
+  #hud-burg-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #6a8a5a, #a8c070); transition: width .2s linear; }
+  #hud-burg.warn #hud-burg-fill { background: linear-gradient(90deg, #c9a227, #ffb347); }
+  #hud-burg.hot  #hud-burg-fill { background: linear-gradient(90deg, #9c3d2e, #ff6a5a); }
+  #hud-burg.hot { animation: throb 0.55s infinite; border-color: #9c3d2e; }
+  #hud-burg-sub { font-family: Georgia, serif; font-style: italic; font-size: 11.5px; color: #b8a890; }
+
   #prompt { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%);
     background: rgba(16,14,12,0.92); border: 1px solid #4a4234; color: var(--cream);
     padding: 8px 18px; border-radius: 5px; font-size: 15px; display: none; z-index: 22;
@@ -219,6 +233,9 @@
   </div>
   <div id="hud-inv"></div>
   <div id="hud-scheme">📓 the plan (TAB)</div>
+  <div id="hud-burg"><div id="hud-burg-label">IN THE HOUSE</div>
+    <div id="hud-burg-bar"><div id="hud-burg-fill"></div></div>
+    <div id="hud-burg-sub"></div></div>
 </div>
 
 <div id="prompt"></div>

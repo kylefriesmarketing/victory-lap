@@ -158,6 +158,13 @@ export class Sfx {
       hiss(0.012, 300);
       return;
     }
+    if (kind === 'in:house') {
+      bed(44, 'sine', 0.016, 0.15, 0.006);                 // a big empty house has a LOW hum
+      hiss(0.008, 240);
+      every(4000, 9000, () => this.tone(2600, 0.04, 'square', 0.009));  // the panel, counting
+      every(11000, 20000, () => this.noise(0.3, 0.012, 400, 1));        // the house settling, or not
+      return;
+    }
     if (kind === 'in:unionhall') {
       bed(96, 'triangle', 0.011, 0.3, 0.005);              // fluorescents Denny replaces himself
       every(8000, 16000, () => this.noise(0.2, 0.02, 600, 1.4));         // a folding chair, adjusting

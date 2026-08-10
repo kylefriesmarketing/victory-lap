@@ -3,7 +3,7 @@
 // View-only: free to use Math.random. Never touches sim state.
 
 import { T, WORLD, BUILDINGS, ALLEY_GAPS, STRIP_Y, EXTERIOR_PROPS, GARAGE, FOXHOLE,
-         DOWNTOWN, DT_Y, RAIL_Y, WATER_TOWER, COURTHOUSE, MAIN_ST, WORKS, INTERIORS,
+         DOWNTOWN, DT_Y, RAIL_Y, WATER_TOWER, COURTHOUSE, MAIN_ST, WORKS, BLUFFS, INTERIORS,
          ARCHETYPES, NAMED } from './game.js';
 
 const PAL = {
@@ -59,7 +59,7 @@ export class Renderer {
     // stack barks that land on top of each other instead of overprinting them into mush
     let lift = 0;
     for (const b of this.barks) {
-      if (Math.abs(b.x - x) < 150 && Math.abs((b.y - b.lift) - y) < 60) lift = Math.max(lift, b.lift + 34);
+      if (Math.abs(b.x - x) < 150 && Math.abs((b.y - b.lift) - y) < 90) lift = Math.max(lift, b.lift + 52);
     }
     this.barks.push({ who, text, x, y: y - lift, lift, t: 0, dur: 2.6 + text.length * 0.045 });
     if (this.barks.length > 5) this.barks.shift();
@@ -259,6 +259,7 @@ export class Renderer {
     this._paintFoxhole(c);
     this._paintDowntown(c);
     this._paintWorks(c);
+    this._paintBluffs(c);
     // south houses (set dressing)
     for (const h of [[760, 1200, 180, 140, '#6d5a4a'], [1000, 1220, 160, 120, '#5a5d52'], [1250, 1200, 200, 140, '#7a6a55'], [1550, 1230, 170, 120, '#615549']]) {
       c.fillStyle = h[4]; c.fillRect(h[0], h[1], h[2], h[3]);
@@ -777,6 +778,130 @@ export class Renderer {
     c.restore();
   }
 
+  // ── THE BLUFFS: lake money, and the only lawns in the county ──────────────
+  _paintBluffs(c) {
+    const W = WORLD.w, B = BLUFFS;
+    // the good grass. Irrigated, striped, and greener than anything downtown.
+    c.fillStyle = '#4e6b41'; c.fillRect(0, B.gateY - 40, W, WORLD.h - B.gateY + 40);
+    for (let sx = 0; sx < W; sx += 90) {                       // mower stripes — the tell of money
+      c.fillStyle = 'rgba(255,255,255,0.028)'; c.fillRect(sx, B.gateY - 40, 45, WORLD.h - B.gateY + 40);
+    }
+    scatter(300, 701, (rnd) => { c.fillStyle = rnd() < 0.5 ? '#557345' : '#48633c'; c.fillRect(rnd() * W, B.gateY + rnd() * 500, 3, 2); });
+
+    // THE GATE: brick piers, a decorative arm, and a sign that means nothing
+    c.fillStyle = '#7a5a4a'; c.fillRect(1000, B.gateY - 26, 26, 52); c.fillRect(1180, B.gateY - 26, 26, 52);
+    c.fillStyle = '#8a6a58'; c.fillRect(998, B.gateY - 32, 30, 8); c.fillRect(1178, B.gateY - 32, 30, 8);
+    c.save(); c.translate(1030, B.gateY); c.rotate(-0.04);
+    c.fillStyle = '#e8e4dc'; c.fillRect(0, -3, 146, 6);
+    c.fillStyle = '#c9302a'; for (let i = 0; i < 4; i++) c.fillRect(6 + i * 36, -3, 16, 6);
+    c.restore();
+    c.fillStyle = '#2e4632'; c.fillRect(1044, B.gateY - 78, 120, 40);
+    c.strokeStyle = '#c9a227'; c.strokeRect(1044, B.gateY - 78, 120, 40);
+    c.fillStyle = '#e8dcc3'; c.font = 'bold 9px Georgia'; c.textAlign = 'center';
+    c.fillText('THE BLUFFS', 1104, B.gateY - 62);
+    c.font = '6px Georgia'; c.fillStyle = 'rgba(232,220,195,0.7)';
+    c.fillText('PRIVATE COMMUNITY', 1104, B.gateY - 52);
+    c.fillText('RESIDENTS & GUESTS ONLY', 1104, B.gateY - 44);
+
+    // the lake road: newer, blacker, and swept
+    c.fillStyle = '#3a3a3c'; c.fillRect(0, B.roadY - 34, W, 68);
+    c.strokeStyle = 'rgba(240,240,235,0.34)'; c.lineWidth = 3; c.setLineDash([30, 24]);
+    c.beginPath(); c.moveTo(0, B.roadY); c.lineTo(W, B.roadY); c.stroke(); c.setLineDash([]); c.lineWidth = 1;
+
+    // THE LAKE — the reason for all of it
+    const lg = c.createLinearGradient(0, B.lakeY, 0, WORLD.h);
+    lg.addColorStop(0, '#3f5f74'); lg.addColorStop(1, '#2b4658');
+    c.fillStyle = lg; c.fillRect(0, B.lakeY, W, WORLD.h - B.lakeY);
+    c.fillStyle = '#c9b28a'; c.fillRect(0, B.lakeY - 16, W, 18);        // the shoreline
+    scatter(200, 702, (rnd) => { c.fillStyle = 'rgba(255,255,255,0.10)'; c.fillRect(rnd() * W, B.lakeY + 10 + rnd() * 150, 10 + rnd() * 26, 1.5); });
+    scatter(60, 703, (rnd) => { c.fillStyle = 'rgba(255,255,255,0.06)'; c.fillRect(rnd() * W, B.lakeY + 40 + rnd() * 140, 30 + rnd() * 60, 2); });
+    // docks + boats under covers, which is most of what a boat does
+    for (const dx of B.docks) {
+      c.fillStyle = '#8a7458'; c.fillRect(dx - 9, B.lakeY - 6, 18, 96);
+      for (let py = B.lakeY + 6; py < B.lakeY + 90; py += 16) { c.fillStyle = 'rgba(0,0,0,0.22)'; c.fillRect(dx - 9, py, 18, 3); }
+      c.fillStyle = '#6a6a72'; c.fillRect(dx + 12, B.lakeY + 28, 54, 22);
+      c.fillStyle = '#e8e4dc'; c.beginPath(); c.moveTo(dx + 12, B.lakeY + 28); c.lineTo(dx + 66, B.lakeY + 30); c.lineTo(dx + 40, B.lakeY + 18); c.fill();
+      c.fillStyle = 'rgba(20,30,40,0.35)'; c.fillRect(dx + 12, B.lakeY + 50, 54, 5);
+    }
+
+    // THE HOUSES. Every tell in the design is PAINTED — you can read a house from
+    // the road without a menu, which is the entire skill of the burglary system.
+    const g = this.g;
+    for (const h of BLUFFS.houses) {
+      const st = g.houseState ? g.houseState(h.key) : null;
+      // lawn pad + drive
+      c.fillStyle = '#46603a'; c.fillRect(h.x - 26, h.y - 20, h.w + 52, h.h + 76);
+      c.fillStyle = '#8a8880'; c.fillRect(h.x + h.w * 0.5 - 26, h.y + h.h, 52, 78);   // driveway to the road
+      // the body: big, pale, and expensively boring
+      const wall = h.daHouse ? '#e2ddd2' : ['#d8d2c4', '#cfc8ba', '#dcd6c8'][BLUFFS.houses.indexOf(h) % 3];
+      c.fillStyle = 'rgba(20,24,20,0.28)'; c.fillRect(h.x + 8, h.y + 10, h.w, h.h);   // it casts a real shadow
+      c.fillStyle = wall; c.fillRect(h.x, h.y, h.w, h.h);
+      c.fillStyle = 'rgba(0,0,0,0.20)'; c.fillRect(h.x, h.y, h.w, 12);
+      c.fillStyle = '#5a4a42'; c.fillRect(h.x - 6, h.y - 8, h.w + 12, 16);            // the deep eave
+      // lake-facing glass wall, because the whole house is an argument for the view
+      c.fillStyle = st && st.occupied ? 'rgba(255,214,150,0.42)' : 'rgba(120,150,175,0.30)';
+      c.fillRect(h.x + 14, h.y + h.h - 54, h.w - 28, 40);
+      for (let mx = h.x + 14; mx < h.x + h.w - 14; mx += 34) { c.strokeStyle = 'rgba(60,60,60,0.35)'; c.beginPath(); c.moveTo(mx, h.y + h.h - 54); c.lineTo(mx, h.y + h.h - 14); c.stroke(); }
+      // door
+      c.fillStyle = '#4a3a30'; c.fillRect(h.x + h.w * 0.5 - 15, h.y + h.h - 30, 30, 30);
+      c.fillStyle = '#c9a227'; c.fillRect(h.x + h.w * 0.5 + 8, h.y + h.h - 18, 3, 5);
+      if (!st) continue;
+      // ── THE TELLS ──
+      if (st.car) {                                   // a car in the drive
+        c.fillStyle = '#2e3a44'; c.beginPath(); c.roundRect(h.x + h.w * 0.5 - 22, h.y + h.h + 14, 44, 56, 7); c.fill();
+        c.fillStyle = 'rgba(20,26,34,0.85)'; c.fillRect(h.x + h.w * 0.5 - 15, h.y + h.h + 24, 30, 32);
+      }
+      if (st.sign) {                                  // the alarm sign — which LIES 40% of the time
+        c.fillStyle = '#7a7a80'; c.fillRect(h.x + 18, h.y + h.h + 26, 2, 16);
+        c.fillStyle = '#2e4a7a'; c.fillRect(h.x + 12, h.y + h.h + 16, 15, 11);
+        c.fillStyle = '#e8dcc3'; c.font = 'bold 3.5px Arial'; c.textAlign = 'center';
+        c.fillText('ARMED', h.x + 19.5, h.y + h.h + 22);
+        c.fillText('RESPONSE', h.x + 19.5, h.y + h.h + 26);
+      }
+      if (st.packages) {                              // days of mail = days of nobody
+        for (let i = 0; i < 3; i++) { c.fillStyle = ['#b8a488', '#c8b898', '#a89878'][i]; c.fillRect(h.x + h.w * 0.5 + 20 + i * 9, h.y + h.h - 12 + i * 3, 12, 9); }
+      }
+      if (st.sprinklers) {                            // watering at the wrong hour, unwatched
+        c.fillStyle = 'rgba(180,220,255,0.30)';
+        for (let i = 0; i < 5; i++) { const a = -0.4 - i * 0.32; c.beginPath(); c.ellipse(h.x - 14 + Math.cos(a) * 24, h.y + h.h + 44 + Math.sin(a) * 12, 8, 3, a, 0, 7); c.fill(); }
+      }
+      if (st.openWindow) {                            // the lake window, cracked for the breeze
+        c.fillStyle = 'rgba(30,40,50,0.75)'; c.fillRect(h.x + h.w - 46, h.y + h.h - 52, 26, 12);
+        c.strokeStyle = 'rgba(255,255,255,0.5)'; c.strokeRect(h.x + h.w - 46, h.y + h.h - 52, 26, 12);
+      }
+      if (st.done) {                                  // you already did this one
+        c.fillStyle = 'rgba(255,240,200,0.10)'; c.fillRect(h.x, h.y, h.w, h.h);
+        c.fillStyle = 'rgba(200,60,50,0.5)'; c.font = 'bold 8px Arial'; c.textAlign = 'center';
+        c.fillText('(you already did this one)', h.x + h.w / 2, h.y - 16);
+      }
+      // the name plate, tasteful, on a rock
+      c.fillStyle = '#6a6258'; c.beginPath(); c.ellipse(h.x - 16, h.y + h.h + 54, 18, 11, 0.15, 0, 7); c.fill();
+      c.fillStyle = 'rgba(232,220,195,0.75)'; c.font = 'italic 6px Georgia'; c.textAlign = 'center';
+      c.fillText(h.daHouse ? 'WHITCOMB' : h.name.replace(/^the /, '').replace(/ (place|house)$/, '').toUpperCase(), h.x - 16, h.y + h.h + 56);
+    }
+
+    // THE COUNTRY CLUB — where the caseload goes to die
+    const K = BLUFFS.club;
+    c.fillStyle = 'rgba(20,24,20,0.28)'; c.fillRect(K.x + 10, K.y + 12, K.w, K.h);
+    c.fillStyle = '#e6e0d2'; c.fillRect(K.x, K.y, K.w, K.h);
+    c.fillStyle = 'rgba(0,0,0,0.18)'; c.fillRect(K.x, K.y, K.w, 14);
+    c.fillStyle = '#5a6a52'; c.fillRect(K.x - 8, K.y - 10, K.w + 16, 18);            // green awning roof
+    for (let i = 0; i < 6; i++) { c.fillStyle = '#d8d2c4'; c.fillRect(K.x + 30 + i * 58, K.y + K.h, 14, 26); }  // columns to the patio
+    c.fillStyle = '#c9b28a'; c.fillRect(K.x + 10, K.y + K.h + 26, K.w - 20, 40);     // the patio
+    for (let i = 0; i < 4; i++) {                                                     // umbrella tables
+      c.fillStyle = '#2e4632'; c.beginPath(); c.arc(K.x + 50 + i * 90, K.y + K.h + 44, 13, 0, 7); c.fill();
+      c.fillStyle = 'rgba(0,0,0,0.2)'; c.beginPath(); c.arc(K.x + 50 + i * 90, K.y + K.h + 48, 9, 0, 7); c.fill();
+    }
+    c.fillStyle = '#2e4632'; c.font = 'bold 13px Georgia'; c.textAlign = 'center';
+    c.fillText('HOPEWELL LAKE CLUB', K.x + K.w / 2, K.y + 44);
+    c.font = 'italic 7px Georgia'; c.fillStyle = 'rgba(46,70,50,0.7)';
+    c.fillText('est. 1961 · members & guests · "a tradition of tradition"', K.x + K.w / 2, K.y + 58);
+    // the practice green, with one flag
+    c.fillStyle = '#5e7d4a'; c.beginPath(); c.ellipse(K.x + K.w + 190, K.y + 120, 150, 70, 0, 0, 7); c.fill();
+    c.fillStyle = '#8a8578'; c.fillRect(K.x + K.w + 188, K.y + 74, 3, 48);
+    c.fillStyle = '#c9302a'; c.fillRect(K.x + K.w + 191, K.y + 74, 20, 12);
+  }
+
   _paintProp(c, p) {
     if (p.kind === 'pumps') {
       c.fillStyle = '#55524c'; c.fillRect(p.x, p.y, p.w, p.h);
@@ -1055,6 +1180,41 @@ export class Renderer {
       c.fillText('ASK VERN', 565, 264); c.fillText('(VERN SAYS NO)', 565, 274);
       c.fillStyle = '#6a5a3a'; c.beginPath(); c.ellipse(600, 90, 12, 16, 0, 0, 7); c.fill(); // the owl
       c.fillStyle = '#c9a227'; c.beginPath(); c.arc(596, 84, 2, 0, 7); c.arc(604, 84, 2, 0, 7); c.fill();
+    }
+    if (room === 'house') {
+      // Wide, pale, and expensive. Deliberately under-decorated: this is a room you
+      // are in for forty seconds with a clock running, so it must READ instantly.
+      c.fillStyle = '#c8bfae'; c.fillRect(0, 0, it.w, it.h);
+      for (let x = 0; x < it.w; x += 78) { c.fillStyle = 'rgba(150,138,120,0.35)'; c.fillRect(x, 0, 2, it.h); }
+      c.fillStyle = 'rgba(190,180,164,0.5)'; c.fillRect(200, 160, 320, 220);          // the big rug
+      c.strokeStyle = 'rgba(120,110,95,0.4)'; c.strokeRect(200, 160, 320, 220);
+      // the lake wall — floor to ceiling, the whole point of the house
+      c.fillStyle = 'rgba(120,160,190,0.35)'; c.fillRect(20, 14, it.w - 40, 40);
+      for (let mx = 20; mx < it.w - 20; mx += 60) { c.strokeStyle = 'rgba(60,60,60,0.4)'; c.beginPath(); c.moveTo(mx, 14); c.lineTo(mx, 54); c.stroke(); }
+      c.fillStyle = 'rgba(232,220,195,0.35)'; c.font = 'italic 7px Georgia'; c.textAlign = 'center';
+      c.fillText('(the lake, doing nothing, worth everything)', it.w / 2, 38);
+      // furniture: a sectional the size of a car, an island, art nobody looks at
+      c.fillStyle = '#8a8272'; c.fillRect(250, 200, 190, 70);
+      c.fillStyle = '#9a9282'; c.fillRect(250, 200, 190, 16);
+      c.fillStyle = '#6a6258'; c.fillRect(520, 320, 150, 60);
+      c.fillStyle = '#c8c2b4'; c.fillRect(520, 320, 150, 10);
+      c.fillStyle = '#7a6a5a'; c.fillRect(60, 60, 46, 60);
+      c.fillStyle = 'rgba(180,170,150,0.6)'; c.fillRect(64, 64, 38, 52);
+      // the search spots, labelled where they are — no menu-hunting on a timer
+      const S = it.spots;
+      const labels = { drawer: 'sock drawer', dresser: 'jewelry dish', office: 'office desk',
+                       closet: 'the safe', garage: 'boat garage', trophy: 'trophy wall' };
+      for (const k of Object.keys(S)) {
+        const [sx, sy] = S[k];
+        const done = this.g.burg && this.g.burg.spots.includes(k);
+        c.fillStyle = done ? 'rgba(120,110,95,0.35)' : 'rgba(60,52,42,0.75)';
+        c.fillRect(sx - 20, sy - 14, 40, 28);
+        c.strokeStyle = done ? 'rgba(120,110,95,0.4)' : 'rgba(232,220,195,0.45)';
+        c.strokeRect(sx - 20, sy - 14, 40, 28);
+        c.fillStyle = done ? 'rgba(200,190,175,0.35)' : 'rgba(232,220,195,0.8)';
+        c.font = 'bold 5.5px Arial'; c.textAlign = 'center';
+        c.fillText(done ? '(turned out)' : labels[k].toUpperCase(), sx, sy + 24);
+      }
     }
     if (room === 'unionhall') {
       // linoleum the color of weak coffee, waxed monthly for forty years by the same man
@@ -1388,7 +1548,10 @@ export class Renderer {
     ];
     let amb = ambients[blockIdx] || ambients[3];
     if (room !== 'ext') amb = room === 'gamebarn' && g.gameBarnDark ? 'rgba(4,6,16,0.84)'
-                            : room === 'foxhole' ? 'rgba(20,4,16,0.78)' : 'rgba(30,22,12,0.22)';
+                            : room === 'foxhole' ? 'rgba(20,4,16,0.78)'
+                            // a house you are not supposed to be in is DARK. Your own
+                            // little pool of light is the entire point of the room.
+                            : room === 'house' ? 'rgba(6,8,18,0.86)' : 'rgba(30,22,12,0.22)';
     lc.fillStyle = amb; lc.fillRect(0, 0, L.width, L.height);
 
     const toScreen = (wx, wy) => [(wx - cx + vw / 2) * z, (wy - cy + vh / 2) * z];
@@ -1444,6 +1607,21 @@ export class Renderer {
         pool(FOXHOLE.door.x, FOXHOLE.door.y + 20, 120, 0.9);
         glow(FOXHOLE.door.x, FOXHOLE.door.y - 6, 34, 'rgba(255,226,170,A)', 0.5);
         glow(FOXHOLE.door.x, FOXHOLE.door.y + 30, 90, 'rgba(255,120,150,A)', 0.10);
+        // THE BLUFFS at night: warm, tasteful, and sparse — landscape lighting, not
+        // streetlights. The whole district glows like it's being photographed.
+        for (const h of BLUFFS.houses) {
+          const st = g.houseState ? g.houseState(h.key) : null;
+          pool(h.x + h.w / 2, h.y + h.h + 20, 120, 0.6);
+          glow(h.x + h.w / 2, h.y + h.h - 10, 60, 'rgba(255,214,160,A)', 0.14);
+          if (st && st.occupied) {                          // the lit house: warm, and NOT for you
+            pool(h.x + h.w / 2, h.y + h.h - 34, 130, 0.85);
+            glow(h.x + h.w / 2, h.y + h.h - 34, 90, 'rgba(255,196,120,A)', 0.30);
+          }
+          for (const lx of [h.x + 10, h.x + h.w - 10]) glow(lx, h.y + h.h + 30, 26, 'rgba(255,220,170,A)', 0.16);
+        }
+        pool(BLUFFS.club.x + BLUFFS.club.w / 2, BLUFFS.club.y + BLUFFS.club.h + 44, 210, 0.8);
+        glow(BLUFFS.club.x + BLUFFS.club.w / 2, BLUFFS.club.y + 40, 130, 'rgba(255,225,180,A)', 0.20);
+        for (const dx of BLUFFS.docks) glow(dx, BLUFFS.lakeY + 80, 40, 'rgba(150,200,255,A)', 0.16);  // dock lamps on the water
         // CASSIDY WORKS at night: sodium yard lights — ORANGE, a different town out here —
         // and the union hall's windows, on out of spite, visible from the road
         for (const [yx, yy] of [[2520, 1120], [2900, 1200], [3160, 1360]]) {
@@ -1519,6 +1697,19 @@ export class Renderer {
       pool(it.counter.x + it.counter.w / 2, it.counter.y + 24, 150, this.tubeDim ? 0.55 : 0.85);
       pool(220, 200, 160, 0.6);
       glow(300, 275, 50, 'rgba(180,210,240,A)', 0.10);                    // the ring case, lit like evidence
+    } else if (room === 'house') {
+      // A dark house you are not supposed to be in. Your own light, the lake's glow,
+      // and — if a panel is counting — a red pulse that gets faster as it runs out.
+      const it = INTERIORS.house, g2 = this.g;
+      pool(g2.player.x, g2.player.y, 105, 0.85);            // you, and one arm's length
+      pool(it.w / 2, 30, 300, 0.34);                        // the lake wall, letting in the night
+      glow(it.w / 2, 30, 200, 'rgba(120,170,210,A)', 0.13);
+      const t = g2.burg ? g2.burg.t : 0;
+      if (g2.burg && g2.burg.in && t > 0) {
+        const urgency = Math.max(0.6, Math.min(6, 60 / Math.max(1, t)));
+        const beat = 0.5 + 0.5 * Math.sin(this.t * 3.4 * urgency);
+        glow(it.w - 40, 24, 70, 'rgba(255,50,40,A)', 0.06 + beat * (t < 20 ? 0.24 : 0.10));
+      }
     } else if (room === 'unionhall') {
       const it = INTERIORS.unionhall;
       pool(it.w / 2, it.h / 2, 280, this.tubeDim ? 0.7 : 0.9);            // every tube works. Denny replaces them HIMSELF
