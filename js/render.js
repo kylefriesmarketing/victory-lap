@@ -37,8 +37,22 @@ export class Renderer {
   constructor(canvas, game) {
     this.cv = canvas; this.g = game;
     this.ctx = canvas.getContext('2d');
-    this.cam = { x: 420, y: 1000, shake: 0, sx: 0, sy: 0 };
+    /* ── THE CAMERA ────────────────────────────────────────────────────────────
+     * Art bible: "intimate and physical without causing motion sickness… subtle
+     * camera shake, impact response, breathing movement, and momentum. Keep these
+     * effects restrained and configurable." Every number below is deliberately
+     * small, and all of it can be switched off in one place (`camFx`).
+     *   lead   — look where you're GOING, not where you've been
+     *   zoom   — the frame widens for danger and tightens for tension, on its own
+     *   punch  — a fast in-and-out on impact
+     *   focus  — an authored push for a beat (a heist, an ending) */
+    this.cam = { x: 420, y: 1000, shake: 0, sx: 0, sy: 0,
+                 leadX: 0, leadY: 0, punch: 0, focus: null, focusT: 0 };
     this.zoom = 1.35;
+    this.baseZoom = 1.35;
+    this.camFx = true;         // one switch for the whole feel (pause menu 🎥)
+    this.ZOOM = { base: 1.35, sprint: 1.27, fight: 1.16, chase: 1.10,
+                  burgle: 1.52, interior: 1.46 };
     this.grounds = {};        // room -> offscreen canvas
     this.light = document.createElement('canvas');
     this.barks = [];          // {who, text, x, y, t}
@@ -126,7 +140,12 @@ export class Renderer {
       if (kind === 'shatter')this.wearMark(x, y + 4, 17, 'rgba(150,170,160,A)', 0.07);
       if (kind === 'break')  this.wearMark(x, y + 6, 20, 'rgba(60,44,28,A)', 0.09);
     }
-    if (kind === 'impact' || kind === 'ko') this.cam.shake = Math.min(6, this.cam.shake + (kind === 'ko' ? 4 : 2));
+    if (kind === 'impact' || kind === 'ko') {
+      this.cam.shake = Math.min(6, this.cam.shake + (kind === 'ko' ? 4 : 2));
+      // …and a quick lens punch, so a landed hit is felt in the FRAME and not
+      // only in the particles. Restrained: 5% of zoom, gone in a quarter second.
+      this.cam.punch = Math.min(1, this.cam.punch + (kind === 'ko' ? 1 : 0.45));
+    }
   }
 
   // ---------------------------------------------------------------------- //
@@ -1508,12 +1527,67 @@ export class Renderer {
     this.neonG = n > 1.15;                                          // the dead G, in believable bursts
     this.tubeDim = Math.sin(this.t * 5.7) + Math.sin(this.t * 13.3) * 0.5 < -1.32;
     const p = g.player;
-    // camera follows with lag; shake decays
-    this.cam.x += (p.x - this.cam.x) * Math.min(1, dt * 5);
-    this.cam.y += (p.y - 40 - this.cam.y) * Math.min(1, dt * 5);
-    this.cam.shake = Math.max(0, this.cam.shake - dt * 14);
-    this.cam.sx = (Math.random() - 0.5) * this.cam.shake;
-    this.cam.sy = (Math.random() - 0.5) * this.cam.shake;
+    const cam = this.cam, FX = this.camFx;
+
+    /* ── WHAT THE FRAME SHOULD BE DOING ────────────────────────────────────
+     * The camera reads the situation and re-frames itself. Danger widens the
+     * shot because you need to see the exits; tension tightens it because you
+     * need to feel the walls. Nothing here is authored per-scene — it falls out
+     * of the sim state, so it works in all six districts and every interior. */
+    let wantZoom = this.ZOOM.base;
+    let danger = false, hunted = false;
+    if (g.room === 'house' && g.burg && g.burg.in) wantZoom = this.ZOOM.burgle;   // the clock is running
+    else if (g.room !== 'ext') wantZoom = this.ZOOM.interior;                     // rooms are small
+    else {
+      for (const n of g.npcs) {
+        if (n.ko || n.room !== 'ext') continue;
+        const d2 = (n.x - p.x) ** 2 + (n.y - p.y) ** 2;
+        if (n.cop && n.state === 'chase' && d2 < 460 * 460) { hunted = true; break; }
+        if ((n.state === 'aggro' || n.brawler && n.state === 'aggro') && d2 < 300 * 300) danger = true;
+      }
+      wantZoom = hunted ? this.ZOOM.chase
+               : danger ? this.ZOOM.fight
+               : (p.moving && p.stamina < T.staminaMax - 4) ? this.ZOOM.sprint
+               : this.ZOOM.base;
+    }
+    if (!FX) wantZoom = this.ZOOM.base;
+
+    // an authored beat can override everything for a moment
+    if (cam.focusT > 0) { cam.focusT -= dt; if (cam.focus) wantZoom = cam.focus.z; }
+    else cam.focus = null;
+
+    // zoom eases, and the PUNCH rides on top of it so impacts read as a jolt
+    this.baseZoom += (wantZoom - this.baseZoom) * Math.min(1, dt * (wantZoom < this.baseZoom ? 3.2 : 1.8));
+    cam.punch = Math.max(0, cam.punch - dt * 4.5);
+    this.zoom = this.baseZoom * (1 + (FX ? cam.punch * 0.05 : 0));
+
+    /* ── LEAD ──────────────────────────────────────────────────────────────
+     * Push the frame the way the player is travelling so the road ahead gets
+     * the screen space, not the road behind. Clamped hard and eased slowly —
+     * an aggressive lead is what makes top-down cameras nauseating. */
+    const spd = Math.hypot(p.vx || 0, p.vy || 0);
+    let tlx = 0, tly = 0;
+    if (FX && p.moving) {
+      tlx = Math.cos(p.facing) * 62; tly = Math.sin(p.facing) * 52;
+      if (spd > 200) { tlx *= 1.25; tly *= 1.25; }     // knocked back: look where you're thrown
+    }
+    cam.leadX += (tlx - cam.leadX) * Math.min(1, dt * 1.9);
+    cam.leadY += (tly - cam.leadY) * Math.min(1, dt * 1.9);
+
+    // the follow itself: a touch snappier when something is hunting you
+    const followK = hunted ? 6.5 : 4.4;
+    const tx = p.x + cam.leadX + (cam.focus ? (cam.focus.x - p.x) * 0.5 : 0);
+    const ty = p.y - 40 + cam.leadY + (cam.focus ? (cam.focus.y - p.y) * 0.5 : 0);
+    cam.x += (tx - cam.x) * Math.min(1, dt * followK);
+    cam.y += (ty - cam.y) * Math.min(1, dt * followK);
+
+    // breathing: a few pixels of drift so a standing frame isn't dead still
+    const breathX = FX ? Math.sin(this.t * 0.45) * 1.6 : 0;
+    const breathY = FX ? Math.cos(this.t * 0.37) * 1.2 : 0;
+
+    cam.shake = Math.max(0, cam.shake - dt * 14);
+    cam.sx = (Math.random() - 0.5) * cam.shake * (FX ? 1 : 0) + breathX;
+    cam.sy = (Math.random() - 0.5) * cam.shake * (FX ? 1 : 0) + breathY;
     const z = this.zoom;
     const vw = cv.width / z, vh = cv.height / z;
     const room = g.room;
@@ -2302,6 +2376,14 @@ export class Renderer {
     c.fillStyle = '#e8dcc3'; c.font = '9px Georgia';
     lines.forEach((l, i) => c.fillText(l, x, y - lh + (b.who ? 20 : 12) + i * 11));
     c.globalAlpha = 1;
+  }
+
+  /* An authored beat: hold on a point, at a chosen zoom, for a moment.
+   * Used for the things the week is actually about. */
+  focusOn(x, y, z, dur) {
+    if (!this.camFx) return;
+    this.cam.focus = { x, y, z: z || 1.7 };
+    this.cam.focusT = dur || 1.6;
   }
 
   shotDataURL() { return this.cv.toDataURL('image/png'); }

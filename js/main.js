@@ -58,15 +58,27 @@ function startRun() {
     alert: feed,
     sfx: (n) => sfx.play(n),
     fx: (k, x, y, d) => renderer && renderer.fx(k, x, y, d),
-    heatStage: (st) => { if (st >= 3) sfx.play('siren'); },
+    heatStage: (st) => {
+      if (st >= 3) { sfx.play('siren'); if (renderer) renderer.focusOn(game.player.x, game.player.y, 1.06, 1.4); }
+    },
     blockEnd: () => onBlock(),
     dayEnd: () => { saveMeta(game.meta); onDay(); },
     ending: (key, sum) => { saveMeta(game.meta); showEnding(key, sum); },
-    scheme: (stage) => { updateScheme(); pulse($('hud-scheme')); sfx.play('register'); },
+    scheme: (stage) => {
+      updateScheme(); pulse($('hud-scheme')); sfx.play('register');
+      // the two stages that are actually a MOMENT get the lens; the rest are admin
+      if (renderer && (stage === 'job' || stage === 'fence')) renderer.focusOn(game.player.x, game.player.y, 1.62, 1.5);
+    },
     cuff: (cop) => cuffStart(cop),
   } });
   window.vl = game;
   renderer = new Renderer($('cv'), game);
+  try {                                       // the preference outlives the run
+    if (localStorage.getItem('vl-camfx') === '0') {
+      renderer.camFx = false;
+      $('p-cam').textContent = '🎥 Camera motion: OFF';
+    }
+  } catch {}
   resize();
   sfx.ensure();
   ambience();
@@ -875,6 +887,14 @@ $('t-start').onclick = () => { sfx.ensure(); startRun(); };
 $('end-next').onclick = () => location.reload();
 $('p-resume').onclick = togglePause;
 $('p-mute').onclick = () => { sfx.setMute(!sfx.muted); $('p-mute').textContent = sfx.muted ? '🔇 Unmute' : '🔊 Mute'; };
+// The art bible asks for camera effects to be "restrained and configurable" — this
+// is the configurable half. Off = a plain locked follow, no lead, punch, or drift.
+$('p-cam').onclick = () => {
+  if (!renderer) return;
+  renderer.camFx = !renderer.camFx;
+  $('p-cam').textContent = `🎥 Camera motion: ${renderer.camFx ? 'ON' : 'OFF'}`;
+  try { localStorage.setItem('vl-camfx', renderer.camFx ? '1' : '0'); } catch {}
+};
 $('p-restart').onclick = () => location.reload();
 $('hud-scheme').onclick = () => $('scheme-panel').classList.toggle('open');
 // The universal "call it" — skipping dead time should be a DECISION you make, and one

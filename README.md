@@ -253,6 +253,31 @@ Uses the portable Node at `C:\Users\kylef\tools\node` (not on PATH).
   `#4a4a42`, **six values** off the road, which is exactly the floating-torso bug
   data.js already warns about. All new pants are now ≥45 apart by channel sum.
 
+- **M1.11 — the camera** ✅ (2026-08-06)
+  Was a flat lerp-follow at a fixed 1.35. Now it reads the situation and re-frames
+  itself, with every number deliberately small per the art bible's "restrained".
+  **Danger widens, tension tightens** — and none of it is authored per scene, it
+  falls out of sim state, so it works in all six districts and every interior:
+  | state | zoom | why |
+  |---|---|---|
+  | cop chasing | 1.10 | widest — you need to see the exits |
+  | aggressor within 300px | 1.16 | a fight needs room |
+  | sprinting | 1.27 | slight pull-back with speed |
+  | base | 1.35 | |
+  | any interior | 1.46 | rooms are small |
+  | mid-burglary | 1.52 | tightest — feel the walls, the clock is running |
+
+  **Lead**: the frame pushes ~62px the way you're travelling so the road ahead gets
+  the screen space, eased slowly (an aggressive lead is what makes top-down cameras
+  nauseating) and boosted when you're knocked back, so you look where you're thrown.
+  **Punch**: a landed hit spikes zoom 5% and releases in a quarter second —
+  verified 1.350 → 1.413 → 1.350.
+  **Breathing**: a couple of pixels of drift so a standing frame isn't dead still.
+  **`focusOn(x, y, z, dur)`** for authored beats — currently the heist landing, the
+  fence cash-out, and hitting WANTED.
+  **🎥 Camera motion toggle** in the pause menu (persisted): off is a plain locked
+  follow with no lead, punch, widen or drift. The bible asked for configurable.
+
 ## What's deliberately NOT in Phase 1 (per the roadmap — don't "fix" these)
 
 - No Hopeless Tech, classes, GPA, or majors (Phase 2).
