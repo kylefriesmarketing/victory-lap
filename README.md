@@ -233,6 +233,26 @@ Uses the portable Node at `C:\Users\kylef\tools\node` (not on PATH).
   at all. Shown in the HUD as a sentence about people, not a bar, because that's
   what a grudge is.
 
+- **M1.10 — people who are going somewhere** ✅ (2026-08-06)
+  **ERRANDS**: ~62% of the street now has a real destination from `ERRANDS` in
+  data.js — the bus shelter, the Split Lip, the plant gate, the quad, home in the
+  Flats — and walks there across district lines at a purposeful gait, dwells, then
+  thinks of the next thing. Seeing a man walk from the dock to the bar is the whole
+  point. ⚠️ Tuned by MEASUREMENT: at 45% with a 14–34s dwell, a sampled instant
+  showed **zero** people mid-errand — the journeys were real but you'd never happen
+  to see one. At 62% with a 7–19s dwell it measures ~4 people visibly in transit at
+  any moment.
+  **IDLE BUSINESS**: every body gets one habit, rolled once at spawn so it's a trait
+  and not a flicker — hands in pockets, on the phone (with a lit screen), arms
+  crossed and leaning, gesturing at nobody, or shifting weight. A standing body that
+  only breathes reads as furniture.
+  **GAIT VARIETY**: per-person `gaitBias`, so a crowd stops marching in lockstep.
+  **SIX NEW OUTFITS** (carhartt, jersey, scrubs, hoodie, church, workshirt) so
+  nineteen people don't read as four cloned.
+  ⚠️ Their pants are validated against the asphalt — a first pass had workshirt at
+  `#4a4a42`, **six values** off the road, which is exactly the floating-torso bug
+  data.js already warns about. All new pants are now ≥45 apart by channel sum.
+
 ## What's deliberately NOT in Phase 1 (per the roadmap — don't "fix" these)
 
 - No Hopeless Tech, classes, GPA, or majors (Phase 2).

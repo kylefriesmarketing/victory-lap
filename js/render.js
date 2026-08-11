@@ -2024,8 +2024,12 @@ export class Renderer {
     // the 1.8px black-eye dot that was standing in for injury before.
     const hurtF = isPlayer ? Math.max(0, 1 - e.hp / e.hpMax) : Math.max(0, 1 - e.hp / (e.hpMax0 || 46));
     const limping = hurtF > 0.62;
-    const phase = (isPlayer ? t * (limping ? 6.4 : 9) : t * 7 + (e.id || 0)) % (Math.PI * 2);
-    const moving = isPlayer ? e.moving : (e.state === 'walk' || e.state === 'flee' || e.state === 'chase' || e.state === 'aggro');
+    // per-person gait speed: a crowd of clones marching in lockstep is the loudest
+    // tell in a top-down game. gaitBias is rolled once per body at spawn.
+    const phase = (isPlayer ? t * (limping ? 6.4 : 9)
+                            : t * 7 * (e.gaitBias || 1) + (e.id || 0)) % (Math.PI * 2);
+    const moving = isPlayer ? e.moving
+      : (e.state === 'walk' || e.state === 'flee' || e.state === 'chase' || e.state === 'aggro' || e.state === 'errand');
     const step = moving ? Math.sin(phase * 2) : 0;
     const hobble = (limping && moving) ? Math.max(0, Math.sin(phase * 2)) * 3.2 : 0;
     const sway = e.drunk ? Math.sin(t * 2.2 + (e.id || 0)) * 3.4 : 0;
@@ -2145,6 +2149,37 @@ export class Renderer {
       c.beginPath(); c.moveTo(-tw * 0.42, armY); c.lineTo(-tw * 0.62, armY + 7); c.lineTo(-tw * 0.26, armY + 13); c.stroke();
       c.beginPath(); c.moveTo(tw * 0.42, armY); c.lineTo(tw * 0.62, armY + 7); c.lineTo(tw * 0.26, armY + 13); c.stroke();
       hand(-tw * 0.26, armY + 13); hand(tw * 0.26, armY + 13);
+    } else if (!moving && !isPlayer && e.idleKind && e.idleKind !== 'none') {
+      /* ── IDLE BUSINESS ─────────────────────────────────────────────────────
+       * A standing body that only breathes reads as furniture. Everyone gets one
+       * habit, picked once at spawn so it's a trait and not a flicker, and it
+       * plays on its own slow clock — so a group of six looks like six people
+       * waiting rather than one person copy-pasted. View-only. */
+      const ph = t * 0.6 + (e.id || 0) * 1.7;
+      if (e.idleKind === 'pockets') {                    // hands in, shoulders up
+        c.beginPath(); c.moveTo(-tw * 0.42, armY); c.lineTo(-tw * 0.30, armY + 9); c.stroke();
+        c.beginPath(); c.moveTo(tw * 0.42, armY);  c.lineTo(tw * 0.30, armY + 9); c.stroke();
+      } else if (e.idleKind === 'phone') {               // the national pastime
+        const lift = 2 + Math.sin(ph * 0.8) * 1.2;
+        c.beginPath(); c.moveTo(flipX * tw * 0.38, armY); c.lineTo(flipX * (tw * 0.22), armY + 5 - lift); c.stroke();
+        c.beginPath(); c.moveTo(-flipX * tw * 0.42, armY); c.lineTo(-flipX * (tw * 0.42 + 1), armY + 11); c.stroke();
+        c.fillStyle = '#1a1e26'; c.fillRect(flipX * tw * 0.22 - 2.5, armY + 1 - lift, 5, 8);
+        c.fillStyle = `rgba(170,210,255,${0.5 + Math.sin(ph * 2.2) * 0.15})`;
+        c.fillRect(flipX * tw * 0.22 - 1.8, armY + 1.7 - lift, 3.6, 6);
+        hand(flipX * tw * 0.22, armY + 5 - lift);
+      } else if (e.idleKind === 'lean') {                // weight on one hip, arms crossed
+        c.beginPath(); c.moveTo(-tw * 0.40, armY + 1); c.lineTo(tw * 0.16, armY + 7); c.stroke();
+        c.beginPath(); c.moveTo(tw * 0.40, armY + 4);  c.lineTo(-tw * 0.16, armY + 10); c.stroke();
+      } else if (e.idleKind === 'talk') {                // gesturing at nobody in particular
+        const g1 = Math.sin(ph * 1.9) * 5, g2 = Math.cos(ph * 1.4) * 4;
+        c.beginPath(); c.moveTo(-tw * 0.42, armY); c.lineTo(-tw * 0.42 - 4, armY + 8 + g1); c.stroke();
+        hand(-tw * 0.42 - 4, armY + 8 + g1);
+        c.beginPath(); c.moveTo(tw * 0.42, armY); c.lineTo(tw * 0.42 + 4, armY + 8 + g2); c.stroke();
+        hand(tw * 0.42 + 4, armY + 8 + g2);
+      } else {                                           // rock: shifting weight, waiting
+        c.beginPath(); c.moveTo(-tw * 0.42, armY); c.lineTo(-tw * 0.42 - 1, armY + 11 + Math.sin(ph) * 1.4); c.stroke();
+        c.beginPath(); c.moveTo(tw * 0.42, armY); c.lineTo(tw * 0.42 + 1, armY + 11 - Math.sin(ph) * 1.4); c.stroke();
+      }
     } else {
       c.beginPath(); c.moveTo(-tw * 0.42, armY); c.lineTo(-tw * 0.42 - 1, armY + 11 + swing * 0.4); c.stroke();
       c.beginPath(); c.moveTo(tw * 0.42, armY); c.lineTo(tw * 0.42 + 1, armY + 11 - swing * 0.4); c.stroke();

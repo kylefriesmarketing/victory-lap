@@ -469,6 +469,17 @@ export const OUTFITS = { // [shirt, pants, skin, hat?]  — palette from the art
   greasy:  { shirt: '#7a7468', pants: '#57503f', skins: ['#c99b74','#8a5a33'] },
   tourist: { shirt: '#e8a8b8', pants: '#d9d2c0', skins: ['#f0c8a8','#e0b490'] }, // pastel = wrong on purpose
   tourist2:{ shirt: '#9fd0c8', pants: '#f0ead8', skins: ['#f0c8a8'] },
+  // more of the street, so a crowd of nineteen doesn't read as four people cloned.
+  // All still inside the art bible's earthy palette — nothing here is BRIGHT.
+  // ⚠️ pants checked against the asphalt (#4a4745) — see the warning above. A first
+  // pass had workshirt at #4a4a42, SIX values off the road, which is the floating-
+  // torso bug this file already warns about. All four are now ≥45 apart by channel sum.
+  carhartt:{ shirt: '#b5762c', pants: '#5f4a30', skins: ['#c99b74','#8a5a33','#e0b490','#6e4a2f'] },
+  jersey:  { shirt: '#5a2f3a', pants: '#2b303a', skins: ['#8a5a33','#c99b74','#6e4a2f'] },
+  scrubs:  { shirt: '#4e7a76', pants: '#41615e', skins: ['#e0b490','#8a5a33','#c99b74'] }, // nursing cohort
+  hoodie:  { shirt: '#3d4148', pants: '#2f3742', skins: ['#c99b74','#6e4a2f','#e0b490'] },
+  church:  { shirt: '#6a5a7a', pants: '#33313a', skins: ['#e0b490','#c99b74','#8a5a33'] },
+  workshirt:{ shirt: '#7a8a6a', pants: '#35402f', skins: ['#8a5a33','#c99b74','#e0b490'] },
 };
 
 export const NAMED = {
@@ -541,7 +552,7 @@ export const POPULATION = {
               { n: 2, spots: 'walk',  outfits: ['denim','camo'] },
               { n: 2, spots: 'dtwalk',outfits: ['denim','hivis'] },
               { n: 2, spots: 'works', outfits: ['hivis','greasy'], pool: 'dockhand' } ],
-  afternoon:[ { n: 4, spots: 'walk',  outfits: ['denim','flannel','camo'] },
+  afternoon:[ { n: 4, spots: 'walk',  outfits: ['denim','flannel','camo','carhartt','hoodie','workshirt'] },
               { n: 2, spots: 'buffet',outfits: ['greasy','denim'] },
               { n: 1, spots: 'walk',  outfits: ['tourist'] },
               { n: 2, spots: 'dtwalk',outfits: ['denim','flannel'] },
@@ -571,6 +582,28 @@ export const SPOTS = {
   // the Works: dockhands by the bays, smokers by the hall
   works: [ [2500, 1150], [2700, 1240], [2900, 1160], [2380, 830] ],
 };
+
+// ── ERRANDS ───────────────────────────────────────────────────────────────────
+// Real destinations, so a share of the population is always IN TRANSIT rather than
+// milling in the spot it spawned. This is the difference between a town with people
+// in it and a town with people arranged in it. They cross district lines on purpose:
+// seeing a man walk from the plant gate to the Split Lip is the whole point.
+export const ERRANDS = [
+  { x: 1000, y: 1092, what: 'the bus shelter' },
+  { x: 250,  y: 640,  what: 'the QwikStop' },
+  { x: 980,  y: 552,  what: 'the buffet' },
+  { x: 1290, y: 516,  what: 'the Wing Barn' },
+  { x: 1960, y: 516,  what: 'Ca$h Kingdom' },
+  { x: 1035, y: 900,  what: 'across the lot' },
+  { x: 380,  y: 2158, what: 'the Split Lip' },
+  { x: 1150, y: 2150, what: 'up Main Street' },
+  { x: 960,  y: 2320, what: 'the courthouse' },
+  { x: 2480, y: 1140, what: 'the dock' },
+  { x: 2360, y: 900,  what: 'the plant gate' },
+  { x: 2560, y: 1900, what: 'the quad' },
+  { x: 600,  y: 1180, what: 'home, in the Flats' },
+  { x: 1720, y: 1120, what: 'nowhere in particular' },
+];
 
 // ---------------------------------------------------------------------------
 // BARKS — collected outside a gas station at 1 a.m. R-rated, no slurs, jokes first.

@@ -5,7 +5,7 @@
 import {
   TUNING as T, WEAPONS, WORLD, BUILDINGS, ALLEY_GAPS, STRIP_Y, EXTERIOR_PROPS, GARAGE, FOXHOLE,
   DOWNTOWN, DT_Y, RAIL_Y, WATER_TOWER, COURTHOUSE, MAIN_ST, WORKS, BLUFFS, LOOT, SEARCH_SPOTS, HTCC,
-  WEAPON_SPAWNS, INTERIORS, ARCHETYPES, OUTFITS, NAMED, POPULATION, SPOTS,
+  WEAPON_SPAWNS, INTERIORS, ARCHETYPES, OUTFITS, NAMED, POPULATION, SPOTS, ERRANDS,
   BARKS, SCHEME, ENDINGS, BLOCK_NAMES, DAY_NAMES, WEATHER_KINDS, MENU, RIP, SKY,
 } from './data.js';
 
@@ -205,6 +205,10 @@ export class Game {
         def.brawler ? 'alumni' : okey.startsWith('tourist') ? 'tourist' : def.drunk ? 'drunk' : 'townie'
       ])),
       robbed: false, grudge: false,
+      // ⚠️ view-only, never read by the sim: which idle a body performs when it has
+      // nothing to do. Picked here so it's stable per person instead of flickering.
+      idleKind: ['pockets', 'phone', 'lean', 'talk', 'rock', 'none'][Math.floor(this.rng() * 6)],
+      gaitBias: 0.9 + this.rng() * 0.24,   // nobody walks at exactly the same speed
     };
   }
 
@@ -222,6 +226,12 @@ export class Game {
         else if (n.drunk) n.pool = 'drunk';
         else if (this.isLate) n.pool = 'townie_late';
         if (n.tourist) n.pool = 'tourist';
+        // ⚠️ Tuned by measurement, not taste: at 45% with a 14–34s dwell, a sampled
+        // instant showed ZERO people mid-errand — the journeys were real but you'd
+        // never happen to see one. 62% with a short dwell keeps somebody visibly
+        // crossing the frame most of the time, which is the entire point.
+        n.errander = this.chance(0.62);
+        n.errandT = this.rr(0.5, 7);
         this.npcs.push(n);
       }
     }
@@ -1835,7 +1845,41 @@ export class Game {
     }
 
     switch (n.state) {
+      // ── ON AN ERRAND ────────────────────────────────────────────────────
+      // Somebody crossing town with somewhere to be. Purposeful gait, no wander,
+      // and a real dwell at the far end before they think of the next thing.
+      case 'errand': {
+        const e = n.errand;
+        if (!e) { n.state = 'idle'; break; }
+        const dx = e.x - n.x, dy = e.y - n.y, d = Math.hypot(dx, dy);
+        if (d < 22) {
+          n.state = 'idle'; n.stateT = this.rr(5, 14);
+          n.hx = n.x; n.hy = n.y;            // wherever they got to is now "home"
+          n.errand = null; n.errandT = this.rr(7, 19);
+          break;
+        }
+        const sp = (n.drunk ? 44 : 74) * (n.gaitBias || 1);
+        n.x += (dx / d) * sp * dt; n.y += (dy / d) * sp * dt;
+        n.facing = Math.atan2(dy, dx);
+        if (n.drunk) n.x += Math.sin(this.time * 3 + n.id) * 20 * dt;
+        n.barkT -= dt;
+        if (n.barkT <= 0 && dToP < 170 && this.chance(0.35)) {
+          n.barkT = this.rr(18, 34);
+          this.say(n.name || null, this.pick(BARKS[n.pool] || BARKS.townie_idle), n.x, n.y);
+        } else if (n.barkT <= 0) n.barkT = this.rr(10, 20);
+        this.collide(n, 12);
+        return;
+      }
       case 'idle': {
+        // people with somewhere to be eventually go there
+        if (!n.static && !n.route && n.errander) {
+          n.errandT = (n.errandT || 0) - dt;
+          if (n.errandT <= 0) {
+            const pick = ERRANDS[Math.floor(this.rng() * ERRANDS.length)];
+            if (Math.hypot(pick.x - n.x, pick.y - n.y) > 220) { n.errand = pick; n.state = 'errand'; break; }
+            n.errandT = this.rr(6, 16);
+          }
+        }
         // ⚠️ Measured over 20 passive runs: NOTHING in Hopewell ever touched the player
         // first. In a town the design calls mean, that's a hole. Loiter next to a drunk
         // in the lot after dark and he will eventually decide he knows you from somewhere.
