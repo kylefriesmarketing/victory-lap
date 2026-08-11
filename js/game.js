@@ -4,14 +4,14 @@
 
 import {
   TUNING as T, WEAPONS, WORLD, BUILDINGS, ALLEY_GAPS, STRIP_Y, EXTERIOR_PROPS, GARAGE, FOXHOLE,
-  DOWNTOWN, DT_Y, RAIL_Y, WATER_TOWER, COURTHOUSE, MAIN_ST, WORKS, BLUFFS, LOOT, SEARCH_SPOTS, HTCC,
+  DOWNTOWN, DT_Y, RAIL_Y, WATER_TOWER, COURTHOUSE, MAIN_ST, WORKS, BLUFFS, LOOT, SEARCH_SPOTS, HTCC, FLATS,
   WEAPON_SPAWNS, INTERIORS, ARCHETYPES, OUTFITS, NAMED, POPULATION, SPOTS, ERRANDS,
   BARKS, SCHEME, ENDINGS, BLOCK_NAMES, DAY_NAMES, WEATHER_KINDS, MENU, RIP, SKY,
 } from './data.js';
 
 export { T, WEAPONS, WORLD, BUILDINGS, ALLEY_GAPS, STRIP_Y, EXTERIOR_PROPS, GARAGE, FOXHOLE,
          DOWNTOWN, DT_Y, RAIL_Y, WATER_TOWER, COURTHOUSE, MAIN_ST, WORKS, BLUFFS, LOOT,
-         SEARCH_SPOTS, HTCC, INTERIORS, SKY,
+         SEARCH_SPOTS, HTCC, FLATS, INTERIORS, SKY,
          ARCHETYPES, OUTFITS, NAMED, BARKS, SCHEME, ENDINGS, BLOCK_NAMES, DAY_NAMES, MENU, RIP };
 
 let _eid = 1;
@@ -53,6 +53,7 @@ export class Game {
     this.burg = { in: null, t: 0, spots: [], cased: [], done: [], owner: false, entryQuiet: false };
     this.htcc = { classes: 0, classToday: -1, aidPaid: false, gymToday: -1, cart: -1, seen: false, stashed: false };
     this.grudge = 0; this._grudgeSeen = 0; this._ambushDay = -1;
+    this.notice = 0; this.flats = { plate: -1 }; this._flatsSaid = false;
     this.npcs = []; this.pickups = []; this.projectiles = [];
     this.stats = { punches: 0, koGiven: 0, koTaken: 0, skimmed: 0, shifts: 0, rip: 0,
                    crimesSeen: 0, cuffsEscaped: 0, spent: 0, earned: 0 };
@@ -130,9 +131,8 @@ export class Game {
       // world edges
       s.push({ x: -40, y: 0, w: 40, h: WORLD.h }, { x: WORLD.w, y: 0, w: 40, h: WORLD.h });
       s.push({ x: 0, y: -40, w: WORLD.w, h: 40 }, { x: 0, y: WORLD.h, w: WORLD.w, h: 40 });
-      // south houses (set dressing, solid)
-      s.push({ x: 760, y: 1200, w: 180, h: 140 }, { x: 1000, y: 1220, w: 160, h: 120 },
-             { x: 1250, y: 1200, w: 200, h: 140 }, { x: 1550, y: 1230, w: 170, h: 120 });
+      // the Flats: five houses, each somebody's
+      for (const h of FLATS.houses) s.push({ x: h.x, y: h.y, w: h.w, h: h.h, door: h.key });
     } else {
       const it = INTERIORS[room];
       s.push({ x: -20, y: -20, w: it.w + 40, h: 20 }, { x: -20, y: it.h, w: it.w + 40, h: 20 });
@@ -264,6 +264,33 @@ export class Game {
     if (this.block === 0 || this.block >= 3) {
       this.npcs.push(this._mkNpc({ ...NAMED.bev, key: 'bev', x: 560, y: 95, room: 'garage', static: true, pool: 'bev' }));
     }
+    /* ── THE FLATS: the people who knew you before you were worth knowing ────
+     * They're STATIC and they're always here. That's the point of a street: the
+     * same faces in the same chairs, which is either comforting or a life
+     * sentence depending on the day you're having. */
+    const rh = FLATS.houses[0], dh = FLATS.houses[1], yh = FLATS.houses[2];
+    this.npcs.push(this._mkNpc({ ...NAMED.ruthie, key: 'ruthie', x: rh.x + 30, y: rh.y + rh.h + 20,
+      static: true, pool: this.heatStage() >= 1 ? 'ruthie_hot' : 'ruthie' }));
+    if (this.block !== 1) this.npcs.push(this._mkNpc({ ...NAMED.darnell, key: 'darnell',
+      x: dh.x + dh.w + 26, y: dh.y + dh.h + 16, static: true, pool: 'darnell' }));
+    this.npcs.push(this._mkNpc({ ...NAMED.yolanda, key: 'yolanda', x: yh.x + 40, y: yh.y + yh.h + 22,
+      static: true, pool: 'yolanda' }));
+    for (let i = 0; i < 2; i++) {
+      this.npcs.push(this._mkNpc({ x: 500 + i * 620 + this.ri(-50, 50), y: 1140 + this.ri(-20, 30),
+        outfitKey: this.pick(['denim', 'workshirt', 'hoodie', 'church']), pool: 'flats_idle' }));
+    }
+    // SATURDAY EVENING: tables out at six, and the whole block turns up
+    if (this.day === T.blockPartyDay && this.block >= 2) {
+      for (let i = 0; i < 7; i++) {
+        const a = (i / 7) * Math.PI * 2;
+        this.npcs.push(this._mkNpc({
+          x: FLATS.party.x + Math.cos(a) * (52 + this.ri(0, 34)),
+          y: FLATS.party.y + Math.sin(a) * (34 + this.ri(0, 22)),
+          outfitKey: this.pick(['denim', 'flannel', 'church', 'carhartt', 'workshirt', 'jersey']),
+          drunk: this.chance(0.45), pool: 'party', static: true }));
+      }
+    }
+
     // HOPELESS: the campus population, and the Polo Shirts on their loop
     if (this.block <= 2) {
       this.npcs.push(this._mkNpc({ ...NAMED.pettig, key: 'pettig', x: 310, y: 104, room: 'aid', static: true, pool: 'pettig' }));
@@ -423,7 +450,14 @@ export class Game {
     const p = this.player;
     if (this.room !== 'garage') return { ok: false, msg: 'Sleep happens at the garage. Everything else is just passing out.' };
     p.sleptAt = 'garage';
-    if (this.meta.runs > 0 && this.block <= 1) this.say('Bev', this.pick(BARKS.bev), 0, 0);
+    /* ⚠️ THE MORAL LEDGER, and it runs HERE — at the moment you come home, which
+     * is the only moment she can see you. She never asks and it never blocks
+     * anything; it only changes what she says. That restraint IS the mechanic. */
+    if (this.heat > T.heatStage.noticed) this.bevNotice(T.noticeHeat, 'came home hot');
+    if ((p.inv.loot || []).length || this.scheme.inCar > 0 || (p.inv.freight || 0) > 0)
+      this.bevNotice(T.noticeLoot, 'came home carrying');
+    if (p.hp < p.hpMax * 0.55 || p.blackEye) this.bevNotice(T.noticeBlood, 'came home wearing a night');
+    this.say('Bev', this.bevLine(), 0, 0);
     const d0 = this.day;
     while (!this.over && this.day === d0) this.endBlock('slept');
     return { ok: true };
@@ -914,6 +948,62 @@ export class Game {
     this.endBlock('the back room');
     // Fade to black. The design doc: "the camera has manners even when nobody else does."
     return { ok: true, msg: `−$${T.foxVipCost}. The curtain closes.\n\nLater: you're in the gravel lot, warmer, calmer, poorer, and no wiser. Somebody put your jacket back on you. The night went somewhere without you and left you the receipt.` };
+  }
+
+  // ══ THE FLATS ═════════════════════════════════════════════════════════════
+  inFlats(x = this.player.x, y = this.player.y) {
+    const F = FLATS.bounds;
+    return this.room === 'ext' && x >= F.x && x <= F.x + F.w && y >= F.y && y <= F.y + F.h;
+  }
+
+  /* "The Flats is the one place where your heat cools naturally: nobody here
+   * talks to police." The ONLY passive decay in the game — everywhere else you
+   * spend a block to lose heat. It settles you; it deliberately cannot clear a
+   * manhunt, because a street that could do that would break the whole chase. */
+  flatsTick(dt) {
+    if (!this.inFlats() || this.heat <= T.flatsCoolStop) return;
+    this.heat = Math.max(T.flatsCoolStop, this.heat - T.flatsCoolPerSec * dt);
+    if (!this._flatsSaid && this.heat > T.flatsCoolStop) {
+      this._flatsSaid = true;
+      this.alert('Four porches, and not one of them saw a thing. Down here the heat just… goes down.', 'ok');
+    }
+  }
+
+  /* WHAT BEV NOTICES. Not a punishment meter — it never blocks anything and it
+   * never costs you money. It only changes what she says to you, which in this
+   * game is the sharpest instrument available. */
+  bevNotice(n, why = '') {
+    this.notice = (this.notice || 0) + n;
+    this.note(`bev notices +${n} (${why}) -> ${this.notice}`);
+  }
+  bevTier() {
+    const n = this.notice || 0, th = T.noticeThresholds;
+    return n >= th[2] ? 3 : n >= th[1] ? 2 : n >= th[0] ? 1 : 0;
+  }
+  bevLine() {
+    const pool = BARKS.bev_notice[this.bevTier()] || BARKS.bev_notice[0];
+    return this.pick(pool);
+  }
+
+  // The block party: Saturday evening, and the whole street turns out.
+  partyOn() { return this.day === T.blockPartyDay && this.block >= 2 && this.room === 'ext'; }
+
+  partyPlate() {
+    if (!this.partyOn()) return { ok: false };
+    if (this.flats.plate === this.day) return { ok: false, msg: 'Yolanda: "You already ate. Go carry something."' };
+    this.flats.plate = this.day;
+    this.player.hp = Math.min(this.player.hpMax, this.player.hp + 30);
+    this.heat = Math.max(0, this.heat - 10);
+    return { ok: true, msg: 'Somebody hands you a paper plate with too much on it and will not accept money. You stand in a driveway eating with people who knew you at nine years old. Heat goes down. So does something else.' };
+  }
+
+  // The block hears everything and charges nothing for it. That's the block.
+  partyRumour() {
+    if (!this.partyOn()) return { ok: false };
+    if (!this.scheme.hear) { this._schemeCheck('hear'); return { ok: true, msg: 'Somebody\'s cousin, four beers in: "Gary Loomis is sittin\' on a room full of sealed \'97 stock like it\'s a PENSION." Three people tell him to shut up. Nobody disagrees with him.' }; }
+    if (!this.scheme.window) { this._schemeCheck('window'); return { ok: true, msg: 'Darnell, not looking up from the cooler: "Thursdays. Gary does the drop hisself, nine-ish. Been doing it since before you could drive."' }; }
+    if (!this.scheme.case) { this._schemeCheck('case'); this.meta.knows.window = true; return { ok: true, msg: 'Yolanda: "That back window\'s been propped on a milk crate since the AC quit. Whole block knows. Whole block also knows better."' }; }
+    return { ok: true, msg: this.pick(BARKS.party) };
   }
 
   // ══ HOPELESS TECH ═════════════════════════════════════════════════════════
@@ -1587,6 +1677,7 @@ export class Game {
       foxEnter: () => this.enterFoxhole(), foxDrink: () => this.foxDrink(),
       foxTip: () => this.foxTip(arg), foxInfo: () => this.foxBuyInfo(),
       foxVip: () => this.foxVip(), foxLayLow: () => this.foxLayLow(),
+      partyPlate: () => this.partyPlate(), partyRumour: () => this.partyRumour(),
       slBeer: () => this.slBeer(), slShot: () => this.slShot(), slRound: () => this.slRound(),
       slLayLow: () => this.slLayLow(), cueGrab: () => this.cueGrab(),
       latte: () => this.latte(), overhear: () => this.overhear(),
@@ -1762,6 +1853,8 @@ export class Game {
       this.htcc.seen = true;
       this.alert('HOPEWELL TECHNICAL & COMMUNITY COLLEGE — the sign says Hopewell Tech. The dean says Hopeless. You are enrolled here, for the money.', 'scheme');
     }
+    this.flatsTick(dt);          // your own street, quietly working on your behalf
+
     if (this.room === 'ext' && !this.dt.bluffsSeen && p.y > BLUFFS.gateY - 20) {
       this.dt.bluffsSeen = true;
       this.alert('THE BLUFFS — lake money, boat people, and the only nine blocks in this county where a squad car shows up because somebody PAID for it to.', 'scheme');

@@ -4,7 +4,7 @@
 
 import { T, WORLD, BUILDINGS, ALLEY_GAPS, STRIP_Y, EXTERIOR_PROPS, GARAGE, FOXHOLE,
          DOWNTOWN, DT_Y, RAIL_Y, WATER_TOWER, COURTHOUSE, MAIN_ST, WORKS, BLUFFS, HTCC, INTERIORS,
-         ARCHETYPES, NAMED, SKY } from './game.js';
+         ARCHETYPES, NAMED, SKY, FLATS } from './game.js';
 
 const PAL = {
   asphalt: '#4a4745', asphalt2: '#565350', patch: '#3e3c38', sidewalk: '#736f67',
@@ -112,7 +112,9 @@ export class Renderer {
     // stack barks that land on top of each other instead of overprinting them into mush
     let lift = 0;
     for (const b of this.barks) {
-      if (Math.abs(b.x - x) < 150 && Math.abs((b.y - b.lift) - y) < 90) lift = Math.max(lift, b.lift + 52);
+      // ⚠️ 220, not 150: a bark bubble is ~200px wide, so two speakers 160px apart
+      // still overlap. The threshold has to exceed the BUBBLE, not the speaker gap.
+      if (Math.abs(b.x - x) < 220 && Math.abs((b.y - b.lift) - y) < 96) lift = Math.max(lift, b.lift + 54);
     }
     this.barks.push({ who, text, x, y: y - lift, lift, t: 0, dur: 2.6 + text.length * 0.045 });
     if (this.barks.length > 5) this.barks.shift();
@@ -330,13 +332,7 @@ export class Renderer {
     this._paintWorks(c);
     this._paintCampus(c);
     this._paintBluffs(c);
-    // south houses (set dressing)
-    for (const h of [[760, 1200, 180, 140, '#6d5a4a'], [1000, 1220, 160, 120, '#5a5d52'], [1250, 1200, 200, 140, '#7a6a55'], [1550, 1230, 170, 120, '#615549']]) {
-      c.fillStyle = h[4]; c.fillRect(h[0], h[1], h[2], h[3]);
-      c.fillStyle = 'rgba(0,0,0,0.25)'; c.fillRect(h[0], h[1], h[2], 10);
-      c.fillStyle = '#3a3632'; c.fillRect(h[0] + 8, h[1] + h[3] - 26, 24, 26); // door
-      c.fillStyle = 'rgba(255,214,140,0.16)'; c.fillRect(h[0] + h[2] - 40, h[1] + h[3] - 30, 26, 18);
-    }
+    this._paintFlats(c);
     // chain-link around the dog run + kiddie pool yard
     c.strokeStyle = 'rgba(160,160,168,0.5)'; c.lineWidth = 1.5;
     c.strokeRect(536, 1160, 130, 90);
@@ -846,6 +842,103 @@ export class Renderer {
     c.fillText('LEAVING HOPEWELL', -45, -18);
     c.font = 'italic 7px Georgia'; c.fillText('why though?', -45, -6);
     c.restore();
+  }
+
+  // ── THE FLATS: chain-link, kiddie pools, dogs that know your walk ──────────
+  _paintFlats(c) {
+    const F = FLATS.bounds;
+    // yards: mown at wildly different standards, which is the whole street in one detail
+    for (const h of FLATS.houses) {
+      const yx = h.x - 34, yy = h.y - 16, yw = h.w + 68, yh = h.h + 96;
+      const kept = h.yard !== 'foreclosed';
+      c.fillStyle = kept ? '#4f6040' : '#5a6440';
+      c.fillRect(yx, yy, yw, yh);
+      scatter(kept ? 90 : 200, h.x, (rnd) => {                       // the empty one has gone to seed
+        c.fillStyle = rnd() < 0.5 ? '#57683f' : '#48583a';
+        c.fillRect(yx + rnd() * yw, yy + rnd() * yh, 3, 2 + rnd() * (kept ? 2 : 5));
+      });
+      // chain-link between every yard — the street's actual architecture
+      c.strokeStyle = 'rgba(158,160,168,0.42)'; c.lineWidth = 1.4;
+      for (let fx = yx; fx < yx + yw; fx += 9) { c.beginPath(); c.moveTo(fx, yy + yh); c.lineTo(fx + 9, yy + yh - 26); c.stroke(); }
+      c.strokeStyle = 'rgba(170,172,180,0.6)';
+      c.beginPath(); c.moveTo(yx, yy + yh - 26); c.lineTo(yx + yw, yy + yh - 26); c.stroke();
+      c.beginPath(); c.moveTo(yx, yy + yh); c.lineTo(yx + yw, yy + yh); c.stroke();
+      c.lineWidth = 1;
+
+      // the house
+      c.fillStyle = 'rgba(20,22,18,0.26)'; c.fillRect(h.x + 7, h.y + 9, h.w, h.h);
+      c.fillStyle = h.wall; c.fillRect(h.x, h.y, h.w, h.h);
+      c.fillStyle = 'rgba(0,0,0,0.24)'; c.fillRect(h.x, h.y, h.w, 11);
+      scatter(18, h.y, (rnd) => { c.fillStyle = `rgba(30,26,22,${0.05 + rnd() * 0.1})`;
+        c.fillRect(h.x + rnd() * h.w, h.y + 14 + rnd() * (h.h - 26), 12 + rnd() * 30, 4 + rnd() * 9); });
+      for (let sy = h.y + 16; sy < h.y + h.h - 6; sy += 11) {          // siding courses
+        c.strokeStyle = 'rgba(0,0,0,0.10)'; c.beginPath(); c.moveTo(h.x, sy); c.lineTo(h.x + h.w, sy); c.stroke();
+      }
+      // door + trim + one lit window
+      c.fillStyle = h.trim; c.fillRect(h.x + 20, h.y + h.h - 30, 30, 30);
+      c.fillStyle = '#2e2a26'; c.fillRect(h.x + 24, h.y + h.h - 26, 22, 26);
+      c.fillStyle = h.key === 'empty' ? 'rgba(120,130,140,0.30)' : 'rgba(255,214,140,0.20)';
+      c.fillRect(h.x + h.w - 56, h.y + h.h - 40, 34, 24);
+      c.strokeStyle = h.trim; c.strokeRect(h.x + h.w - 56, h.y + h.h - 40, 34, 24);
+
+      // ── THE YARD TELLS YOU WHO LIVES THERE ──
+      const yb = h.y + h.h + 30;
+      if (h.yard === 'porch') {                                       // Miss Ruthie
+        c.fillStyle = '#8a7a62'; c.fillRect(h.x + 8, h.y + h.h, h.w - 16, 22);
+        c.fillStyle = '#6a5a48'; c.fillRect(h.x + 8, h.y + h.h + 22, h.w - 16, 4);
+        c.fillStyle = '#9c5a4a'; c.fillRect(h.x + 26, h.y + h.h + 2, 22, 16);       // THE chair
+        c.fillStyle = '#7a4438'; c.fillRect(h.x + 26, h.y + h.h - 4, 22, 7);
+        c.strokeStyle = 'rgba(210,205,190,0.55)';                                    // wind chimes
+        for (let i = 0; i < 4; i++) { c.beginPath(); c.moveTo(h.x + h.w - 30 + i * 4, h.y + h.h);
+          c.lineTo(h.x + h.w - 30 + i * 4, h.y + h.h + 9 + (i % 2) * 4); c.stroke(); }
+      } else if (h.yard === 'carUp') {                                 // Darnell's Buick
+        c.fillStyle = '#6e6a64'; c.fillRect(h.x + h.w + 4, h.y + 30, 74, 104);       // the drive
+        c.fillStyle = '#4a5a68'; c.beginPath(); c.roundRect(h.x + h.w + 12, h.y + 46, 58, 76, 8); c.fill();
+        c.fillStyle = 'rgba(20,26,34,0.8)'; c.fillRect(h.x + h.w + 20, h.y + 58, 42, 30);
+        for (const bx of [h.x + h.w + 14, h.x + h.w + 58]) {                          // up on blocks
+          c.fillStyle = '#8a8578'; c.fillRect(bx, h.y + 118, 12, 10); c.fillRect(bx, h.y + 44, 12, 10);
+        }
+        c.fillStyle = 'rgba(30,26,20,0.5)'; c.beginPath(); c.ellipse(h.x + h.w + 41, h.y + 130, 26, 7, 0, 0, 7); c.fill();
+        c.fillStyle = '#7a7468'; c.fillRect(h.x + h.w + 84, h.y + 96, 22, 26);        // toolbox
+      } else if (h.yard === 'party') {                                 // Yolanda's tables
+        for (let i = 0; i < 3; i++) { c.fillStyle = '#9a9488';
+          c.fillRect(h.x + 12 + i * 7, h.y + h.h + 4, 5, 40); }                       // stacked, permanently
+        c.fillStyle = '#c9302a'; c.fillRect(h.x + h.w - 54, h.y + h.h + 8, 34, 22);   // the cooler
+        c.fillStyle = '#e8e4dc'; c.fillRect(h.x + h.w - 54, h.y + h.h + 8, 34, 6);
+      } else if (h.yard === 'foreclosed') {                            // the bank's house
+        c.fillStyle = '#e8e4dc'; c.fillRect(h.x + h.w / 2 - 22, h.y + h.h - 38, 44, 26);
+        c.strokeStyle = 'rgba(60,60,66,0.5)'; c.strokeRect(h.x + h.w / 2 - 22, h.y + h.h - 38, 44, 26);
+        c.fillStyle = 'rgba(40,44,50,0.7)'; c.font = 'bold 6px Arial'; c.textAlign = 'center';
+        c.fillText('NOTICE OF', h.x + h.w / 2, h.y + h.h - 27);
+        c.fillText('FORECLOSURE', h.x + h.w / 2, h.y + h.h - 19);
+        c.fillStyle = 'rgba(232,220,195,0.35)'; c.font = 'italic 6px Georgia';
+        c.fillText('somebody still cuts the grass', h.x + h.w / 2, yb + 26);
+      } else if (h.yard === 'pool') {                                  // two feet of green water
+        c.fillStyle = '#8a8578'; c.beginPath(); c.ellipse(h.x + h.w / 2, h.y + h.h + 48, 56, 30, 0, 0, 7); c.fill();
+        c.fillStyle = '#4a6a4a'; c.beginPath(); c.ellipse(h.x + h.w / 2, h.y + h.h + 48, 49, 25, 0, 0, 7); c.fill();
+        c.fillStyle = 'rgba(120,160,110,0.5)'; c.beginPath(); c.ellipse(h.x + h.w / 2 - 10, h.y + h.h + 43, 18, 8, 0, 0, 7); c.fill();
+        c.fillStyle = '#c8c4bc'; c.fillRect(h.x + h.w / 2 + 52, h.y + h.h + 30, 6, 30); // the ladder nobody uses
+      }
+      // the name on the mailbox, for the houses that have somebody
+      if (h.who) {
+        c.fillStyle = '#6a6258'; c.fillRect(h.x - 26, yb, 3, 22);
+        c.fillStyle = '#8a8578'; c.fillRect(h.x - 34, yb - 10, 20, 11);
+        c.fillStyle = 'rgba(232,220,195,0.6)'; c.font = 'italic 6px Georgia'; c.textAlign = 'center';
+        c.fillText(h.who.replace('Miss ', ''), h.x - 24, yb + 32);
+      }
+    }
+    // the cul-de-sac mouth where the block gathers on a Saturday
+    const P = FLATS.party;
+    c.fillStyle = '#514d49'; c.beginPath(); c.ellipse(P.x, P.y, 120, 62, 0, 0, 7); c.fill();
+    scatter(40, 901, (rnd) => { c.fillStyle = 'rgba(30,28,26,0.25)';
+      c.fillRect(P.x - 110 + rnd() * 220, P.y - 54 + rnd() * 108, 12 + rnd() * 30, 3 + rnd() * 5); });
+    c.fillStyle = 'rgba(201,178,138,0.16)'; c.font = 'bold 15px Impact, Arial'; c.textAlign = 'center';
+    c.fillText('NO OUTLET', P.x, P.y + 4);
+    // a basketball hoop on a pole, rim bent, net long gone
+    c.fillStyle = '#5a5a62'; c.fillRect(P.x + 128, P.y - 74, 5, 74);
+    c.fillStyle = '#e8e4dc'; c.fillRect(P.x + 116, P.y - 88, 30, 20);
+    c.strokeStyle = '#c9302a'; c.lineWidth = 2;
+    c.beginPath(); c.ellipse(P.x + 131, P.y - 66, 9, 3.4, 0.16, 0, 7); c.stroke(); c.lineWidth = 1;
   }
 
   // ── HOPELESS TECH: a campus that is mostly parking ────────────────────────

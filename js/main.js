@@ -4,7 +4,7 @@
 // except through game.act / documented fields.
 
 import { Game, soakRun, T, BUILDINGS, GARAGE, FOXHOLE, DOWNTOWN, DT_Y, WATER_TOWER, COURTHOUSE,
-         WORKS, BLUFFS, LOOT, SEARCH_SPOTS, HTCC, INTERIORS, STRIP_Y, BARKS, SCHEME, ENDINGS,
+         WORKS, BLUFFS, LOOT, SEARCH_SPOTS, HTCC, FLATS, INTERIORS, STRIP_Y, BARKS, SCHEME, ENDINGS,
          BLOCK_NAMES, DAY_NAMES, NAMED } from './game.js';
 import { Renderer } from './render.js';
 import { Sfx } from './audio.js';
@@ -233,6 +233,12 @@ function interactables() {
       if (n.room !== 'ext' || n.ko) continue;
       if (n.key === 'peanut') add(n.x, n.y, 50, 'Talk to Peanut', () => { const r = g.act('talkPeanut'); renderer.bark('Peanut', r.text, n.x, n.y); });
       else if (n.key === 'chuck' || n.key === 'tanner') add(n.x, n.y, 44, `${n.name} (Alumni, loud)`, () => renderer.bark(n.name, uiPick(BARKS[n.key]), n.x, n.y));
+      else if (n.key === 'ruthie') add(n.x, n.y, 48, 'Miss Ruthie, on the porch',
+        () => renderer.bark('Miss Ruthie', uiPick(BARKS[g.heatStage() >= 1 ? 'ruthie_hot' : 'ruthie']), n.x, n.y));
+      else if (n.key === 'darnell') add(n.x, n.y, 48, 'Darnell, under the Buick',
+        () => renderer.bark('Darnell', uiPick(BARKS.darnell), n.x, n.y));
+      else if (n.key === 'yolanda') add(n.x, n.y, 48, 'Yolanda',
+        () => renderer.bark('Yolanda', uiPick(BARKS.yolanda), n.x, n.y));
     }
     // DOWNTOWN doors + furniture
     for (const b of DOWNTOWN) {
@@ -245,6 +251,19 @@ function interactables() {
       }
       if (g.isOpen(b.key)) add(dx, dy, 46, `Enter ${b.label}`, () => result(g.act('enter', b.key)));
       else add(dx, dy, 46, `${b.label} — closed`, () => result(g.act('enter', b.key)));
+    }
+    // ── THE FLATS ──
+    for (const h of FLATS.houses) {
+      add(h.x + 35, h.y + h.h + 10, 44, h.who ? `${h.who}'s place` : h.blurb.split('.')[0], () => feed(h.blurb, 'ok'));
+    }
+    if (g.partyOn()) {
+      const P = FLATS.party;
+      add(P.x, P.y, 96, '🎉 THE BLOCK PARTY — a plate, and whatever the street knows', () => showChoice(
+        'Saturday on the block.', 'Tables out at six. Somebody\'s cousin brought a smoker on a trailer. Nobody will take your money for anything.', [
+        { label: 'Take a plate (heals, cools you off)', go: () => result(g.act('partyPlate')) },
+        { label: 'Listen to what the block knows', go: () => { const r = result(g.act('partyRumour')); if (r.ok) { updateScheme(); pulse($('hud-scheme')); } } },
+        { label: 'Just stand in it a minute', go: () => renderer.bark(null, uiPick(BARKS.party), P.x, P.y - 30) },
+      ]));
     }
     // ── HOPELESS TECH ──
     for (const b of HTCC.buildings) {
@@ -530,8 +549,10 @@ function interactables() {
     add(120, 95, 60, 'The cot (sleep — ends the day)', () => showChoice('Sleep?', 'The rest of today goes with it. Heat cools double here — the Flats wouldn\'t give a cop directions to a fire.', [
       { label: 'Sleep. Let the town forget your face a little.', go: () => result(g.act('sleep')) }]));
     add(335, 95, 54, 'The beer fridge (Bev\'s. Ask first.)', () => feed(`Inside: three beers, a film canister of quarters, and the rent jar. The jar notices you.`, 'warn'));
+    // ⚠️ Bev speaks from the NOTICE ladder now, not a flat pool — what she says is
+    // the readout for the moral ledger, and it's the only readout there is.
     add(560, 100, 60, 'The house door', () => renderer.bark('Bev',
-      uiPick(g.scheme.job ? BARKS.bev_after : BARKS.bev), 560, 82));
+      g.scheme.job && g.bevTier() < 2 ? uiPick(BARKS.bev_after) : g.bevLine(), 560, 82));
     add(INTERIORS.garage.w / 2, INTERIORS.garage.h - 26, 60, 'Out to the street', () => result(g.act('leave')));
   }
   return out;

@@ -278,6 +278,40 @@ Uses the portable Node at `C:\Users\kylef\tools\node` (not on PATH).
   **🎥 Camera motion toggle** in the pause menu (persisted): off is a plain locked
   follow with no lead, punch, widen or drift. The bible asked for configurable.
 
+- **M1.12 — THE FLATS: where you live** ✅ (2026-08-06)
+  The thinnest district becomes the emotional floor, and it finally has the two
+  things the design doc specified and the build never had.
+
+  **THE SANCTUARY.** *"The Flats is the one place where your heat cools naturally:
+  nobody here talks to police."* Passive decay, 0.55/sec, just for standing on your
+  own street — **the only passive heat decay in the game**; everywhere else costs a
+  block. Verified: 20s in the Flats takes 60 → 49; 20s in the Mile lot takes 60 →
+  60. It floors at 8, so it settles you but deliberately **cannot clear a manhunt** —
+  a street that could do that would break every chase in the game.
+
+  **WHAT BEV NOTICES.** *"She doesn't ask where the money comes from, but she
+  notices, and the game tracks that."* A four-tier ledger that ticks when you come
+  home hot, carrying, or wearing a night — evaluated at the one moment she can
+  actually see you, which is when you sleep. ⚠️ It **never blocks anything and never
+  costs a cent**. It only changes what she says, and that restraint is the whole
+  mechanic. Verified climbing 4 → 8 → 12 over three bad nights, ending on *"Whatever
+  it is, it ends this week. I've buried enough men out of this house."*
+
+  **THE BLOCK.** Five houses whose yards say who lives there — Miss Ruthie's porch
+  chair and wind chimes, Darnell's Buick up on blocks since March, Yolanda's
+  permanently-stacked folding tables, a foreclosed house whose grass somebody still
+  cuts, and an above-ground pool holding two feet of green water. Chain-link between
+  every yard, mailboxes with names, a NO OUTLET cul-de-sac and a bent hoop.
+
+  **THE BLOCK PARTY**, Saturday evening: seven neighbours turn out, and the street
+  gives you things for free because that's what the street is — a plate (+30 hp,
+  −10 heat) and **all three scheme intel stages, at no cost**, a fourth route that
+  costs only being someone this block still claims.
+
+  ⚠️ TONAL RULE, and it's deliberate: everywhere else the crudeness points outward
+  at marks and money. In the Flats it points **inward**, which in this town is how
+  affection is spelled. Do not make the Flats mean.
+
 ## What's deliberately NOT in Phase 1 (per the roadmap — don't "fix" these)
 
 - No Hopeless Tech, classes, GPA, or majors (Phase 2).

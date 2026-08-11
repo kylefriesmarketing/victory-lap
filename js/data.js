@@ -116,6 +116,22 @@ export const TUNING = {
                               // heart, not a manhunt.
   libHeatDecay: 12,           // nobody has ever been arrested in a library
   gymPay: 26,                 // spotting the meatheads for beer money
+  // ── THE FLATS ────────────────────────────────────────────────────────────
+  // "The Flats is the one place where your heat cools naturally: nobody here
+  // talks to police." Passive, per second, just for standing on your own street.
+  // This is the only passive decay in the game — everywhere else costs a block.
+  flatsCoolPerSec: 0.55,
+  flatsCoolStop: 8,           // it settles you; it can't clear a manhunt for you
+  // ── WHAT BEV NOTICES ─────────────────────────────────────────────────────
+  // "She doesn't ask where the money comes from, but she NOTICES, and the game
+  // tracks that." Notice is not a punishment meter. It never blocks anything.
+  // It only changes what she says, and that is the entire point of it.
+  noticeHeat: 1,              // coming home hot
+  noticeLoot: 2,              // coming home with somebody else's things
+  noticeBlood: 1,             // coming home wearing a night
+  noticeThresholds: [3, 7, 12],
+  blockPartyDay: 5,           // Saturday. It ends in a fistfight or a marriage.
+  partyRumourCost: 0,         // the block tells you things for free. That's the block.
   // heat
   heatStage: { noticed: 15, named: 40, wanted: 70 },
   heatMax: 100,
@@ -370,6 +386,34 @@ export const EXTERIOR_PROPS = [
 
 export const GARAGE = { x: 300, y: 1150, w: 220, h: 180, door: { x: 395, y: 1150 } };
 
+// ── THE FLATS ─────────────────────────────────────────────────────────────────
+// Where you live. Chain-link, kiddie pools, dogs that know you, block parties that
+// end in either a fistfight or a marriage. It is the ONE district where heat cools
+// on its own, because nobody here talks to police — that isn't flavour, it's the
+// mechanic, and it's why this is the district you run home to.
+// Every house is somebody's, and the yard says who.
+export const FLATS = {
+  bounds: { x: 0, y: 1086, w: 2200, h: 414 },
+  party:  { x: 1080, y: 1300 },        // the cul-de-sac mouth: where the block gathers
+  houses: [
+    { key: 'ruthie', x: 700,  y: 1190, w: 190, h: 145, wall: '#7a6a58', trim: '#9c5a4a',
+      who: 'Miss Ruthie', yard: 'porch',
+      blurb: 'Porch chair, wind chimes, and forty years of watching this street.' },
+    { key: 'darnell', x: 960, y: 1210, w: 175, h: 130, wall: '#5f6a58', trim: '#c9a227',
+      who: 'Darnell', yard: 'carUp',
+      blurb: 'A Buick on blocks since March and a man who genuinely intends to finish it.' },
+    { key: 'yolanda', x: 1220, y: 1188, w: 205, h: 148, wall: '#8a7a5a', trim: '#4a6a8a',
+      who: 'Yolanda', yard: 'party',
+      blurb: 'Folding tables stacked by the door, permanently, because you never know.' },
+    { key: 'empty',  x: 1520, y: 1218, w: 170, h: 126, wall: '#6a6258', trim: '#5a5044',
+      who: null, yard: 'foreclosed',
+      blurb: 'Bank paper in the window since ’22. The grass still gets cut by somebody.' },
+    { key: 'pooler', x: 1760, y: 1196, w: 185, h: 138, wall: '#7a5a5a', trim: '#7aa8b8',
+      who: null, yard: 'pool',
+      blurb: 'Above-ground pool, two feet of green water, and a filter nobody has run since Obama.' },
+  ],
+};
+
 // ⚠️ NOT part of the BUILDINGS strip row — the Foxhole is a standalone windowless
 // cinder-block box set back on its own gravel lot, which is exactly how these places
 // actually sit at the edge of a town like this. Its own geometry, its own door.
@@ -543,6 +587,13 @@ export const NAMED = {
             silhouette: 'cardigan, lanyard, and the only real power on this campus' },
   dunn:   { name: 'Dunn', role: 'welding instructor', arch: 'broad', outfit: { shirt: '#8a5a33', pants: '#4a4438' }, hat: 'trucker',
             silhouette: 'forearm scars, safety glasses on his hat, thirty years of other people\'s sons' },
+  // ── The Flats: the people who knew you before you were worth knowing ──────
+  ruthie: { name: 'Miss Ruthie', role: 'the porch', arch: 'short', outfit: { shirt: '#8a7a9a', pants: '#4a4452' }, hat: 'curlers',
+            silhouette: 'housecoat and a porch chair with a permanent dent in it' },
+  darnell:{ name: 'Darnell', role: 'third shift', arch: 'broad', outfit: { shirt: '#4a5a68', pants: '#3a3e44' }, hat: 'capBack',
+            silhouette: 'half under a Buick; you mostly know him by the boots' },
+  yolanda:{ name: 'Yolanda', role: 'runs the block', arch: 'average', outfit: { shirt: '#b8683a', pants: '#3d4c63' }, hat: 'bun',
+            silhouette: 'moving fast, carrying something, already talking' },
 };
 
 // ambient population per block: [count, archetype pool, outfit pool, where]
@@ -900,6 +951,62 @@ export const BARKS = {
     "—the pawn guy'll sell. They always sell. You just find the number where his dignity rounds down—",
     "—call it 'The Lip.' Heritage signage, new everything. People LOVE a scar if you frame it—",
     "—game store's the holdout. Old man's sitting on prime frontage like it's a memory. Memories have carrying costs—",
+  ],
+  // ── THE FLATS ─────────────────────────────────────────────────────────────
+  // ⚠️ TONAL EXCEPTION, and it's deliberate. Everywhere else the crudeness points
+  // outward at marks, clientele and money. Here it points INWARD, which in this
+  // town is how affection is spelled. These people are on your side and the
+  // insults are the proof. Do not make the Flats mean.
+  ruthie: [
+    "There he is. Come here so I can look at you and be disappointed up close.",
+    "I changed your diapers, so you can drop the walk. The WALK, baby. I know that walk.",
+    "Your grandmother don't sleep till she hears that gate. Forty years I've watched that light stay on.",
+    "Police come down this street they get four porches of NOTHING. That's not loyalty, that's just how we were raised.",
+    "You know what I like about you? You still say good morning. Half these grown men can't manage it.",
+    "Whatever you're into — and you're into something, don't insult me — you eat first. Sit down.",
+  ],
+  ruthie_hot: [
+    "Two cars went by slow. I counted 'em. I always count 'em.",
+    "Somebody was asking after you. Didn't get a thing out of anybody, but they were ASKING. Sit inside a while.",
+    "Baby. Your face is on somebody's list. I can tell from here. Go on in and be quiet a minute.",
+  ],
+  darnell: [
+    "Pass me the — no, the OTHER one. Thank you. This thing's been up on blocks since March and it's WINNING.",
+    "Third shift'll ruin a man. I ain't seen a Tuesday afternoon in nine years.",
+    "Whatever you're doing? Don't do it on this block. Do it somewhere else and come home quiet. That's all anybody asks.",
+    "Your grandfather taught me to time an engine right where you're standing. Man had hands like a vice and no patience at all.",
+    "You need to move something, you know where I'm at. I don't ask questions 'cause I don't want the ANSWERS.",
+  ],
+  yolanda: [
+    "Saturday. Tables out at six. You're coming, and you're carrying something heavy, 'cause that's the price.",
+    "Three jobs and this block and I still can't tell you where my thirties went.",
+    "I got the permit. I ALWAYS get the permit. That's why they can't say nothing to us.",
+    "Bring your grandmother down. She says no. She always says no. Ask her anyway.",
+  ],
+  flats_idle: [
+    "Evening. — Evening. (That's the whole conversation. It's enough.)",
+    "Dogs know your walk down here. That's the only security system this street's ever had.",
+    "Gate creaks. Everybody's gate creaks. It's a neighbourhood WATCH, technically.",
+    "Somebody's grilling. Somebody's ALWAYS grilling. It might be nobody. It might be the block itself.",
+    "That house been empty two years and the grass still gets cut. Nobody knows who. Nobody asks.",
+    "This street's the only place in town nobody's ever tried to sell me anything.",
+  ],
+  party: [
+    "TABLES OUT! Somebody get the cooler, and somebody get Ruthie a CHAIR, a real one—",
+    "Every year this ends one of two ways and I've stopped predicting which.",
+    "That's the third time that song's been on. Nobody's complaining. That's how you know it's going well.",
+    "Somebody's cousin brought a whole SMOKER. On a TRAILER. We don't even know whose cousin.",
+    "Plate's free. Everything down here is free, that's the whole point of down here.",
+  ],
+  // Bev, as the week accumulates. She never asks. She notices, which is worse.
+  bev_notice: [
+    [ "You're in early. That's nice.", "There's a plate. Eat the plate." ],
+    [ "You've been out a lot this week. I'm not asking. I'm saying it out loud so you hear it in my voice.",
+      "You came in at three again. I know because I was up. Don't ask why I was up." ],
+    [ "The jar's fuller than it was and I didn't put nothing in it. I'm not gonna ask. But I noticed, and now you know I noticed.",
+      "Your grandfather used to come home with money he couldn't explain either. I'd like you to hear that as the warning it is." ],
+    [ "Sit down. — No. SIT. ...I'm not angry. I'm scared, and at my age those wear the same face, so you'll have to take my word.",
+      "Whatever it is, it ends this week. I've buried enough men out of this house." ],
   ],
   // ── HOPELESS TECH ─────────────────────────────────────────────────────────
   // The doc calls the Polo Shirts "an entire comedy ecosystem." Four guys, one
