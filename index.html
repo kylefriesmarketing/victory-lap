@@ -75,6 +75,11 @@
   #hud-heat.st2 { border-left-color: #a86a2a; } #hud-heat.st2 #hud-scan-line { color: #ffc98a; }
   #hud-heat.st3 { border-left-color: #ff6a5a; animation: throb 0.9s infinite; }
   #hud-heat.st3 #hud-scan-line { color: #ff9a8a; }
+  /* the OTHER track: the one that never decays. Deliberately not a bar — it's a
+     sentence about people, because that's what a grudge is. */
+  #hud-grudge { display: none; font-family: Georgia, serif; font-style: italic; font-size: 11px;
+    color: #c98a7a; border-top: 1px dotted #4a3a3a; margin-top: 5px; padding-top: 4px; }
+  #hud-grudge.on { display: block; }
   @keyframes throb { 50% { background: rgba(80,20,10,0.55); } }
   #hud-vitals { position: absolute; bottom: 16px; left: 14px; width: 190px; }
   .vbar { height: 9px; background: rgba(10,12,18,0.85); border: 1px solid #33302a; border-radius: 4px;
@@ -226,6 +231,7 @@
   <div id="hud-heat">
     <div id="hud-scan-head"><span>HPD BAND 4 · SCANNER</span><span id="hud-scan-bars"><i></i><i></i><i></i></span></div>
     <div id="hud-scan-line">…quiet out there. 10-8, nothing to report…</div>
+    <div id="hud-grudge"></div>
   </div>
   <div id="hud-vitals">
     <div class="vbar"><div id="hud-hp-fill" style="width:100%"></div></div>

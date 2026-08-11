@@ -43,6 +43,17 @@ export const TUNING = {
   wakeRobbedAfterS: 38,       // unless you went through their pockets first
   wakeHpFrac: 0.34,
   grudgeChance: 0.65,         // …and then they come looking for you
+  // ── GRUDGE HEAT (design doc's second, civilian track) ────────────────────
+  // "Rob a man's garage and HPD forgets by Thursday — HE doesn't." Grudge never
+  // decays on its own. It is the town's memory, and it is the only heat in the
+  // game you cannot sleep off.
+  grudgeAssault: 1,           // a punch in public: one person now dislikes you
+  grudgeRob: 3,               // going through pockets: three, and they talk
+  grudgeBurgle: 4,            // a Bluffs house: the whole road hears about it
+  grudgeMarkup: 0.14,         // every counter in town charges this much more, per point
+  grudgeMarkupCap: 0.85,      // …up to nearly double. They can read you now.
+  grudgeAmbushAt: 6,          // past this, somebody is waiting in a parking lot
+  grudgeRefuseAt: 9,          // past THIS, doors that used to open don't
   // ── THE FOXHOLE ───────────────────────────────────────────────────────────
   // A windowless cinder-block box on gravel at the edge of the Mile. Mechanically
   // it's three things: a money sink, the best heat sanctuary in the district (nobody
@@ -1107,6 +1118,25 @@ export const ENDINGS = {
       : "No cuffs, no casts, no cash. You watched the drop night come and go from a parking lot you know better than your own face. Nothing happened. That's the worst one.",
   },
 };
+
+// ── THE SUN ───────────────────────────────────────────────────────────────────
+// ONE table drives the look of all six districts: the ambient wash, the world
+// grade, and — the part that actually sells time of day — the direction and
+// LENGTH of every shadow in the game. Long and west at breakfast, short and hard
+// at noon, long and east at supper, gone by dark.
+// ⚠️ index 4 is the Rip bonus block: deeper night than LATE, deliberately.
+export const SKY = [
+  { key: 'morning',   amb: 'rgba(150,95,40,0.06)',  sun: [-1.0, 0.34], len: 2.1, soft: 0.30,
+    grade: 'rgba(255,190,120,0.05)', shadow: 0.30 },
+  { key: 'afternoon', amb: 'rgba(0,0,0,0.02)',      sun: [0.18, 0.42], len: 0.85, soft: 0.16,
+    grade: 'rgba(255,245,225,0.02)', shadow: 0.36 },
+  { key: 'evening',   amb: 'rgba(70,40,90,0.24)',   sun: [1.15, 0.30], len: 2.4, soft: 0.42,
+    grade: 'rgba(255,140,80,0.07)', shadow: 0.26 },
+  { key: 'late',      amb: 'rgba(8,13,34,0.60)',    sun: [0.25, 0.20], len: 0.6, soft: 0.55,
+    grade: 'rgba(70,110,190,0.06)', shadow: 0.34 },
+  { key: 'bonus',     amb: 'rgba(5,9,26,0.68)',     sun: [0.25, 0.18], len: 0.5, soft: 0.6,
+    grade: 'rgba(60,95,175,0.07)', shadow: 0.34 },
+];
 
 export const BLOCK_NAMES = ['MORNING', 'AFTERNOON', 'EVENING', 'LATE'];
 export const DAY_NAMES = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];

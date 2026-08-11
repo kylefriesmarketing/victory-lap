@@ -209,6 +209,30 @@ Uses the portable Node at `C:\Users\kylef\tools\node` (not on PATH).
   ⚠️ cart rage is 11, not 26 — at 26 the crowd multiplier put you at WANTED off one
   golf cart. It's a misdemeanour of the heart.
 
+- **M1.9 — the world layer: one sun, one memory, one weather** ✅ (2026-08-06)
+  An "alive" pass built as **world-scale systems rather than per-district dressing**,
+  because that's what actually spreads evenly across six districts.
+  **THE SUN** (`SKY` in data.js) is now a single source of truth driving the ambient
+  wash, a per-hour world grade, and — the part that sells it — the **direction and
+  length of every shadow in the game**. Long and west at breakfast (sunX −1.0,
+  len 2.1), short and hard at noon (0.18, 0.85), long and east at supper (1.15,
+  2.4). ⚠️ render.js used to keep a private `ambients` array that could drift out of
+  step with the shadows; it's gone, SKY is the only table.
+  **THE WEAR LAYER** — one quarter-res world canvas (850×800 for a 3400×3200 world)
+  that accumulates and never resets inside a run: the paths you actually walk
+  (one scuff per stride, not per frame), blood where people went down, vomit
+  outside the Lip, glass, splinters. Composites over the baked ground, under
+  everything alive, so all six districts get a memory from one implementation.
+  **WET GROUND** — rain now darkens and sheens the entire county rather than
+  filling a few authored puddles.
+  **GRUDGE HEAT** — the design doc's second, civilian track, finally built:
+  *"Rob a man's garage and HPD forgets by Thursday — he doesn't."* It **never
+  decays** (verified: overnight HPD 60→25, grudge 11→11). It buys three things at
+  thresholds — every counter in town marks you up (+14%/point, capped near double),
+  then somebody starts waiting in a parking lot once a day, then doors stop opening
+  at all. Shown in the HUD as a sentence about people, not a bar, because that's
+  what a grudge is.
+
 ## What's deliberately NOT in Phase 1 (per the roadmap — don't "fix" these)
 
 - No Hopeless Tech, classes, GPA, or majors (Phase 2).

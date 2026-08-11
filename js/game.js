@@ -6,12 +6,12 @@ import {
   TUNING as T, WEAPONS, WORLD, BUILDINGS, ALLEY_GAPS, STRIP_Y, EXTERIOR_PROPS, GARAGE, FOXHOLE,
   DOWNTOWN, DT_Y, RAIL_Y, WATER_TOWER, COURTHOUSE, MAIN_ST, WORKS, BLUFFS, LOOT, SEARCH_SPOTS, HTCC,
   WEAPON_SPAWNS, INTERIORS, ARCHETYPES, OUTFITS, NAMED, POPULATION, SPOTS,
-  BARKS, SCHEME, ENDINGS, BLOCK_NAMES, DAY_NAMES, WEATHER_KINDS, MENU, RIP,
+  BARKS, SCHEME, ENDINGS, BLOCK_NAMES, DAY_NAMES, WEATHER_KINDS, MENU, RIP, SKY,
 } from './data.js';
 
 export { T, WEAPONS, WORLD, BUILDINGS, ALLEY_GAPS, STRIP_Y, EXTERIOR_PROPS, GARAGE, FOXHOLE,
          DOWNTOWN, DT_Y, RAIL_Y, WATER_TOWER, COURTHOUSE, MAIN_ST, WORKS, BLUFFS, LOOT,
-         SEARCH_SPOTS, HTCC, INTERIORS,
+         SEARCH_SPOTS, HTCC, INTERIORS, SKY,
          ARCHETYPES, OUTFITS, NAMED, BARKS, SCHEME, ENDINGS, BLOCK_NAMES, DAY_NAMES, MENU, RIP };
 
 let _eid = 1;
@@ -52,6 +52,7 @@ export class Game {
     this.dt = { round: -1, shots: 0, seen: false, pallet: -1, worksSeen: false, bluffsSeen: false };
     this.burg = { in: null, t: 0, spots: [], cased: [], done: [], owner: false, entryQuiet: false };
     this.htcc = { classes: 0, classToday: -1, aidPaid: false, gymToday: -1, cart: -1, seen: false, stashed: false };
+    this.grudge = 0; this._grudgeSeen = 0; this._ambushDay = -1;
     this.npcs = []; this.pickups = []; this.projectiles = [];
     this.stats = { punches: 0, koGiven: 0, koTaken: 0, skimmed: 0, shifts: 0, rip: 0,
                    crimesSeen: 0, cuffsEscaped: 0, spent: 0, earned: 0 };
@@ -330,6 +331,19 @@ export class Game {
     if (this.block === 1) this._spawnCop('tapp', [[500, 505], [1300, 505], [1900, 508], [1000, 1060]]);
     if (this.block >= 2) this._spawnCop('brill', [[1880, 508], [1100, 505], [520, 508], [900, 1060], [700, 2145], [1400, 2148], [1500, 1060]]);
     if (this.heatStage() >= 3) { this._spawnCop('tapp', [[600, 700]]); this._spawnCop('brill', [[1600, 700]]); }
+    // ── THE GRUDGE AMBUSH ────────────────────────────────────────────────────
+    // Past the threshold, somebody who has a reason is waiting where you park.
+    // Once a day, so it's a consequence and not a siege.
+    if ((this.grudge || 0) >= T.grudgeAmbushAt && this._ambushDay !== this.day && this.block >= 2) {
+      this._ambushDay = this.day;
+      const spot = this.pick(SPOTS.lot);
+      const a = this._mkNpc({ x: spot[0] + this.ri(-30, 30), y: spot[1] + this.ri(-20, 20),
+        outfitKey: this.pick(['flannel', 'greasy', 'camo']), brawler: true, hp: 85, pool: 'drunk' });
+      a.state = 'aggro'; a.persistent = true; a.grudged = true;
+      this.npcs.push(a);
+      this.alert('Somebody is standing in the lot who is not waiting for anything except you.', 'bad');
+    }
+
     // debt collector
     if (this.player.debt > 0 && this.day >= 5 && this.block >= 2 && !this.reggieSpawned) {
       this.reggieSpawned = true;
@@ -431,11 +445,14 @@ export class Game {
     const it = items[what];
     if (!it) return { ok: false };
     if (r !== it.room) return { ok: false, msg: 'Wrong counter.' };
-    if (!this._spend(it.cost)) return { ok: false, msg: 'You are, in the regional dialect, broke.' };
+    // the town has read you, and the town prices accordingly
+    if (this.grudgeRefuses()) return { ok: false, msg: 'The hand comes off the counter. "We\'re good. You can go." No heat in it — that\'s the worst part. They just don\'t want your money.' };
+    const price = this.grudgePrice(it.cost);
+    if (!this._spend(price)) return { ok: false, msg: `That's $${price}${price > it.cost ? ' — for you' : ''}. You are, in the regional dialect, broke.` };
     it.do();
     if (p.stolenPending === what) p.stolenPending = null;
     this.sfx('register');
-    return { ok: true };
+    return { ok: true, msg: price > it.cost ? `−$${price}. The old price was $${it.cost}. Nobody explains the difference and you don't ask.` : undefined };
   }
 
   shoplift(what) {
@@ -722,6 +739,40 @@ export class Game {
       if (st === 3) this.alert('WANTED. That\'s both cars. Both of them start today, apparently. Run.', 'heat');
     }
   }
+
+  /* ══ GRUDGE HEAT ═══════════════════════════════════════════════════════════
+   * The design doc's second track, and the one that makes the town a character:
+   * "HPD Heat is the legal track… Grudge Heat is the civilian track, and it never
+   * expires by itself. Rob a man's garage and HPD forgets by Thursday — he
+   * doesn't." So: no decay, ever. Sleep doesn't touch it. The morning-after
+   * doesn't touch it. The only thing that clears a grudge is the run ending.
+   *
+   * It buys three things, at thresholds: prices go up everywhere (they can read
+   * you now), somebody starts waiting for you in parking lots, and eventually
+   * doors that used to open just don't. */
+  addGrudge(n, why = '') {
+    this.grudge = (this.grudge || 0) + n;
+    this.note(`grudge +${n} (${why}) -> ${this.grudge}`);
+    const was = this._grudgeSeen || 0;
+    if (this.grudge >= T.grudgeRefuseAt && was < T.grudgeRefuseAt) {
+      this._grudgeSeen = this.grudge;
+      this.alert('You have crossed enough people that the town has quietly closed ranks. Some counters are done serving you. Nobody announces it; you just find out.', 'bad');
+    } else if (this.grudge >= T.grudgeAmbushAt && was < T.grudgeAmbushAt) {
+      this._grudgeSeen = this.grudge;
+      this.alert('Word travels. Somebody is going to be waiting for you in a parking lot, and it will not be a conversation.', 'bad');
+    } else if (this.grudge >= 3 && was < 3) {
+      this._grudgeSeen = this.grudge;
+      this.alert('People have started pricing you differently. That is what a reputation IS in a town this size.', 'warn');
+    }
+    this._grudgeSeen = Math.max(this._grudgeSeen || 0, this.grudge);
+  }
+
+  // every counter in town reads this
+  grudgePrice(base) {
+    const m = Math.min(T.grudgeMarkupCap, (this.grudge || 0) * T.grudgeMarkup);
+    return Math.max(1, Math.round(base * (1 + m)));
+  }
+  grudgeRefuses() { return (this.grudge || 0) >= T.grudgeRefuseAt; }
 
   countWitnesses() {
     if (this.room !== 'ext') return 0;
@@ -1337,6 +1388,7 @@ export class Game {
     this.stats.rolled = (this.stats.rolled || 0) + 1;
     this.stats.rolledCash = (this.stats.rolledCash || 0) + take;
     this.addHeat(T.rollHeat, 0, 'robbing a man on the ground');
+    this.addGrudge(T.grudgeRob, 'went through a man\'s pockets');
     if (this.chance(T.grudgeChance)) n.grudge = true;      // he will remember this
     this.sfx('pickup');
     const line = take >= 20 ? this.pick(BARKS.rolled_fat)
@@ -1380,8 +1432,9 @@ export class Game {
     n.vx += Math.cos(ang) * kb; n.vy += Math.sin(ang) * kb;
     this.fx('impact', n.x, n.y, { ang });
     if (!n.cop && !n.brawler && !n.ko) {
-      // civilians: assault, witnessed
+      // civilians: assault, witnessed — and one more person who won't forget
       this.addHeat(T.heatCrime.assault, 0, 'assault');
+      if (!n.grudged) { n.grudged = true; this.addGrudge(T.grudgeAssault, 'hit a neighbour'); }
       if (this.chance(0.6)) this.say(n.name || 'Townie', this.pick(BARKS.hit_react), n.x, n.y);
     }
     if (n.hp <= 0 && !n.ko) {
@@ -1499,7 +1552,7 @@ export class Game {
     const summary = {
       key, day: this.day, dayName: this.dayName, cash: Math.round(this.player.cash),
       heat: Math.round(this.heat), crates: this.scheme.sold, schemeCash: this.scheme.cash,
-      debtOpen: this.player.debt > 0,
+      debtOpen: this.player.debt > 0, grudge: this.grudge || 0,
       stats: { ...this.stats }, meta: { ...m, knows: { ...m.knows } },
       roommate: key === 'BODIED' ? this.pick(BARKS.hospital_roommate) : null,
     };

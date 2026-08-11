@@ -4,7 +4,7 @@
 
 import { T, WORLD, BUILDINGS, ALLEY_GAPS, STRIP_Y, EXTERIOR_PROPS, GARAGE, FOXHOLE,
          DOWNTOWN, DT_Y, RAIL_Y, WATER_TOWER, COURTHOUSE, MAIN_ST, WORKS, BLUFFS, HTCC, INTERIORS,
-         ARCHETYPES, NAMED } from './game.js';
+         ARCHETYPES, NAMED, SKY } from './game.js';
 
 const PAL = {
   asphalt: '#4a4745', asphalt2: '#565350', patch: '#3e3c38', sidewalk: '#736f67',
@@ -49,6 +49,45 @@ export class Renderer {
     scatter(8, 78, (rnd) => this.puddles.push({ x: 200 + rnd() * 1800, y: 2140 + rnd() * 180, rx: 18 + rnd() * 40, ry: 7 + rnd() * 12 }));
     this.t = 0;
     this.flicker = 0;
+
+    /* ── THE WEAR LAYER ──────────────────────────────────────────────────────
+     * One world-scale canvas that ACCUMULATES and never resets inside a run:
+     * the paths you actually walk, what gets spilled, what gets burned, what
+     * gets bled. It sits over the baked ground and under everything alive, so
+     * every district gets a memory for the price of one implementation — which
+     * is exactly why this beats hand-dressing six districts.
+     * ⚠️ Quarter-res on purpose. Full-res would be 3400×3200 = 10.9M pixels of
+     * canvas we composite every frame; /4 is 850×800 and reads identically once
+     * it's scaled back up, because every mark on it is a soft blob anyway. */
+    this.WEAR_DIV = 4;
+    this.wear = document.createElement('canvas');
+    this.wear.width = Math.ceil(WORLD.w / this.WEAR_DIV);
+    this.wear.height = Math.ceil(WORLD.h / this.WEAR_DIV);
+    this.wearC = this.wear.getContext('2d');
+    this._wearAt = 0;      // throttle: footpaths stamp on an interval, not per frame
+    this._lastFoot = null;
+  }
+
+  /* Stamp something into the world's memory. World coords in, soft blob out. */
+  wearMark(x, y, r, color, alpha) {
+    const c = this.wearC, d = this.WEAR_DIV;
+    const wx = x / d, wy = y / d, wr = Math.max(0.8, r / d);
+    const g = c.createRadialGradient(wx, wy, 0, wx, wy, wr);
+    g.addColorStop(0, color.replace('A)', alpha + ')'));
+    g.addColorStop(1, color.replace('A)', '0)'));
+    c.fillStyle = g;
+    c.beginPath(); c.arc(wx, wy, wr, 0, 7); c.fill();
+  }
+
+  /* The path you actually walk. Not a design decision — a record of one. */
+  wearFootfall(x, y, moving) {
+    if (!moving) { this._lastFoot = null; return; }
+    if (this._lastFoot) {
+      const d = Math.hypot(x - this._lastFoot[0], y - this._lastFoot[1]);
+      if (d < 26) return;                       // one scuff per stride, not per frame
+    }
+    this._lastFoot = [x, y];
+    this.wearMark(x, y + 6, 15, 'rgba(24,20,16,A)', 0.05);
   }
 
   resize(w, h) { this.cv.width = w; this.cv.height = h; this.light.width = w; this.light.height = h; }
@@ -76,6 +115,17 @@ export class Renderer {
     if (kind === 'whiff') add(4, (i) => ({ x: x + rr(-6, 6), y: y - 24 + rr(-4, 4),
       vx: Math.cos(d.ang || 0) * rr(40, 90), vy: Math.sin(d.ang || 0) * rr(40, 90) - 20,
       g: 40, r: rr(0.8, 1.6), c: 'rgba(232,220,195,0.35)', t: 0, dur: rr(0.16, 0.28) }));
+
+    // ── and the marks that STAY ────────────────────────────────────────────
+    // Every violent or disgusting thing that happens writes itself into the wear
+    // layer, so a lot you fought in on Tuesday still shows it on Sunday.
+    if (this.g && this.g.room === 'ext') {
+      if (kind === 'impact') this.wearMark(x, y + 8, 13, 'rgba(90,20,18,A)', 0.05);
+      if (kind === 'ko')     this.wearMark(x, y + 6, 26, 'rgba(80,16,14,A)', 0.16);
+      if (kind === 'hurl')   this.wearMark(x + rr(-6, 10), y + 4, 22, 'rgba(120,116,60,A)', 0.20);
+      if (kind === 'shatter')this.wearMark(x, y + 4, 17, 'rgba(150,170,160,A)', 0.07);
+      if (kind === 'break')  this.wearMark(x, y + 6, 20, 'rgba(60,44,28,A)', 0.09);
+    }
     if (kind === 'impact' || kind === 'ko') this.cam.shake = Math.min(6, this.cam.shake + (kind === 'ko' ? 4 : 2));
   }
 
@@ -1479,11 +1529,25 @@ export class Renderer {
     c.scale(z, z);
     c.translate(-cx + vw / 2, -cy + vh / 2);
 
+    const blockIdx = Math.min(g.block, 4);
+    const late = blockIdx >= 3;
+    const sky = SKY[blockIdx] || SKY[3];
+
     // ground
     c.drawImage(gr, 0, 0);
 
-    const blockIdx = Math.min(g.block, 4);
-    const late = blockIdx >= 3;
+    // ── the world's memory, over the paint and under everything alive ──
+    if (room === 'ext') {
+      c.drawImage(this.wear, 0, 0, WORLD.w, WORLD.h);
+      // rain doesn't just fall, it WETS: one dark sheen over every surface in the
+      // county, which is the cheapest way to make 3400×3200 of ground feel weather.
+      if (g.weather === 'rain') {
+        c.fillStyle = 'rgba(28,36,50,0.20)'; c.fillRect(0, 0, WORLD.w, WORLD.h);
+        c.save(); c.globalCompositeOperation = 'lighter';
+        c.fillStyle = 'rgba(120,150,190,0.045)'; c.fillRect(0, 0, WORLD.w, WORLD.h);
+        c.restore();
+      }
+    }
 
     // Puddles, and the thing the art bible singles out: "rain doubles every light source
     // as a smeared vertical reflection in the puddles — worth more than any shader."
@@ -1525,11 +1589,25 @@ export class Renderer {
         r: rr(4, 9), c: 'rgba(120,116,112,0.16)', t: 0, dur: rr(2.4, 4) });
     }
 
-    // entity shadows (sun-skewed by block)
-    const sunSkew = [[-14, 5], [3, 7], [16, 6], [0, 4], [0, 4]][blockIdx] || [0, 4];
+    /* ── SHADOWS CAST BY A REAL SUN ────────────────────────────────────────
+     * Every shadow in the game now comes off one vector in SKY, so the whole
+     * town agrees about where the light is. Long and west at breakfast, short
+     * and hard at noon, long and east at supper. Length scales with `len`, and
+     * `soft` fades the edge, so a midday shadow is a tight dark pool and an
+     * evening one is a long soft smear — which is most of what "time of day"
+     * actually looks like from above. */
+    const sunX = sky.sun[0], sunLen = sky.len, sunSoft = sky.soft;
     const drawShadow = (x, y, r) => {
-      c.fillStyle = late ? 'rgba(10,12,20,0.35)' : 'rgba(20,18,16,0.3)';
-      c.beginPath(); c.ellipse(x + sunSkew[0] * 0.4, y + 2, r + Math.abs(sunSkew[0]) * 0.3, r * 0.38, 0, 0, 7); c.fill();
+      const off = sunX * r * sunLen * 0.9;
+      const stretch = r * (1 + sunLen * 0.55);
+      const gx = c.createRadialGradient(x + off, y + 3, 0, x + off, y + 3, Math.max(stretch, r));
+      const core = late ? `rgba(8,10,20,${sky.shadow})` : `rgba(20,18,16,${sky.shadow})`;
+      gx.addColorStop(0, core);
+      gx.addColorStop(Math.max(0.2, 1 - sunSoft), core.replace(/[\d.]+\)$/, (sky.shadow * 0.45) + ')'));
+      gx.addColorStop(1, 'rgba(0,0,0,0)');
+      c.save(); c.translate(x + off, y + 3); c.scale(1, 0.4); c.translate(-(x + off), -(y + 3));
+      c.fillStyle = gx; c.beginPath(); c.arc(x + off, y + 3, Math.max(stretch, r), 0, 7); c.fill();
+      c.restore();
     };
 
     // pickups
@@ -1546,6 +1624,8 @@ export class Renderer {
       if (e.player) { drawShadow(p.x, p.y, 12); this._drawDude(c, p, true); }
       else { drawShadow(e.x, e.y, 11); this._drawDude(c, e, false); }
     }
+    // the town keeps a record of where you actually walk
+    if (room === 'ext') this.wearFootfall(p.x, p.y, p.moving);
 
     // projectiles
     for (const pr of g.projectiles) {
@@ -1607,6 +1687,8 @@ export class Renderer {
     const vg = c.createRadialGradient(cv.width / 2, cv.height / 2, cv.height / 3, cv.width / 2, cv.height / 2, cv.height * 0.85);
     vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(6,6,10,0.26)');
     c.fillStyle = vg; c.fillRect(0, 0, cv.width, cv.height);
+    // the hour's colour, over everything, before the weather has its say
+    if (sky.grade) { c.fillStyle = sky.grade; c.fillRect(0, 0, cv.width, cv.height); }
     if (g.weather === 'heatwave' && !late) { c.fillStyle = 'rgba(255,160,60,0.06)'; c.fillRect(0, 0, cv.width, cv.height); }
     if (g.weather === 'overcast') { c.fillStyle = 'rgba(90,100,115,0.10)'; c.fillRect(0, 0, cv.width, cv.height); }
   }
@@ -1721,14 +1803,10 @@ export class Renderer {
     const c = this.ctx, L = this.light, lc = L.getContext('2d');
     const z = this.zoom;
     lc.clearRect(0, 0, L.width, L.height);
-    const ambients = [
-      'rgba(150,95,40,0.06)',     // morning: gold, not gravy
-      'rgba(0,0,0,0.02)',         // afternoon: nothing to hide behind
-      'rgba(70,40,90,0.24)',      // evening
-      'rgba(8,13,34,0.60)',       // late
-      'rgba(5,9,26,0.68)',        // rip bonus block: deeper night
-    ];
-    let amb = ambients[blockIdx] || ambients[3];
+    // ⚠️ ONE source of truth for the hour: SKY in data.js drives the ambient wash,
+    // the world grade AND every shadow vector. There used to be a second private
+    // `ambients` array here that could silently drift out of step with the shadows.
+    let amb = (SKY[blockIdx] || SKY[3]).amb;
     if (room !== 'ext') amb = room === 'gamebarn' && g.gameBarnDark ? 'rgba(4,6,16,0.84)'
                             : room === 'foxhole' ? 'rgba(20,4,16,0.78)'
                             // a house you are not supposed to be in is DARK. Your own

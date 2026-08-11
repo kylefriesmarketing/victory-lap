@@ -719,6 +719,17 @@ function updateHud() {
     lastScanStage = st; lastScanAt = performance.now();
     $('hud-scan-line').textContent = uiPick(BARKS.scanner[st]);
   }
+  // the grudge track — never decays, so it's phrased as people, not a number
+  const gr = g.grudge || 0;
+  const ge = $('hud-grudge');
+  if (gr > 0) {
+    ge.className = 'on';
+    ge.textContent = gr >= T.grudgeRefuseAt ? 'Some counters are done serving you.'
+      : gr >= T.grudgeAmbushAt ? 'Somebody is waiting in a parking lot.'
+      : gr >= 3 ? 'You are being priced differently.'
+      : 'Somebody in this town has not forgotten.';
+  } else ge.className = '';
+
   // the burglary clock
   const bg = $('hud-burg');
   if (g.burg && g.burg.in) {
