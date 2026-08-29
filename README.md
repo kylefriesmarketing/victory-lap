@@ -312,7 +312,7 @@ Uses the portable Node at `C:\Users\kylef\tools\node` (not on PATH).
   at marks and money. In the Flats it points **inward**, which in this town is how
   affection is spelled. Do not make the Flats mean.
 
-- **M1.13 — THE PRINTED PLATES: a Higgsfield pass, 14 credits** ✅ (2026-08-29)
+- **M1.13 — THE PRINTED PLATES: a Higgsfield pass, 12 credits** ✅ (2026-08-29)
   Seven images, and the discipline is *where* they were allowed to go.
 
   ⚠️⚠️ **GENERATED ART IS BANNED FROM THE TOWN** — see `ART_BIBLE.md`. No sprites, no
@@ -355,6 +355,14 @@ Uses the portable Node at `C:\Users\kylef\tools\node` (not on PATH).
   needle silently MISSES while single-line ones land and the script still looks like it
   worked. Same session, same lesson twice: `node -e` inside bash eats backticks and
   `${...}` — write patch scripts with the Write tool.
+
+  ⚠️ **SPEND RECONCILIATION, and a hazard worth knowing.** This pass cost **12 credits**
+  — six images at a flat 2cr (nano_banana_pro), confirmed by reading  after
+  the FIRST one rather than trusting a preflight. But the account balance moved **110**
+  over the same half hour, because a parallel session was generating on the same account
+  at the same time (including Seed Audio, which this pass never touched). **Never read a
+  balance delta as your own spend here.** Count your own job IDs — mine were f3b75d5d,
+  886afa7d, 4551c3fc, aa7286a3, 871a8435, 768ab6aa — and price from .
 
   New QA hook `window.__vlEnd(key)` forces an ending screen. It drives the real `endGame`
   so the summary shape can never drift from the live one, but snapshots and restores
