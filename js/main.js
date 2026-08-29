@@ -798,7 +798,17 @@ function showEnding(key, sum) {
   modalPause = true;
   sfx.stopAmbience();
   if (key === 'BUSTED') sfx.play('siren');
-  $('end-art').textContent = E.art;
+  // ⚠️ The plate is OPTIONAL and must fail soft in both directions: no `card` field
+  // at all (a future ending nobody has drawn yet) and a card that 404s both land on
+  // the emoji. An ending screen is the payoff of a whole run — it never shows a
+  // broken-image glyph, and it never waits on the network to render its text.
+  const art = $('end-art');
+  art.className = ''; art.textContent = E.art;
+  if (E.card) {
+    const img = new Image();
+    img.onload = () => { art.textContent = ''; art.className = 'plate'; art.appendChild(img); };
+    img.alt = ''; img.src = E.card;          // onerror: simply never swaps — emoji stands
+  }
   $('end-title').textContent = E.title;
   $('end-text').textContent = E.text + (sum.coda ? `\n\n${sum.coda}` : '')
     + (sum.roommate ? `\n\nYour roommate: "${sum.roommate}"` : '');
@@ -946,6 +956,21 @@ window.__vlShot = async (name = 'shot', port = 8446) => {
   } catch (e) { return 'receiver down: ' + e.message; }
 };
 window.__vlR = () => renderer;   // view handle: zoom/cam pokes for visual QA
+// Force an ending screen without playing a week, so the four cards can be checked
+// on demand. ⚠️ Pass a bogus ENDINGS[k].card first to exercise the 404 fallback —
+// the plate is optional and an ending must never show a broken-image glyph.
+// ⚠️ Drives the REAL endGame so the summary shape can never drift from the live
+// one — but snapshots meta and `over` around it, because endGame increments runs
+// and awards rep/cred/scars, and QA must not bank a fake week into the save.
+window.__vlEnd = (key = 'WALKING') => {
+  if (!game) return 'no game';
+  const meta = JSON.parse(JSON.stringify(game.meta)), over = game.over, end = game.ending;
+  game.over = false;
+  game.endGame(key);
+  game.meta = meta; saveMeta(meta); game.over = over; game.ending = end;
+  return key;
+};
+window.__vlEndings = ENDINGS;    // live object — QA can swap a card path in place
 window.__vlState = () => game && ({ day: game.day, block: game.block, room: game.room, cash: game.player.cash,
   hp: game.player.hp, heat: Math.round(game.heat), stage: game.heatStage(), scheme: { ...game.scheme },
   npcs: game.npcs.length, over: game.over, ending: game.ending });

@@ -312,6 +312,54 @@ Uses the portable Node at `C:\Users\kylef\tools\node` (not on PATH).
   at marks and money. In the Flats it points **inward**, which in this town is how
   affection is spelled. Do not make the Flats mean.
 
+- **M1.13 — THE PRINTED PLATES: a Higgsfield pass, 14 credits** ✅ (2026-08-29)
+  Seven images, and the discipline is *where* they were allowed to go.
+
+  ⚠️⚠️ **GENERATED ART IS BANNED FROM THE TOWN** — see `ART_BIBLE.md`. No sprites, no
+  tiles, no props, no portraits, no interiors, no UI icons. Everything the camera sees
+  while you are *playing* stays flat vector drawn in code; a raster toy dropped in there
+  fights the style and wins ugly. Plates are allowed only where the camera has already
+  left the town — endings, title, share card, shelf poster. Printed matter *about* the
+  game, not surfaces *in* it.
+
+  **The four endings were a 54px emoji.** In a roguelike you see an ending every ~15
+  minutes: it is the payoff, the one moment the camera leaves the top-down view, and it
+  was 🌅. Each is now a four-colour screen print in the game's own palette — the 6 a.m.
+  bus with the mill sliding past the window, a deputy reading rights off a card while a
+  bystander films it vertically, a hospital roommate mid-gesture who has not stopped
+  talking in hours, and the back steps on a Sunday night with the kitchen window warm
+  behind you. Plus the title screen, an `og:image` (the game had been live for weeks
+  unfurling as a grey box), and a real 512×768 shelf poster — VICTORY LAP was the only
+  game on THE ROOM wall whose poster was procedurally painted rather than printed, and
+  `room.js` already carried the note *"delete the flag the day a real print lands"*.
+
+  ⚠️ **A plate is optional in BOTH directions**: no `card` field, and a `card` that 404s,
+  both fall back to the emoji; the title plate layers *above* the old radial gradient
+  rather than replacing it. Verified by pointing an ending at a nonexistent file and
+  watching 🕒 hold.
+
+  ⚠️ **Fixed a latent CSS bug that only the art could expose.** `#ending` is a column
+  flex container with `align-items:center`, so `#end-card` got shrink-to-fit sizing and
+  `max-width:620px` was only ever a ceiling — the card actually measured **258px**.
+  Harmless while the art was an emoji. The moment a `width:100%` image went in, the plate
+  rendered at a third size **and changed width per ending** (277/237/229/204px) because it
+  was tracking the longest line of text. It needs an explicit `width`, not a `max-width`.
+  All four now measure 620px card / 566×377 plate.
+
+  ⚠️⚠️ **NEVER patch `index.html` with `perl -0pi`.** It round-trips the file through a
+  latin-1 lens and double-encodes every em-dash and bullet (U+00E2 U+0080 U+0094 instead
+  of U+2014). The whole page turned to "â" glyphs, the diff ballooned to +30/−21 for a
+  ten-line change, and the only warning was `Wide character in print`. It had to be
+  reverted from git. Patch with node and explicit utf8 — **and assert every replacement
+  matched**, because `git checkout` restores this file as **CRLF**, so a multi-line `\n`
+  needle silently MISSES while single-line ones land and the script still looks like it
+  worked. Same session, same lesson twice: `node -e` inside bash eats backticks and
+  `${...}` — write patch scripts with the Write tool.
+
+  New QA hook `window.__vlEnd(key)` forces an ending screen. It drives the real `endGame`
+  so the summary shape can never drift from the live one, but snapshots and restores
+  `meta` around the call — otherwise ending-card QA banks fake runs into the save.
+
 ## What's deliberately NOT in Phase 1 (per the roadmap — don't "fix" these)
 
 - No Hopeless Tech, classes, GPA, or majors (Phase 2).

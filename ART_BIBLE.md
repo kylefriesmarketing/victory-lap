@@ -108,3 +108,33 @@ Before approving any asset, ask:
 10. Does it avoid directly copying another game?
 
 Reject or revise anything that fails more than two.
+
+## Generated art: where it is allowed, and where it is banned (2026-08-29)
+
+A Higgsfield pass added seven printed plates. The rule that made it safe, and that
+every future art pass is held to:
+
+**GENERATED RASTER ART MAY NEVER ENTER THE TOWN.** No sprites, no tiles, no portraits,
+no props, no interiors, no UI icons. The world is flat vector drawn on canvas from a
+fixed palette, and a raster toy dropped into it reads as a ransom note — the styles do
+not blend, they fight, and the AI one wins in the worst way. Everything the camera sees
+while you are *playing* is painted in code. That is not a budget constraint; it is the
+art direction.
+
+**It is allowed only where the camera has already left the town:** the four ending
+cards, the title screen, the share image, and the shelf poster. These are printed
+matter *about* the game rather than surfaces *in* it, which is why a different medium
+is legible there instead of jarring.
+
+**House style for any plate: four-colour screen print / risograph.** Heavy paper grain,
+visible halftone, slight ink misregistration, flat shapes and no gradients, and the
+permanent palette above quoted as literal hex in the prompt. Screen print is the
+*elevated cousin* of flat vector — it is the one raster style that reads as the same
+world grown up for one frame. Painterly or photographic plates would not.
+Every prompt ends with an explicit no-text clause; the game sets its own type.
+
+**Every plate is optional in both directions.** No `card` field, and a `card` that
+404s, both fall back to the emoji. The title plate is layered *above* the original
+radial gradient rather than replacing it. An ending screen is the payoff of a whole
+run and a title screen is the first thing anyone sees — neither may ever depend on a
+file being there.

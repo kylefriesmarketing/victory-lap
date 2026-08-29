@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>VICTORY LAP — an open-town roguelike about never leaving</title>
+<meta name="description" content="One week in Hopewell. Make rent, settle a score, catch the 6 a.m. bus — or leave in the other kind of car. An open-town roguelike about never leaving.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="VICTORY LAP">
+<meta property="og:description" content="One week in Hopewell. Make rent, settle a score, catch the 6 a.m. bus — or leave in the other kind of car.">
+<meta property="og:image" content="https://kylefriesmarketing.github.io/victory-lap/assets/og.jpg">
+<meta property="og:url" content="https://kylefriesmarketing.github.io/victory-lap/">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://kylefriesmarketing.github.io/victory-lap/assets/og.jpg">
 <style>
   :root {
     --cream: #e8dcc3; --tobacco: #6b4a2f; --leather: #8a5a33; --green: #2e4632;
@@ -26,8 +34,11 @@
   .btn-dim { background: #2a2620; color: #9a8f7a; }
 
   /* ---------- title ---------- */
-  #title { display: none; z-index: 60; background:
-    radial-gradient(ellipse at 50% 30%, #1c2338 0%, #0c0e14 70%); text-align: center; }
+  #title { display: none; z-index: 60; text-align: center; background:
+    radial-gradient(ellipse at 50% 36%, rgba(10,12,18,0.10) 0%, rgba(10,12,18,0.90) 74%),
+    linear-gradient(rgba(10,12,18,0.34), rgba(10,12,18,0.34)),
+    url('assets/title.jpg') center/cover no-repeat,
+    radial-gradient(ellipse at 50% 30%, #1c2338 0%, #0c0e14 70%); }
   #t-logo { font-family: Impact, 'Arial Black', sans-serif; font-size: clamp(52px, 10vw, 110px);
     letter-spacing: 4px; color: var(--cream);
     text-shadow: 0 3px 0 #3a2c1c, 0 8px 24px rgba(255,179,71,0.25); }
@@ -199,8 +210,19 @@
 
   /* ---------- ending ---------- */
   #ending { z-index: 55; background: rgba(6,7,11,0.94); }
-  #end-card { max-width: 560px; text-align: center; padding: 30px 36px; }
-  #end-art { font-size: 54px; }
+  /* ⚠️ #ending is a COLUMN flex container with align-items:center, so a child gets
+     shrink-to-fit sizing and max-width is only a ceiling — this card actually measured
+     258px. Harmless while the art was a 54px emoji; the moment a width:100% image
+     went in, the plate rendered at a third size and CHANGED WIDTH PER ENDING because
+     it was tracking the text. An explicit width is required, not a max-width. */
+  #end-card { width: min(620px, 92vw); max-width: none; text-align: center; padding: 26px 32px 30px; }
+  /* ⚠️ The plate is optional in BOTH directions — an ending with no card field, and
+     a card that 404s, both fall back to the emoji in main.js. An ending screen is
+     the payoff of a whole run; it never renders as a broken-image glyph. */
+  #end-art { font-size: 54px; line-height: 1; margin-bottom: 6px; }
+  #end-art.plate { font-size: 0; margin: -6px -6px 14px; }
+  #end-art img { width: 100%; display: block; border-radius: 3px;
+    box-shadow: 0 10px 34px rgba(0,0,0,0.6), 0 0 0 1px rgba(232,220,195,0.09); }
   #end-title { font-family: Impact, 'Arial Black', sans-serif; font-size: 58px; letter-spacing: 8px;
     color: var(--cream); text-shadow: 0 3px 0 #3a2c1c, 0 8px 30px rgba(156,61,46,0.4); margin: 4px 0 14px; }
   #end-text { color: var(--tan); font-size: 15px; line-height: 1.65; white-space: pre-line; margin-bottom: 12px; }

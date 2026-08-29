@@ -1217,6 +1217,7 @@ export const ENDINGS = {
   WALKING: {
     title: 'WALKING',
     art: '🌅',
+    card: 'assets/endings/walking.jpg',
     text: "The 6 a.m. bus smells like coffee and other people's better decisions. You take a window seat. Nobody chases you. Nobody even looks up. That's the whole trick of this town — it only holds people who stop moving.",
     tag: 'Cashed out clean. He just walked. Nobody even chased him.',
     meta: 'rep',
@@ -1228,6 +1229,7 @@ export const ENDINGS = {
   BUSTED: {
     title: 'BUSTED',
     art: '🚔',
+    card: 'assets/endings/busted.jpg',
     text: "Brill reads you your rights from memory, bored, while somebody you went to middle school with films it vertically. The county DA will drop it by Friday — he always does — but the video's forever.",
     tag: 'Charges evaporate. The footage doesn’t. +CRED',
     meta: 'cred',
@@ -1239,6 +1241,7 @@ export const ENDINGS = {
   BODIED: {
     title: 'BODIED',
     art: '🏥',
+    card: 'assets/endings/bodied.jpg',
     text: "County hospital, curtain bed 2. Your roommate has been talking since before you woke up and possibly since before you were admitted. The doctor signing your discharge golfs with the officer who scraped you off the lot. Small town. Everything's connected. Mostly at the elbow.",
     tag: 'The bone sets. The story stays. +SCARS',
     meta: 'scars',
@@ -1250,6 +1253,7 @@ export const ENDINGS = {
   STUCK: {
     title: 'STUCK',
     art: '🕒',
+    card: 'assets/endings/stuck.jpg',
     text: "Sunday night. The week just… ended.",
     tag: 'The week cost more than it paid. +LESSONS',
     meta: 'lessons',
