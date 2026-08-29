@@ -1218,6 +1218,8 @@ export const ENDINGS = {
     title: 'WALKING',
     art: '🌅',
     card: 'assets/endings/walking.jpg',
+    // Left with money: the bus is already gone and so are you.
+    cardAlt: { src: 'assets/endings/walking-out.jpg', when: (s) => s.cash >= 400 },
     text: "The 6 a.m. bus smells like coffee and other people's better decisions. You take a window seat. Nobody chases you. Nobody even looks up. That's the whole trick of this town — it only holds people who stop moving.",
     tag: 'Cashed out clean. He just walked. Nobody even chased him.',
     meta: 'rep',
@@ -1230,6 +1232,8 @@ export const ENDINGS = {
     title: 'BUSTED',
     art: '🚔',
     card: 'assets/endings/busted.jpg',
+    // A grudge means this arrest is personal, not procedural.
+    cardAlt: { src: 'assets/endings/busted-grudge.jpg', when: (s) => (s.grudge || 0) > 0 },
     text: "Brill reads you your rights from memory, bored, while somebody you went to middle school with films it vertically. The county DA will drop it by Friday — he always does — but the video's forever.",
     tag: 'Charges evaporate. The footage doesn’t. +CRED',
     meta: 'cred',
@@ -1242,6 +1246,8 @@ export const ENDINGS = {
     title: 'BODIED',
     art: '🏥',
     card: 'assets/endings/bodied.jpg',
+    // You put people down on the way. Two beds, two wrecks, mutual respect.
+    cardAlt: { src: 'assets/endings/bodied-even.jpg', when: (s) => (s.stats && s.stats.koGiven || 0) >= 3 },
     text: "County hospital, curtain bed 2. Your roommate has been talking since before you woke up and possibly since before you were admitted. The doctor signing your discharge golfs with the officer who scraped you off the lot. Small town. Everything's connected. Mostly at the elbow.",
     tag: 'The bone sets. The story stays. +SCARS',
     meta: 'scars',
@@ -1254,6 +1260,8 @@ export const ENDINGS = {
     title: 'STUCK',
     art: '🕒',
     card: 'assets/endings/stuck.jpg',
+    // The week ended AND the debt is still open. Notice on the door.
+    cardAlt: { src: 'assets/endings/stuck-debt.jpg', when: (s) => !!s.debtOpen },
     text: "Sunday night. The week just… ended.",
     tag: 'The week cost more than it paid. +LESSONS',
     meta: 'lessons',
@@ -1303,4 +1311,68 @@ export const RIP = {
   name: 'Rip',
   desc: 'Gas-station energy sludge. Technically legal. The can is screaming.',
   flavor: ['ORIGINAL SCREAM', 'BLUE JUDGMENT', 'UNSUPERVISED MANGO'],
+};
+
+// ---------------------------------------------------------------------------
+// THE PLATES — establishing cards, night cards, and place cards.
+//
+// ⚠️ Everything in this block is VIEW-ONLY printed matter. The sim never reads
+// it. A wrong boundary here is a cosmetic bug and can never be a gameplay one.
+// See ART_BIBLE.md: generated raster art is banned from the town itself and
+// allowed only where the camera has already left it. These are those places.
+// ---------------------------------------------------------------------------
+
+// ⚠️ FIRST MATCH WINS, so the tightest regions are listed first. The Works yard
+// (x>=2300, y 1090-1470) overlaps the Flats' y-band, and the college overlaps
+// Downtown's — both are resolved purely by this ordering, not by the tests.
+export const DISTRICTS = [
+  { key: 'works', name: 'THE WORKS', sub: 'Local 448 built this town, then watched it close',
+    plate: 'assets/places/d-works.jpg', test: (x, y) => x >= 2260 && y < 1520 },
+  { key: 'college', name: 'HOPEWELL TECH', sub: 'Two years. Credits transfer, allegedly',
+    plate: 'assets/places/d-college.jpg', test: (x, y) => x >= 1860 && y >= 1520 && y < 2260 },
+  { key: 'bluffs', name: 'THE BLUFFS', sub: 'Where the money went when the plant did not',
+    plate: 'assets/places/d-bluffs.jpg', test: (x, y) => y >= 2380 },
+  { key: 'downtown', name: 'DOWNTOWN', sub: 'Beautiful buildings. Nobody in them',
+    plate: 'assets/places/d-downtown.jpg', test: (x, y) => y >= 1800 && y < 2380 },
+  { key: 'flats', name: 'THE FLATS', sub: 'Nobody down here talks to police',
+    plate: 'assets/places/d-flats.jpg', test: (x, y) => y >= 1040 && y < 1560 },
+  // The catch-all must stay last and must always return true — a position that
+  // matches nothing would show no plate at all and look like a broken feature.
+  { key: 'mile', name: 'THE MIRACLE MILE', sub: '"It Gets Better From Here"',
+    plate: 'assets/places/d-mile.jpg', test: () => true },
+];
+
+export function districtAt(x, y) {
+  for (const d of DISTRICTS) if (d.test(x, y)) return d;
+  return DISTRICTS[DISTRICTS.length - 1];
+}
+
+// One per day, shown on the night card when you sleep. Index is the day you are
+// waking INTO, so Sunday's is the last night and deliberately foreshadows the
+// 6 a.m. bus that WALKING pays off.
+export const NIGHTS = [
+  { plate: 'assets/places/n-mon.jpg', line: 'One window still lit. Nothing has cost anything yet.' },
+  { plate: 'assets/places/n-tue.jpg', line: 'The strip after midnight belongs to nobody.' },
+  { plate: 'assets/places/n-wed.jpg', line: 'The plant keeps one light on. Nobody knows who pays for it.' },
+  { plate: 'assets/places/n-thu.jpg', line: 'Rain all night. The town sounds better in it.' },
+  { plate: 'assets/places/n-fri.jpg', line: 'Friday lights, four blocks over. Somebody else’s good night.' },
+  { plate: 'assets/places/n-sat.jpg', line: 'The block ate outside tonight. Somebody saved you a plate.' },
+  { plate: 'assets/places/n-sun.jpg', line: 'The 6 a.m. stops here. It has stopped here your whole life.' },
+];
+
+// Interior establishing cards, keyed to INTERIORS. ⚠️ Deliberately NOT one per
+// interior — a plate for every door would be fourteen interruptions a run. These
+// are the places the fiction actually lives, and each fires ONCE EVER (tracked in
+// meta, not in the run) so a new player gets the tour and a veteran never does.
+export const PLACES = {
+  splitlip:  { plate: 'assets/places/p-splitlip.jpg',  sub: 'The good stools are spoken for' },
+  foxhole:   { plate: 'assets/places/p-foxhole.jpg',   sub: 'Sadder with the lights on' },
+  cashking:  { plate: 'assets/places/p-cashking.jpg',  sub: 'Everything here is a payday loan' },
+  pawn:      { plate: 'assets/places/p-pawn.jpg',      sub: 'All of it belonged to somebody in a hurry' },
+  daybreak:  { plate: 'assets/places/p-daybreak.jpg',  sub: 'Open before anything else is' },
+  unionhall: { plate: 'assets/places/p-unionhall.jpg', sub: 'Built for two hundred. Holding eleven' },
+  library:   { plate: 'assets/places/p-library.jpg',   sub: 'The last warm room that wants nothing' },
+  aid:       { plate: 'assets/places/p-aid.jpg',       sub: 'Take a number. Take a seat. Take a breath' },
+  buffet:    { plate: 'assets/places/p-buffet.jpg',    sub: 'Cheap, endless, and honestly pretty good' },
+  gamebarn:  { plate: 'assets/places/p-gamebarn.jpg',  sub: 'Smells like carpet and 1998' },
 };

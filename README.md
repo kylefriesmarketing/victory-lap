@@ -371,6 +371,71 @@ Uses the portable Node at `C:\Users\kylef\tools\node` (not on PATH).
   so the summary shape can never drift from the live one, but snapshots and restores
   `meta` around the call — otherwise ending-card QA banks fake runs into the save.
 
+- **M1.14 — THE PLATE SET: 32 more images, 64 more credits** ✅ (2026-08-29)
+  Kyle asked for the rest of the art budget to be spent. It was, on four systems —
+  and the rule from M1.13 held the whole way: **not one of these is a surface in
+  the town.** Every plate is an overlay shown where the camera has already left it.
+
+  **Six district plates.** Crossing into a district raises a card in the lower left:
+  THE MIRACLE MILE *"It Gets Better From Here"*, THE FLATS *"Nobody down here talks
+  to police"*, DOWNTOWN *"Beautiful buildings. Nobody in them"*, THE BLUFFS *"Where
+  the money went when the plant did not"*, HOPEWELL TECH *"Two years. Credits
+  transfer, allegedly"*, THE WORKS *"Local 448 built this town, then watched it
+  close"*. `DISTRICTS` + `districtAt(x,y)` in data.js — ⚠️ **first match wins**, and
+  two of the six regions genuinely overlap (the Works yard sits inside the Flats'
+  y-band, the college inside Downtown's), resolved purely by list order.
+
+  **Ten place plates**, same treatment on first entry to the bar, the Foxhole, Ca$h
+  Kingdom, the pawn shop, Daybreak, the union hall, the library, financial aid, the
+  buffet and the Game Barn.
+
+  ⚠️ **Both fire ONCE EVER, not once per run** — tracked in `meta.seen`, so a new
+  player gets the tour of the town and a veteran on run 20 is never interrupted.
+  ⚠️ And the card is **non-blocking by construction**: it never sets `modalPause`,
+  has `pointer-events: none`, and slides itself away after 4.2s. You keep walking.
+  A card that stopped the game to say "THE FLATS" would be worse than no card.
+
+  **Seven night cards.** Sleeping was a 2.8-second floating toast; now it is a page.
+  One plate per day — a single lit window Monday, the empty strip after midnight,
+  the plant under a moon midweek, rain, Friday's stadium lights blooming four blocks
+  over, the block party's string lights, and Sunday an empty bus bench with the sky
+  just starting to go grey. **This is where Bev's notice ledger now lands**, which is
+  the whole reason to build it: the game's best line had been a floating bark.
+
+  **Eight ending cards instead of four.** A roguelike shows its endings over and over
+  and one fixed card per ending is stale by run three, so each now picks from the
+  run's own summary — the same object `coda()` already reads. Cash ≥ 400 gets the bus
+  pulling away at gold dawn instead of the melancholy window seat; a grudge makes the
+  arrest personal instead of procedural; 3+ KOs given puts *both* men in hospital beds
+  looking at each other; an open debt tapes a notice to the door.
+
+  ⚠️ **The bug worth remembering.** The district poller originally seeded
+  `lastDistrict` silently on its first call so it wouldn't fire a card before the
+  player moved. Measured: **5 cards on a first lap instead of 6** — and in real play
+  you boot inside the garage (`room !== 'ext'`, so `lastDistrict` is null), step out
+  into the Flats, and **THE FLATS never announced itself**. Your own street, the
+  emotional centre of the game, silently skipped. A null `lastDistrict` must FIRE.
+
+  ⚠️ Failure paths verified in all directions: a throwing `cardAlt.when` falls back
+  to the default card, a `cardAlt` pointing at a 404 falls back to the emoji, a
+  missing plate file shows no card rather than a broken image, and the night card
+  renders with its art hidden if the image fails. Nothing here can break a run.
+
+  ⚠️ Prompting note: the first six district plates came back with **titles baked into
+  the artwork** ("THE FLATS", "DOWNTOWN", one garbled "U.C DISTRICT") because the
+  prompt said *"a district title plate"* — which asks for a title. Re-rolled at 2cr
+  each with the phrase removed and an explicit *"every sign, banner and billboard is
+  blank"*. The game sets its own type; baked type in four different fonts does not.
+
+  ⚠️ 33 image files / 5.3 MB, and **only `title.jpg` is ever fetched at boot** (it is
+  a CSS background, and only if the title screen is shown). Every plate loads through
+  `new Image()` at the moment it is needed. Verified: 7 fetched after a full lap of
+  the town, 0 at load.
+
+  New QA hooks: `__vlNight(day, line)`, `__vlNightOff()`, and `__vlPlates(rearm)` —
+  the last one clears the once-ever ledger, which is otherwise fresh-browser-only
+  state and so untestable without wiping localStorage by hand.
+
 ## What's deliberately NOT in Phase 1 (per the roadmap — don't "fix" these)
 
 - No Hopeless Tech, classes, GPA, or majors (Phase 2).

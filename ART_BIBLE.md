@@ -138,3 +138,30 @@ Every prompt ends with an explicit no-text clause; the game sets its own type.
 radial gradient rather than replacing it. An ending screen is the payoff of a whole
 run and a title screen is the first thing anyone sees — neither may ever depend on a
 file being there.
+
+### The four allowed plate classes (2026-08-29)
+
+The permitted zone now has a shape, and it is closed. A new plate belongs to one of
+these four or it does not get made:
+
+1. **Ending cards** — the run's payoff. Two per ending, chosen from the run summary.
+2. **Night cards** — the day boundary, shown at sleep. One per day of the week.
+3. **District plates** — crossing into a named part of town.
+4. **Place plates** — first entry to a named interior.
+
+Plus the three one-offs that are not in-game at all: the title screen, the share
+image, and the shelf poster.
+
+**Rules that bind every one of them:**
+- **Once ever, not once per run.** Districts and places are tracked in `meta.seen`.
+  A new player gets the tour; a veteran is never interrupted by it again.
+- **The in-world card never blocks.** No `modalPause`, `pointer-events: none`,
+  self-dismissing. The night card is the single exception and only because sleep was
+  already a modal beat.
+- **Lazy, always.** Plates load through `new Image()` when needed. Only
+  `title.jpg` may be fetched at boot, and only as a CSS background.
+- **Every plate is optional.** A missing or 404ing file degrades to no card, or to
+  the emoji for endings. Nothing decorative may break a run.
+- **The game sets the type.** Prompts carry an explicit blank-signage clause; art
+  that arrives with baked lettering gets re-rolled, not shipped. Never write the
+  words "title plate" in a prompt — it asks the model for a title, and it obliges.

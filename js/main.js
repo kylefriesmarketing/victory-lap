@@ -5,7 +5,7 @@
 
 import { Game, soakRun, T, BUILDINGS, GARAGE, FOXHOLE, DOWNTOWN, DT_Y, WATER_TOWER, COURTHOUSE,
          WORKS, BLUFFS, LOOT, SEARCH_SPOTS, HTCC, FLATS, INTERIORS, STRIP_Y, BARKS, SCHEME, ENDINGS,
-         BLOCK_NAMES, DAY_NAMES, NAMED } from './game.js';
+         BLOCK_NAMES, DAY_NAMES, NAMED, DISTRICTS, districtAt, NIGHTS, PLACES } from './game.js';
 import { Renderer } from './render.js';
 import { Sfx } from './audio.js';
 
@@ -21,9 +21,9 @@ let lastRaf = 0;
 function loadMeta() {
   try {
     const m = JSON.parse(localStorage.getItem(METAKEY));
-    if (m && m.knows) return m;
+    if (m && m.knows) { if (!m.seen) m.seen = {}; return m; }
   } catch {}
-  return { runs: 0, cred: 0, scars: 0, lessons: 0, rep: 0, cashBanked: 0,
+  return { runs: 0, cred: 0, scars: 0, lessons: 0, rep: 0, cashBanked: 0, seen: {},
            knows: { window: false, blind: false, drop: false, dog: false } };
 }
 function saveMeta(m) { try { localStorage.setItem(METAKEY, JSON.stringify(m)); } catch {} }
@@ -145,6 +145,84 @@ function feed(text, kind = 'ok') {
 }
 
 let toastT = null;
+// ---------------------------------------------------------------------------
+// ESTABLISHING PLATES
+// ⚠️ View-only and non-blocking. Never sets modalPause, never takes a click,
+// never touches the sim. If any of it throws, the try/catch below eats it — a
+// decorative card must not be able to break a run.
+// ---------------------------------------------------------------------------
+let plateT = 0, plateEl = null;
+function showPlate(name, sub, src) {
+  if (!plateEl) plateEl = $('plate');
+  if (!plateEl) return;
+  const img = plateEl.querySelector('img');
+  // ⚠️ Only reveal once the image has actually decoded. Showing the bar first and
+  // letting the art pop in a beat later reads as a glitch on a cold cache.
+  const go = () => {
+    plateEl.querySelector('.pl-name').textContent = name;
+    plateEl.querySelector('.pl-sub').textContent = sub || '';
+    plateEl.classList.add('show');
+    plateT = 4.2;
+  };
+  if (img.getAttribute('src') === src && img.complete && img.naturalWidth) { go(); return; }
+  const probe = new Image();
+  probe.onload = () => { img.src = src; go(); };   // onerror: no card at all, by design
+  probe.src = src;
+}
+function platesTick(dt) {
+  if (plateT <= 0) return;
+  plateT -= dt;
+  if (plateT <= 0 && plateEl) plateEl.classList.remove('show');
+}
+// The last district we announced.
+// ⚠️ This started life as "seed silently on the first call, never fire on it" —
+// which suppressed the very first card of a new save. In real play you boot inside
+// the garage (room !== 'ext', so lastDistrict is null), step out into the Flats,
+// and THE FLATS — your own street, the emotional centre of the game — never
+// announced itself. Measured as 5 cards on a first lap instead of 6.
+// A null lastDistrict must therefore FIRE, not seed.
+let lastDistrict = null;
+function checkPlates() {
+  if (!game || game.over || modalPause) return;
+  try {
+    const meta = game.meta;
+    if (game.room !== 'ext') {                       // interiors: once ever, on entry
+      const p = PLACES[game.room];
+      if (p && !meta.seen['p:' + game.room]) {
+        meta.seen['p:' + game.room] = 1; saveMeta(meta);
+        showPlate((INTERIORS[game.room] || {}).label || game.room, p.sub, p.plate);
+      }
+      lastDistrict = null;                           // re-announce on stepping back out
+      return;
+    }
+    const d = districtAt(game.player.x, game.player.y);
+    if (d.key === lastDistrict) return;
+    lastDistrict = d.key;
+    if (meta.seen['d:' + d.key]) return;
+    meta.seen['d:' + d.key] = 1; saveMeta(meta);
+    showPlate(d.name, d.sub, d.plate);
+  } catch {}
+}
+
+// ---------------------------------------------------------------------------
+// THE NIGHT CARD — shown when you sleep.
+// This one blocks, deliberately: sleep is already a modal beat, and it is where
+// Bev's notice ledger lands. Before this it was a 2.8-second floating toast.
+// ---------------------------------------------------------------------------
+function showNight(dayIdx, bevLine) {
+  const n = NIGHTS[Math.max(0, Math.min(NIGHTS.length - 1, dayIdx))];
+  const card = $('night'); if (!card || !n) return false;
+  const img = card.querySelector('img');
+  img.onerror = () => { img.style.display = 'none'; };   // card still works with no art
+  img.style.display = ''; img.src = n.plate;
+  $('n-day').textContent = (DAY_NAMES && DAY_NAMES[dayIdx]) || '';
+  $('n-line').textContent = n.line;
+  $('n-bev').innerHTML = bevLine ? '<b>Bev:</b> &ldquo;' + bevLine.replace(/[<>&]/g, '') + '&rdquo;' : '';
+  card.style.display = 'flex'; modalPause = true;
+  return true;
+}
+function hideNight() { const c = $('night'); if (c) c.style.display = 'none'; modalPause = false; }
+
 function toast(big, small, dur = 2.4) {
   $('toast-big').textContent = big; $('toast-small').textContent = small;
   $('toast').classList.add('show');
@@ -547,7 +625,13 @@ function interactables() {
     add(IT.w / 2, IT.h - 24, 60, 'Back to the yard', () => result(g.act('leave')));
   } else if (g.room === 'garage') {
     add(120, 95, 60, 'The cot (sleep — ends the day)', () => showChoice('Sleep?', 'The rest of today goes with it. Heat cools double here — the Flats wouldn\'t give a cop directions to a fire.', [
-      { label: 'Sleep. Let the town forget your face a little.', go: () => result(g.act('sleep')) }]));
+      { label: 'Sleep. Let the town forget your face a little.', go: () => {
+        const r = result(g.act('sleep'));
+        if (r && r.ok !== false && !g.over) {
+          let line = ''; try { line = g.bevLine(); } catch {}
+          showNight(g.day, line);
+        }
+      } }]));
     add(335, 95, 54, 'The beer fridge (Bev\'s. Ask first.)', () => feed(`Inside: three beers, a film canister of quarters, and the rent jar. The jar notices you.`, 'warn'));
     // ⚠️ Bev speaks from the NOTICE ladder now, not a flat pool — what she says is
     // the readout for the moral ledger, and it's the only readout there is.
@@ -804,10 +888,12 @@ function showEnding(key, sum) {
   // broken-image glyph, and it never waits on the network to render its text.
   const art = $('end-art');
   art.className = ''; art.textContent = E.art;
-  if (E.card) {
+  let cardSrc = E.card;
+  try { if (E.cardAlt && E.cardAlt.when(sum)) cardSrc = E.cardAlt.src; } catch {}
+  if (cardSrc) {
     const img = new Image();
     img.onload = () => { art.textContent = ''; art.className = 'plate'; art.appendChild(img); };
-    img.alt = ''; img.src = E.card;          // onerror: simply never swaps — emoji stands
+    img.alt = ''; img.src = cardSrc;         // onerror: simply never swaps — emoji stands
   }
   $('end-title').textContent = E.title;
   $('end-text').textContent = E.text + (sum.coda ? `\n\n${sum.coda}` : '')
@@ -881,6 +967,7 @@ function frame(now) {
   if (renderer && game) renderer.render(dt);
   if (reg) regTick(dt);
   if (cuff) cuffTick(dt);
+  platesTick(dt);
   updatePrompt();
 }
 requestAnimationFrame(frame);
@@ -891,12 +978,14 @@ setInterval(() => {
   if (!modalPause && !choiceOpen) game.update(0.1, {});
   if (reg) regTick(0.1);   // reg/cuff tick OUTSIDE the modal gate — the modals ARE the modalPause
   if (cuff) cuffTick(0.1);
+  platesTick(0.1);
 }, 100);
 
 setInterval(() => {
   if (!game || game.over) return;
   updateHud();
   if (game.room !== lastRoom) { lastRoom = game.room; ambience(); } // doors change the room tone
+  checkPlates();
 }, 200);
 
 function resize() {
@@ -916,6 +1005,14 @@ window.addEventListener('resize', resize);
 
 $('t-start').onclick = () => { sfx.ensure(); startRun(); };
 $('end-next').onclick = () => location.reload();
+// ⚠️ The night card sets modalPause; this is the ONLY thing that clears it, so it
+// must never be conditional. Space/Enter dismiss too — the game is keyboard-first
+// and stranding a player who never reaches for the mouse would freeze the run.
+$('n-go').onclick = () => hideNight();
+addEventListener('keydown', (e) => {
+  if ($('night').style.display !== 'flex') return;
+  if (e.code === 'Space' || e.code === 'Enter' || e.code === 'Escape') { e.preventDefault(); hideNight(); }
+}, true);
 $('p-resume').onclick = togglePause;
 $('p-mute').onclick = () => { sfx.setMute(!sfx.muted); $('p-mute').textContent = sfx.muted ? '🔇 Unmute' : '🔊 Mute'; };
 // The art bible asks for camera effects to be "restrained and configurable" — this
@@ -971,6 +1068,16 @@ window.__vlEnd = (key = 'WALKING') => {
   return key;
 };
 window.__vlEndings = ENDINGS;    // live object — QA can swap a card path in place
+// Plate QA. `modalPause` and the plate functions are module-scoped, so a console
+// check cannot reach them without this. __vlPlates(true) re-arms every card by
+// clearing the once-ever ledger, which is otherwise a fresh-browser-only state.
+window.__vlNight = (day, line) => showNight(day == null ? game.day : day,
+  line == null ? (game ? game.bevLine() : '') : line);
+window.__vlNightOff = () => hideNight();
+window.__vlPlates = (rearm) => {
+  if (rearm && game) { game.meta.seen = {}; saveMeta(game.meta); lastDistrict = null; }
+  return { modalPause, lastDistrict, seen: game ? Object.keys(game.meta.seen || {}) : [] };
+};
 window.__vlState = () => game && ({ day: game.day, block: game.block, room: game.room, cash: game.player.cash,
   hp: game.player.hp, heat: Math.round(game.heat), stage: game.heatStage(), scheme: { ...game.scheme },
   npcs: game.npcs.length, over: game.over, ending: game.ending });
