@@ -357,12 +357,15 @@ Uses the portable Node at `C:\Users\kylef\tools\node` (not on PATH).
   `${...}` — write patch scripts with the Write tool.
 
   ⚠️ **SPEND RECONCILIATION, and a hazard worth knowing.** This pass cost **12 credits**
-  — six images at a flat 2cr (nano_banana_pro), confirmed by reading  after
+  — six images at a flat 2cr (nano_banana_pro), confirmed by reading `transactions` after
   the FIRST one rather than trusting a preflight. But the account balance moved **110**
   over the same half hour, because a parallel session was generating on the same account
   at the same time (including Seed Audio, which this pass never touched). **Never read a
   balance delta as your own spend here.** Count your own job IDs — mine were f3b75d5d,
-  886afa7d, 4551c3fc, aa7286a3, 871a8435, 768ab6aa — and price from .
+  886afa7d, 4551c3fc, aa7286a3, 871a8435, 768ab6aa — and price from `transactions`.
+  ⚠️ This is the third time in one session that bash ate backticks and `${...}` out of a
+  `node -e` / heredoc string. CLAUDE.md already says to use the Write tool for any patch
+  text containing them. It is right. Do that.
 
   New QA hook `window.__vlEnd(key)` forces an ending screen. It drives the real `endGame`
   so the summary shape can never drift from the live one, but snapshots and restores
