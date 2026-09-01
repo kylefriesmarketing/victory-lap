@@ -7,9 +7,14 @@ import { Game, soakRun, T, BUILDINGS, GARAGE, FOXHOLE, DOWNTOWN, DT_Y, WATER_TOW
          WORKS, BLUFFS, LOOT, SEARCH_SPOTS, HTCC, FLATS, INTERIORS, STRIP_Y, BARKS, SCHEME, ENDINGS,
          BLOCK_NAMES, DAY_NAMES, NAMED, DISTRICTS, districtAt, NIGHTS, PLACES } from './game.js';
 import { Renderer } from './render.js';
+// ⚠️ The 3D view is a SECOND CONSUMER of the same sim, not a replacement. It is
+// loaded lazily and only on ?3d=1 so the default game keeps its byte-for-byte
+// 2D path and never pays for a 1.2 MB three.js it is not using.
+const WANT_3D = new URLSearchParams(location.search).get('3d') === '1';
 import { Sfx } from './audio.js';
 
 const $ = (id) => document.getElementById(id);
+let Renderer3D = null;   // resolved at boot below, before any startGame
 const uiPick = (a) => a[Math.floor(Math.random() * a.length)]; // UI barks never touch sim rng
 const METAKEY = 'vl-meta-v1';
 
@@ -72,7 +77,11 @@ function startRun() {
     cuff: (cop) => cuffStart(cop),
   } });
   window.vl = game;
-  renderer = new Renderer($('cv'), game);
+  // ⚠️ The 2D renderer owns a 2D context on #cv and WebGL owns a webgl context —
+  // a canvas can only ever have ONE. So the choice is made once, here, and can
+  // never be toggled at runtime without a reload.
+  renderer = (WANT_3D && Renderer3D) ? new Renderer3D($('cv'), game) : new Renderer($('cv'), game);
+  window.__vl3d = (WANT_3D && Renderer3D) ? renderer : null;
   try {                                       // the preference outlives the run
     if (localStorage.getItem('vl-camfx') === '0') {
       renderer.camFx = false;
@@ -1083,5 +1092,15 @@ window.__vlState = () => game && ({ day: game.day, block: game.block, room: game
   npcs: game.npcs.length, over: game.over, ending: game.ending });
 
 // boot
-if (qs.get('autostart')) startRun();
-else showTitle();
+// ⚠️ The 3D module MUST be resolved before anything can call startGame, because
+// a canvas gets exactly one context and the renderer choice is permanent from
+// that moment. A "prefetch and hope" raced autostart and silently fell back to
+// 2D — the param was right, the module loaded fine, it just landed too late.
+// Boot therefore waits, and only when 3D was actually asked for.
+(WANT_3D ? import('./render3d.js').then(m => { Renderer3D = m.Renderer3D; })
+             .catch(e => console.error('3D view unavailable, staying 2D:', e.message))
+         : Promise.resolve()
+).then(() => {
+  if (qs.get('autostart')) startRun();
+  else showTitle();
+});

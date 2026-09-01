@@ -436,6 +436,73 @@ Uses the portable Node at `C:\Users\kylef\tools\node` (not on PATH).
   the last one clears the once-ever ledger, which is otherwise fresh-browser-only
   state and so untestable without wiping localStorage by hand.
 
+- **M1.15 — 3D PROTOTYPE (`?3d=1`), opt-in, ~500 lines** ✅ (2026-09-01)
+  Kyle asked whether the game could go 3D "kinda like Schedule 1". It can, and the
+  answer is cheap for one reason that was decided long before this milestone.
+
+  ⚠️⚠️ **`game.js` IS 100% HEADLESS, AND THAT IS THE WHOLE ASSET.** Grepping it for
+  DOM access returns three hits, all of which are the word *"window"* inside prose
+  strings. The sim already publishes everything a renderer of any dimensionality
+  needs, per entity: `x/y`, `facing`, `vx/vy`, `moving`, `state`, `hp/ko`,
+  `atkT`, `hitT/hitDir`, `outfit/skin/hat`, `held`, and even a per-NPC `gaitBias`.
+  So 3D is **a second consumer of the same sim, not a rewrite**. `js/render3d.js`
+  reads exactly what `render.js` reads. **`game.js`, `data.js` and the soak were not
+  touched at all.**
+
+  **What runs today**: the whole town built from the same data (Mile storefronts,
+  Main Street, the Flats, the Bluffs, the college, the Works with its stacks, the
+  water tower), all 38 people as eight-box figures wearing their real sim outfit /
+  skin / hat, gait driven off sim velocity, KO tipping the body, swings and flinches,
+  day/night off `game.block`, cast shadows, and barks as camera-facing sprites.
+  **1,364 triangles and 114 draw calls for the entire scene** — it is boxes and
+  cylinders, there is not one imported model, and it costs nothing to run or make.
+
+  ⚠️ **`?3d=1` is opt-in and the default game pays NOTHING.** Verified on the plain
+  URL: three.js is never downloaded, `render3d.js` is never downloaded, and `#cv`
+  still gets a 2D context. A canvas can only ever hold one context type, so the
+  choice is made once at boot and cannot be toggled without a reload.
+
+  ⚠️ Boot has to **await** the 3D import before `startGame`. The first wiring
+  prefetched and hoped; autostart won the race, `Renderer3D` was still null, and it
+  silently fell back to 2D with no error — the param was right and the module loaded
+  fine, it just landed too late.
+
+  ⚠️ **Five scale/lighting bugs worth keeping**, all found by measuring:
+  - **Camera distance must come from world scale.** 520 put the camera inside the
+    neighbours' roofs. A person is 62 units and you want ~1100 units of ground in
+    frame, so at a 42° FOV `dist ≈ 900`.
+  - **Camera must be polar, not two offsets.** Scaling `up` and `back` separately
+    meant tilting also changed how far away you were and the framing lurched.
+    `dist` is now the radius, `pitch` only rotates along it.
+  - **THE SUN MUST BE ON THE CAMERA'S SIDE.** Every facade faces +z, so a sun at
+    −z lit the backs of the buildings and everything visible fell in shadow. That
+    single sign flip was the whole "why does it look like permanent dusk".
+  - **three r155+ turned OFF legacy light units.** Intensities that used to read as
+    daylight (~1.0) now render as dusk; these are ~2.5× the old numbers.
+  - **A 4-sided cone has its corners at the radius**, so a roof cap is the box's
+    half-diagonal. `max(w,d)*0.78` gave a 220-wide house a 344-wide hat.
+
+  ⚠️ **Two sentinel traps that collapsed the crowd into clones** — the sim ships
+  **23 distinct shirts, 5 skins and 10 hat kinds** and the first build threw all of
+  it away. `n.outfit` is ALREADY the resolved `{shirt,pants}` object, not an index
+  into `OUTFITS`; and `n.hat` is the **string `'none'`** when hatless, not null, so
+  `if (hat)` was true and the whole town wore a hat coloured `"none"`. Hats are also
+  KIND NAMES (`cap`, `trucker`, `curlers`, `bun`, `copHat`), never colours, so they
+  needed real shapes. Same class of bug as `carrier === -1` elsewhere in the workspace:
+  **check the sentinel, not the truthiness.**
+
+  **NOT done, and this is the honest remaining cost** — the prototype proves the
+  architecture, not the product:
+  - **The 16 interiors are not built.** This is the single biggest remaining job.
+  - No props, vehicles, signage text, road markings, curbs, or per-shop wall variety.
+  - The HUD, plates, night cards and endings all still work (they are DOM), but the
+    2D view's wear canvas, lighting pass and litter have no 3D equivalent.
+  - **Camera pitch is an open DESIGN question, not a setting.** `pitch` 1.0 is the
+    current top-down game, 0.0 is Bully/Schedule I at street level. The size-up
+    panel, crowd reading and chase legibility all assume you can see the street —
+    dropping to a low camera changes the GAME, not just the look. 0.46–0.62 keeps
+    both. That call is Kyle's and it should be made by playing, not by looking.
+
 ## What's deliberately NOT in Phase 1 (per the roadmap — don't "fix" these)
 
 - No Hopeless Tech, classes, GPA, or majors (Phase 2).
