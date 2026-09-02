@@ -9,6 +9,15 @@ Design pitch: `~/Downloads/victory-lap-design.md`. Visual constitution: `ART_BIB
 
 **This README is the milestone authority for this repo.**
 
+## ⚠️ Verifying a Pages deploy
+
+**ES MODULES ARE CACHED BY URL, and a plain reload can reuse them.** After a push,
+Pages can report  and the browser still runs the OLD  — measured
+this exact way: the deploy served the new file ( proved the new code was
+there) while the running page still reported the old mesh count. Fetching each
+module with  and THEN reloading gets the real build.
+Verify a deploy by a NUMBER that changed, never by the page loading without error.
+
 ## Deploy
 
 Pages serves **master, root** — so deploying is just `git push origin master`. There is
