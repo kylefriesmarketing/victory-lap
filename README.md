@@ -12,11 +12,13 @@ Design pitch: `~/Downloads/victory-lap-design.md`. Visual constitution: `ART_BIB
 ## ⚠️ Verifying a Pages deploy
 
 **ES MODULES ARE CACHED BY URL, and a plain reload can reuse them.** After a push,
-Pages can report  and the browser still runs the OLD  — measured
-this exact way: the deploy served the new file ( proved the new code was
-there) while the running page still reported the old mesh count. Fetching each
-module with  and THEN reloading gets the real build.
-Verify a deploy by a NUMBER that changed, never by the page loading without error.
+Pages can report `built` and the browser still runs the OLD `town3d.js` — measured
+exactly that way: a `fetch` of the module proved the new code was being served,
+while the running page still reported the old mesh count (442, not 580). Fetching
+each module with `{cache: 'reload'}` and *then* reloading gets the real build.
+
+⚠️ **Verify a deploy by a NUMBER that changed**, never by the page loading without
+an error. "It loads and looks right" is exactly what a stale module also does.
 
 ## Deploy
 
