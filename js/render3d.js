@@ -566,7 +566,17 @@ export class Renderer3D {
   applySky() {
     const b = Math.max(0, Math.min(3, this.g.block || 0));
     const su = SUNS[b];
-    let day = su.day, sunI = 0.5 + day * 2.4, hemiI = 0.6 + day * 1.9;
+    // ⚠️ KEY-TO-FILL RATIO IS THE FORM KNOB. Shadows were technically working and
+    // measured as 0.8% of frame luma — invisible — because sun 2.90 against hemi
+    // 2.50 is a ratio of 1.16:1. Ambient that strong relative to the key light
+    // means a shadowed face is barely darker than a lit one, and chunky geometry
+    // whose whole appeal is its silhouette reads flat and brown. Real daylight is
+    // nearer 3:1. Total illumination is roughly preserved (was ~5.4 combined, now
+    // ~4.9) so the town is not darker — it just has shape.
+    // ⚠️ Measure this with the block PINNED immediately before each render: the
+    // hidden-tab interval keeps advancing the sim and an earlier probe of mine
+    // silently sampled LATE while believing it was afternoon.
+    let day = su.day, sunI = 0.55 + day * 3.05, hemiI = 0.42 + day * 0.92;
 
     const wx = this.g.weather;
     if (wx === 'overcast') { sunI *= 0.45; hemiI *= 1.1; day *= 0.8; }

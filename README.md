@@ -725,6 +725,44 @@ Uses the portable Node at `C:\Users\kylef\tools\node` (not on PATH).
 
   Cost: town meshes 442 → 580, still ~3.5k triangles / 275 draw calls.
 
+- **M2.4 — light: give the town form** ✅ (2026-09-01)
+  The town read flat and brown and I couldn't say why, so I measured. The
+  investigation is worth more than the fix.
+
+  ⚠️⚠️ **KEY-TO-FILL RATIO IS THE FORM KNOB.** Shadows were working the whole
+  time and contributed **0.46 luma to a 62-luma frame — 0.8%, invisible**. Cause:
+  sun 2.90 against hemisphere 2.50, a ratio of **1.16:1**. Ambient that strong
+  relative to the key means a shadowed face is barely darker than a lit one, and
+  chunky low-poly geometry whose entire appeal *is* its silhouette reads
+  shapeless. Real daylight is nearer 3:1. Rebalanced to
+  `sun 0.55 + day*3.05` / `hemi 0.42 + day*0.92` → ratio **2.46–2.69**, shadow
+  contribution **0.46 → 1.95 (4×)**, and the afternoon frame got *brighter*, not
+  darker (luma 62 → 73), because total illumination is roughly preserved. Morning
+  now throws the long raking east shadows the per-block `SUNS` table always
+  intended. Interiors are untouched — their rig overrides the outdoor maths after
+  the fact (verified 1.10 / 2.30 / 180000).
+
+  ⚠️ **THREE MEASUREMENT TRAPS**, each of which produced a confident wrong answer:
+  1. A **region** probe reported *"delta 0.00, nothing is casting"* — it was
+     sampling a box the shadow didn't fall in. A whole-frame mean found the 0.23
+     it missed. **A zero from a probe is a claim about the probe** until proven
+     otherwise.
+  2. So validate the instrument first: moving the camera 400 units changed the
+     mean 67.66 → 62.82. Without that control you cannot tell *"no shadows"* from
+     *"not reading the render"*.
+  3. ⚠️ **THE SIM KEEPS RUNNING WHILE YOU MEASURE.** `vl.block = 1` was overwritten
+     by the hidden-tab interval before the probe read pixels, so several
+     measurements concluded shadows were broken **while looking at a night scene**
+     where weak shadows are correct. **Pin the block immediately before each
+     render**, or you measure a different game than the one you think you have.
+
+  (The pane does have a real GPU — RTX 5060 Ti via ANGLE — so "software renderer"
+  was ruled out rather than assumed.)
+
+  ⚠️ I nearly "fixed" a non-bug twice: once when *overcast* correctly suppressed
+  shadows, once when *night* did. Both times the number that looked broken was
+  the system working.
+
 ## What's deliberately NOT in Phase 1 (per the roadmap — don't "fix" these)
 
 - No Hopeless Tech, classes, GPA, or majors (Phase 2).
