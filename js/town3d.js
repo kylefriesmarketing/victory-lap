@@ -45,12 +45,24 @@ function paintGround(D) {
   const sx = cv.width / WORLD.w, sy = cv.height / WORLD.h;
   const R = (x, y, w, h, col) => { c.fillStyle = col; c.fillRect(x * sx, y * sy, w * sx, h * sy); };
 
+  // ⚠️ SEEDED, not Math.random. This canvas is painted once per page load, so a
+  // random one means every stain, crack and oil patch in Hopewell MOVES between
+  // sessions — the town would never look like the same town twice. Same argument
+  // as the interior grime, and it matters more outdoors because you see more of it.
+  let h0 = 0x9c3d2e;
+  const rnd = () => { h0 ^= h0 << 13; h0 ^= h0 >>> 17; h0 ^= h0 << 5; return ((h0 >>> 0) % 100000) / 100000; };
+
   R(0, 0, WORLD.w, WORLD.h, '#3f5138');                       // grass base
   // gentle mottling so the grass is a lawn, not a swatch
   for (let i = 0; i < 900; i++) {
-    const x = Math.random() * WORLD.w, y = Math.random() * WORLD.h;
-    R(x, y, 40 + Math.random() * 90, 30 + Math.random() * 70,
+    const x = rnd() * WORLD.w, y = rnd() * WORLD.h;
+    R(x, y, 40 + rnd() * 90, 30 + rnd() * 70,
       ['rgba(46,70,50,0.16)', 'rgba(90,105,70,0.10)', 'rgba(60,80,56,0.12)'][i % 3]);
+  }
+  // bare dirt where grass loses: verges, desire lines, the edges of every lot
+  for (let i = 0; i < 130; i++) {
+    const x = rnd() * WORLD.w, y = rnd() * WORLD.h, w = 30 + rnd() * 150;
+    R(x, y, w, 14 + rnd() * 40, 'rgba(107,95,76,' + (0.10 + rnd() * 0.22).toFixed(2) + ')');
   }
   for (const p of D.patches || []) R(p.x, p.y, p.w, p.h, p.c || '#6b5f4c');
   for (const l of D.lots || []) {
@@ -80,6 +92,56 @@ function paintGround(D) {
     c.fillStyle = 'rgba(220,210,180,0.55)';
     for (let x = w.x; x < w.x + w.w; x += 26) c.fillRect(x * sx, w.y * sy, 14 * sx, w.h * sy);
   }
+  // ── WEAR ─────────────────────────────────────────────────────────────────
+  // ⚠️ Painted AFTER the roads and lots so it lands ON the asphalt, and BEFORE
+  // the rail so the spur still reads cleanly. The 2D game has a whole wear
+  // canvas (scuffs, scorches, litter drifted against every curb); this is the
+  // static half of that, and it is what stops the Mile reading as fresh-poured.
+  const paved = [].concat(D.roads || [], D.lots || []);
+  for (const p of paved) {
+    // oil drips and dead-car stains, thickest in the lots
+    const drips = Math.round((p.w * p.h) / 26000) + 3;
+    for (let i = 0; i < drips; i++) {
+      const x = p.x + rnd() * p.w, y = p.y + rnd() * p.h, r = (5 + rnd() * 16);
+      const g2 = c.createRadialGradient(x * sx, y * sy, 0, x * sx, y * sy, r * sx);
+      g2.addColorStop(0, 'rgba(10,9,12,' + (0.20 + rnd() * 0.22).toFixed(2) + ')');
+      g2.addColorStop(1, 'rgba(10,9,12,0)');
+      c.fillStyle = g2; c.beginPath(); c.arc(x * sx, y * sy, r * sx, 0, 6.284); c.fill();
+    }
+    // cracks: thin pale lines that wander, the way frost heave actually breaks tar
+    // ⚠️ SHORT and FAINT. The first pass drew 7-segment wanders at 0.16 alpha
+    // across whole lots and they read as SCRIBBLES, not cracks — a drawn line
+    // announces itself, a crack has to be found. Four short segments at 0.09.
+    const cracks = Math.round((p.w * p.h) / 60000) + 1;
+    for (let i = 0; i < cracks; i++) {
+      let x = p.x + rnd() * p.w, y = p.y + rnd() * p.h;
+      c.strokeStyle = 'rgba(150,144,132,0.09)'; c.lineWidth = Math.max(1, 1.1 * sx);
+      c.beginPath(); c.moveTo(x * sx, y * sy);
+      for (let k = 0; k < 4; k++) {
+        x += (rnd() - 0.5) * 40; y += (rnd() - 0.5) * 28;
+        c.lineTo(x * sx, y * sy);
+      }
+      c.stroke();
+    }
+    // ⚠️ Tyre scuff: SHORT arcs only. Full sweeps at r 26–66 rendered as drawn
+    // circles on the tarmac — the eye reads a complete circle as a mark somebody
+    // made, never as wear. A 0.5–1.2 rad slice reads as a turn.
+    for (let i = 0; i < 2; i++) {
+      const x = p.x + rnd() * p.w, y = p.y + rnd() * p.h;
+      const a0 = rnd() * 6.28;
+      c.strokeStyle = 'rgba(16,14,18,0.13)'; c.lineWidth = Math.max(1, 3 * sx);
+      c.beginPath(); c.arc(x * sx, y * sy, (20 + rnd() * 26) * sx, a0, a0 + 0.5 + rnd() * 0.7); c.stroke();
+    }
+  }
+  // litter drifts against the kerb — the 2D view piles it at every hard edge
+  for (const s of D.sidewalks || []) {
+    for (let i = 0; i < 26; i++) {
+      const x = s.x + rnd() * s.w, y = s.y + (rnd() > 0.5 ? -2 : s.h + 1);
+      c.fillStyle = ['rgba(232,220,195,0.30)', 'rgba(156,61,46,0.24)', 'rgba(107,95,76,0.30)'][i % 3];
+      c.fillRect(x * sx, y * sy, (2 + rnd() * 5) * sx, (2 + rnd() * 3) * sy);
+    }
+  }
+
   if (D.rail) {                                               // the spur: ties then rails
     const { y, x0 = 0, x1 = WORLD.w } = D.rail;
     c.fillStyle = '#4a4038';

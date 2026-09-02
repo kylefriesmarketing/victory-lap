@@ -627,6 +627,53 @@ Uses the portable Node at `C:\Users\kylef\tools\node` (not on PATH).
   more than one place, accumulate and assign ONCE.** Both found by measuring the
   result rather than trusting the edit.
 
+- **M2.2 — UI pass: one HUD, a readable title, worn streets** ✅ (2026-09-01)
+
+  ⚠️⚠️ **SCREENSHOTS OF THE UI WORK. THE OLD "THEY TIME OUT" NOTE WAS WRONG.**
+  Every prior session recorded that `computer{screenshot}` fails on this page and
+  verified DOM work by geometry alone. The real cause is that **the Browser pane
+  is HIDDEN** — `preview_start` opens it and screenshots return real pixels
+  immediately. `tabs_context` prints *"The Browser pane is currently hidden"*;
+  that line is the diagnosis. **Open the pane before any UI work.** Three of the
+  four problems fixed below were invisible to geometry and obvious at a glance.
+
+  **The title screen** measured perfectly — zero DOM collisions, correct spacing —
+  and looked like a pile-up, because pale cream type sat on the busiest part of a
+  painted town. ⚠️ **The fix for text-on-art is a GROUND for the type, not more
+  type styling**: the plate moved to `64% 62%` so the lone figure clears the
+  wordmark instead of standing behind it, a soft dark column runs under the text
+  block, the subtitle hangs off a hairline rule, and the motto became small amber
+  letterspaced caps.
+
+  **The HUD became one object** instead of four dialects in four corners. Vitals
+  were two naked lines reading as debris — now a framed panel labelled **BODY**
+  and **WIND** (Hopewell's words; you get the wind knocked out of you here, you
+  don't "deplete stamina"). ⚠️ **Cash was mint green `#b8d8a0`** — the only
+  element in the game speaking a colour the palette does not contain, and it read
+  like a different application pasted into the corner; money is amber now. A
+  **vignette** earns its place twice: it frames the render like the
+  miniature-camera look the bible asks for *and* gives every HUD panel darkness to
+  sit on, since the corners are exactly where the HUD lives.
+
+  **The pause menu ranked its offers** — five identical buttons made the primary
+  action, two toggles and a *destructive* action look like the same choice.
+  Resume is red like START THE WEEK, settings sit in a labelled group, abandon is
+  below a rule. ⚠️ The view button names its **destination** ("Switch to classic
+  2D"), not its state ("View: 3D") — the old label left you guessing whether
+  clicking confirmed or changed it, and it wrapped to two lines.
+
+  **Worn streets.** Interiors got grime in M2.1; the town was still fresh-poured.
+  Oil drips in every lot, frost-heave cracks, tyre scuff where cars turn in,
+  litter drifted against every kerb, bare dirt where grass loses.
+  ⚠️ **`paintGround` is now SEEDED** — it used `Math.random` and is painted once
+  per page load, so every stain in Hopewell moved between sessions and the town
+  never looked like the same town twice.
+  ⚠️ **The first pass read as SCRIBBLES**: 7-segment crack wanders at 0.16 alpha
+  and full-sweep tyre arcs both announced themselves as *drawn marks*. A drawn
+  line says somebody made it; wear has to be found. Four short segments at 0.09
+  and arc slices of 0.5–1.2 rad. **Caught by looking — the numbers were identical
+  either way.**
+
 ## What's deliberately NOT in Phase 1 (per the roadmap — don't "fix" these)
 
 - No Hopeless Tech, classes, GPA, or majors (Phase 2).

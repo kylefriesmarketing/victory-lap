@@ -976,7 +976,10 @@ function togglePause() {
   $('pause').style.display = paused ? 'flex' : 'none';
   // ⚠️ set here, not at module load — at module load the renderer doesn't exist
   // yet and the label reported the wrong view forever.
-  if (paused) $('p-view').textContent = `🕹️ View: ${window.__vl3d ? '3D' : 'classic 2D'} — switch & restart`;
+  // ⚠️ The label names the DESTINATION, not the current state — "View: 3D" left
+  // players guessing whether clicking confirms 3D or leaves it, and the longer
+  // string wrapped to two lines in the button.
+  if (paused) $('p-view').textContent = window.__vl3d ? '🕹️ Switch to classic 2D' : '🕹️ Switch to 3D';
 }
 
 // ---------------------------------------------------------------------------
