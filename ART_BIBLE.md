@@ -165,3 +165,28 @@ image, and the shelf poster.
 - **The game sets the type.** Prompts carry an explicit blank-signage clause; art
   that arrives with baked lettering gets re-rolled, not shipped. Never write the
   words "title plate" in a prompt — it asks the model for a title, and it obliges.
+
+## The 3D view (2026-09-01) — same constitution, third dimension
+
+The town went 3D and the rules carry over verbatim: the permanent palette, wear
+over polish, nobody a clone, saturation earned. New law specific to the medium:
+
+- **Chunky or nothing.** Boxes and cylinders, flat Lambert, real shadows. Not one
+  imported model ships — the whole town plus its crowd is ~2.4k triangles, and
+  that ceiling is a look, not a budget. If a thing cannot be read as itself in
+  eight boxes, simplify the thing, not the primitive.
+- **The sim dresses everyone.** Shirt, pants, skin, hat and body shape come from
+  the entity record — the 3D crowd is the same 23-shirt, 6-silhouette crowd the
+  2D view draws. A view that recasts the town is a bug.
+- **Layout data is mined, never invented.** The furniture in every interior and
+  every exterior prop position was transcribed from what render.js paints
+  (generated `layouts3d.js`). If the 2D painter changes a room, re-mine; do not
+  fork the two towns.
+- **Type belongs to the game.** Canvas-lettered signs with the real shop names
+  are required here, exactly where AI-baked type is banned in the plates.
+- **One sun, on the camera's side**, staged by `game.block` — never a second
+  light source that contradicts the hour. Interiors get one moving point light
+  (~120000 candela — r155+ physical units) and are exempt from weather.
+- **The wheel owns the pitch question.** Close = street-level Schedule I; far =
+  readable top-down. Do not add a separate pitch control; do not clamp the range
+  tighter without a playtest saying so.

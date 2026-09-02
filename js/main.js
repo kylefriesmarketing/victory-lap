@@ -10,7 +10,13 @@ import { Renderer } from './render.js';
 // ⚠️ The 3D view is a SECOND CONSUMER of the same sim, not a replacement. It is
 // loaded lazily and only on ?3d=1 so the default game keeps its byte-for-byte
 // 2D path and never pays for a 1.2 MB three.js it is not using.
-const WANT_3D = new URLSearchParams(location.search).get('3d') === '1';
+// ⚠️ 3D IS THE DEFAULT NOW (Kyle: "lets go all in", 2026-09-01). The classic
+// top-down view survives behind ?2d=1 or localStorage vl-force2d — and as the
+// automatic fallback when WebGL is missing or the 3D module fails to load, so
+// no machine ever gets a black screen out of the switch.
+const _q = new URLSearchParams(location.search);
+const WANT_3D = !(_q.get('2d') === '1' || (() => { try { return localStorage.getItem('vl-force2d') === '1'; } catch { return false; } })())
+  && _q.get('3d') !== '0';
 import { Sfx } from './audio.js';
 
 const $ = (id) => document.getElementById(id);
@@ -80,8 +86,16 @@ function startRun() {
   // ⚠️ The 2D renderer owns a 2D context on #cv and WebGL owns a webgl context —
   // a canvas can only ever have ONE. So the choice is made once, here, and can
   // never be toggled at runtime without a reload.
-  renderer = (WANT_3D && Renderer3D) ? new Renderer3D($('cv'), game) : new Renderer($('cv'), game);
-  window.__vl3d = (WANT_3D && Renderer3D) ? renderer : null;
+  // ⚠️ The 3D constructor THROWS when WebGL is unavailable. Catching it and
+  // falling back is safe on the SAME canvas: getContext('webgl') returning null
+  // does not claim the canvas, so getContext('2d') still works afterwards.
+  renderer = null;
+  if (WANT_3D && Renderer3D) {
+    try { renderer = new Renderer3D($('cv'), game); }
+    catch (e) { console.error('3D unavailable, using classic view:', e.message); renderer = null; }
+  }
+  window.__vl3d = renderer;
+  if (!renderer) renderer = new Renderer($('cv'), game);
   try {                                       // the preference outlives the run
     if (localStorage.getItem('vl-camfx') === '0') {
       renderer.camFx = false;
@@ -960,6 +974,9 @@ window.addEventListener('keyup', (e) => {
 function togglePause() {
   paused = !paused;
   $('pause').style.display = paused ? 'flex' : 'none';
+  // ⚠️ set here, not at module load — at module load the renderer doesn't exist
+  // yet and the label reported the wrong view forever.
+  if (paused) $('p-view').textContent = `🕹️ View: ${window.__vl3d ? '3D' : 'classic 2D'} — switch & restart`;
 }
 
 // ---------------------------------------------------------------------------
@@ -1026,6 +1043,13 @@ $('p-resume').onclick = togglePause;
 $('p-mute').onclick = () => { sfx.setMute(!sfx.muted); $('p-mute').textContent = sfx.muted ? '🔇 Unmute' : '🔊 Mute'; };
 // The art bible asks for camera effects to be "restrained and configurable" — this
 // is the configurable half. Off = a plain locked follow, no lead, punch, or drift.
+// ⚠️ The view toggle RELOADS — a canvas can hold exactly one context type, so
+// 2D↔3D cannot switch live. The button says so instead of pretending. Its label
+// is written when pause OPENS (the renderer doesn't exist yet at module load).
+$('p-view').onclick = () => {
+  try { localStorage.setItem('vl-force2d', window.__vl3d ? '1' : '0'); } catch {}
+  location.reload();
+};
 $('p-cam').onclick = () => {
   if (!renderer) return;
   renderer.camFx = !renderer.camFx;

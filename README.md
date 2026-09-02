@@ -503,6 +503,89 @@ Uses the portable Node at `C:\Users\kylef\tools\node` (not on PATH).
     dropping to a low camera changes the GAME, not just the look. 0.46–0.62 keeps
     both. That call is Kyle's and it should be made by playing, not by looking.
 
+- **M2 — ALL IN ON 3D: the full second view, and it is now the DEFAULT** ✅ (2026-09-01)
+  Kyle: *"keep building out the 3d - lets go all in."* Done: the whole town, all
+  sixteen interiors, weather, the day's light, weapons, fx and the crowd — and the
+  live game now boots into 3D. The classic top-down view survives behind `?2d=1`,
+  the `vl-force2d` localStorage flag, the 🕹️ pause-menu toggle, and as the
+  automatic fallback when WebGL is missing (the 3D constructor throws; boot
+  catches and re-runs the 2D path on the same canvas — safe, because a null
+  `getContext('webgl')` does not claim the canvas).
+
+  **HOW IT WAS BUILT — the architecture is the story.** All CODE is hand-written;
+  all LAYOUT DATA was mined. Three workflow passes:
+  1. *Spec mine*: four agents read `render.js`/`main.js`/`game.js` and produced
+     exact JSON specs — every room's furniture with real positions from the 2D
+     painter, every exterior prop, every facade, and the full sim→view contract.
+  2. *Transcribe*: two agents converted the specs into pure data against my
+     builder vocabulary (no agent wrote a line of code). Baked into generated
+     `js/layouts3d.js`; validated headlessly — all 16 rooms build in node, zero
+     unknown kinds, before a browser ever opened.
+  3. *Adversarial review*: find → independent refutation, before ship.
+
+  Files: `render3d.js` (people/camera/light/weather/fx/rooms switch),
+  `town3d.js` (ground canvas, facades with REAL lettered signs, 22 prop builders,
+  landmarks), `rooms3d.js` (36-kind furniture vocabulary + interpreter),
+  `layouts3d.js` (GENERATED — never hand-edit, re-run the bake).
+
+  **What the mined data bought**: the gamebarn's three FUNSTATION crates sit at
+  the exact heist grab spots (84/148/212,140); the splitlip jukebox is on its
+  interactable; the union hall's 18 chairs face the lectern; the Rip rack is red
+  and where it is in 2D; the Bluffs got their lake; the rail its boxcars.
+
+  ⚠️ **THE CONTRACT SPEC PAID FOR ITSELF TWICE.**
+  - The swing beat lives on `windT` (0.13s telegraph, arm goes BACK) then
+    `strikeT` (0.18s arm-out impact) — `atkT` is only the post-swing COOLDOWN.
+    The prototype animated the lunge off `atkT`, playing the swing AFTER the hit.
+  - NPCs carry `arch` → ARCHETYPES {tw, belly, sh, h 46–62, slouch}: six real
+    body silhouettes the prototype was flattening into one.
+
+  ⚠️ **r155+ PHYSICAL LIGHTS, LAYER TWO**: PointLight intensity is CANDELA with
+  inverse-square falloff — 2.4 at 170 units above the floor delivers 0.00008 and
+  every interior rendered as a cave, with no warning. A ceiling fixture at this
+  world scale is intensity ≈ 120000. One point light serves all 16 rooms (only
+  one is ever visible; it just moves).
+
+  ⚠️ **ROOMS OVERLAP THE TOWN.** The sim moves the player into room coordinates
+  on enterRoom, so rooms are built at those coords (overlapping the town's west
+  end) and town/room visibility swaps per door. Consequences that bit:
+  - NPC deletion must be by EXISTENCE, not visibility — using the per-room `seen`
+    set destroyed the entire street cast every time a door opened.
+  - The room filter is `n.room === g.room` with 'ext' the literal street value
+    (never undefined) — drawing everyone stood Moose and Sal on the grass at
+    their tiny room coordinates near the world origin.
+  - Fog off inside (rooms sit entirely within fog.near), one PointLight on, and
+    the camera reframes to the ROOM at pitch 0.42 — from 0.55 a 96-tall
+    bookshelf reads as a floor mat. Furniture must be seen from the side to BE
+    furniture. (Related: book spines must sit PROUD of the case — buried inside
+    it, the library rendered as blank cabinets.)
+
+  ⚠️ **THE WHEEL IS THE PITCH ANSWER.** dist 480–1400 with pitch following it:
+  pulled close you play Schedule I at street level, pulled back it tilts toward
+  top-down so chases stay readable. One control, both moods, persisted
+  (`vl-3dcam`). Inside rooms the wheel is overridden — a street-scale dist puts
+  three other shops in frame through the missing front wall.
+
+  ⚠️ **A WEAPON MUST NOT BE PARENTED TO THE ARM** — the arm is a scaled unit box
+  (5×19×6); a child inherits the non-uniform scale and a bat becomes a plank. It
+  rides the group at the hand and mirrors the arm's swing each frame.
+
+  ⚠️ **SIGN TEXT IS ALLOWED IN town3d AND NOWHERE NEAR GENERATED ART**: canvas
+  sign textures ARE the game setting its own type — the same letters the 2D
+  signs carry. The ART_BIBLE ban is on baked type in AI plates, not on type.
+
+  The fx pool is a 1:1 port of render.js `fx()` — same six kinds, counts,
+  colours, envelopes. The day's light: per-block sun azimuth (morning east/warm,
+  noon high, evening west/amber, late moonlight), never crossing to −z (THE SUN
+  STAYS ON THE CAMERA'S SIDE). Weather: overcast dims, rain adds an instanced
+  streak volume that follows the camera + storm light, heatwave warms. Night:
+  evening lights every storefront window; LATE keeps only qwikstop and cashking
+  (the open-late pair), houses hold one warm window; signs go emissive. The
+  gamebarn heist runs in real darkness (`gameBarnDark`).
+
+  Perf: whole town + 38 people ≈ 2.4k triangles, ~160 draw calls; a room ≈ 1k.
+  Soak untouched and green at 48 — the sim doesn't know any of this happened.
+
 ## What's deliberately NOT in Phase 1 (per the roadmap — don't "fix" these)
 
 - No Hopeless Tech, classes, GPA, or majors (Phase 2).
