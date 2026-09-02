@@ -674,6 +674,46 @@ Uses the portable Node at `C:\Users\kylef\tools\node` (not on PATH).
   and arc slices of 0.5–1.2 rad. **Caught by looking — the numbers were identical
   either way.**
 
+- **M2.3 — facades that are buildings, and a courthouse** ✅ (2026-09-01)
+  All of this was found by *looking*, which only became possible in M2.2.
+
+  ⚠️ **MAIN STREET WAS ONE GREY WALL.** Measured against the mined data: the Mile
+  carries **8 distinct facade colours**, Downtown carries **one** — `#7a7062` for
+  all seven buildings, because the 2D painter falls through to a single facade
+  tone. That is fine seen flat and top-down; it renders as one grey hangar when
+  you see whole volumes in a row. Overridden at build time with a deterministic
+  per-key palette. ⚠️ **A deliberate 3D-only divergence**, and the fiction backs
+  it: an old main street is varied *by construction* — every building went up in a
+  different decade for a different owner. Real data still wins wherever it exists;
+  the override only fires on the fallthrough colour. **7 distinct facades render
+  where there was 1.**
+
+  **Facades are buildings, not slabs with stickers.** A storefront was body +
+  parapet + sign + a flat glass rectangle. What makes it read is what sticks
+  *out* and catches its own shadow: a bulkhead under the glass, a canvas awning
+  angled out in the shop's own sign colour on two rods, a lintel and a step at
+  the door, a cornice on the downtown rows.
+
+  **Kerbs are real geometry, not a painted stripe.** A 6-unit concrete lip is the
+  cheapest thing that makes a street read as a *street* — it catches the raking
+  morning and evening sun and lays a hard line down the whole Mile, which is
+  exactly the edge the flat painted ground was missing.
+
+  **The courthouse** was the civic centre of Downtown rendering as a grey
+  shoebox: one 210-tall box, four columns floating on its face, the "pediment"
+  stranded halfway up it. A classical front is a **stack** — plinth, steps,
+  columns, entablature, pediment *on top* — so it is built in that order now,
+  with window bays down the long face.
+
+  ⚠️⚠️ **THE PEDIMENT LESSON.** First attempt was a 3-sided `CylinderGeometry`
+  rotated `(π/2, 0, π/2)`. It rendered as a **vertical blade stabbing up through
+  the roof**, because Euler order XYZ turns two stacked right-angle turns into
+  something you did not ask for. Five stacked boxes make the same triangle,
+  cannot be rotated wrong, and match the chunky house style. **Reach for a
+  rotation only when a stack genuinely cannot express the shape.**
+
+  Cost: town meshes 442 → 580, still ~3.5k triangles / 275 draw calls.
+
 ## What's deliberately NOT in Phase 1 (per the roadmap — don't "fix" these)
 
 - No Hopeless Tech, classes, GPA, or majors (Phase 2).
