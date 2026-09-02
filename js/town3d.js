@@ -135,6 +135,9 @@ function paintGround(D) {
   }
   // litter drifts against the kerb — the 2D view piles it at every hard edge
   for (const s of D.sidewalks || []) {
+    // ⚠️ a painted stripe is not a kerb — see the raised geometry below. This is
+    // only the shadow line where the concrete meets the road.
+    R(s.x, s.y + s.h - 2, s.w, 2, 'rgba(0,0,0,0.22)');
     for (let i = 0; i < 26; i++) {
       const x = s.x + rnd() * s.w, y = s.y + (rnd() > 0.5 ? -2 : s.h + 1);
       c.fillStyle = ['rgba(232,220,195,0.30)', 'rgba(156,61,46,0.24)', 'rgba(107,95,76,0.30)'][i % 3];
@@ -286,10 +289,38 @@ export function buildTown(D) {
   surround.receiveShadow = true;
   g.add(surround);
 
+  // ── KERBS ────────────────────────────────────────────────────────────────
+  // ⚠️ Real geometry, not a painted stripe. A 6-unit lip is the single cheapest
+  // thing that makes a street read as a STREET: it catches the raking morning and
+  // evening sun and lays a hard line all the way down the Mile, which is exactly
+  // the edge the flat painted ground was missing.
+  for (const s of D.sidewalks || []) {
+    const walk = new THREE.Mesh(_box, mat(0x8c8880));
+    walk.scale.set(s.w, 6, s.h);
+    walk.position.set(s.x + s.w / 2, 3, s.y + s.h / 2);
+    walk.receiveShadow = true; walk.castShadow = true;
+    g.add(walk);
+  }
+
   // ── facades ──────────────────────────────────────────────────────────────
   // ⚠️ depth convention: a strip building's interior box sits NORTH of its
   // baseline; the face (glass, sign, door) hangs on the +z side, toward the
   // street the baseline names. Same for downtown at DT_Y.
+  // ⚠️ DELIBERATE 3D-ONLY DIVERGENCE, and the reason matters. The mined data
+  // gives Main Street ONE wall colour (#7a7062) for all seven buildings — the 2D
+  // painter falls through to a single facade tone, which is fine seen flat and
+  // top-down. In 3D you see whole volumes in a row and it reads as one grey
+  // hangar. An old main street is varied BY CONSTRUCTION: every building went up
+  // in a different decade for a different owner. Deterministic per key, drawn
+  // from the palette, so it is stable and never fights the town's colour.
+  const MAINST = ['#7a4436', '#8a6a4a', '#6d6255', '#94705a', '#7a7062', '#5f5a52', '#8a7a62'];
+  function mainStreetWall(b, i) {
+    if (b.wall && b.wall.toLowerCase() !== '#7a7062') return b.wall;   // respect real data
+    let h = 0; const k = b.key || String(i);
+    for (let j = 0; j < k.length; j++) h = (h * 31 + k.charCodeAt(j)) >>> 0;
+    return MAINST[h % MAINST.length];
+  }
+
   function facade(b, baseZ, h, depth, opts = {}) {
     const wall = hx(b.wall, opts.wallFb || '#7a4436');
     const x = b.x, w = b.w;
@@ -307,8 +338,35 @@ export function buildTown(D) {
       g.add(glass);
       nightWindows.push({ mesh: glass, lateOpen: !!opts.lateOpen });
     }
+    // ── DEPTH ────────────────────────────────────────────────────────────
+    // ⚠️ A facade was body + parapet + sign + a flat glass rectangle, and it read
+    // as a SLAB with stickers. What makes a storefront a building is the stuff
+    // that sticks OUT of it and catches its own shadow: a bulkhead under the
+    // glass, an awning over it, a step at the door, a cornice at the roof. Five
+    // boxes each, and the row stops being a wall.
+    const face = baseZ + depth;
+    // bulkhead: the low panel every shopfront sits its glass on
+    B(g, glassW + 14, 12, 6, '#2f2822', x + w / 2, 6, face + 2);
+    // awning over the glass — canvas in the shop's own sign colour, angled out
+    if (!b.boarded && w > 90) {
+      const aw = new THREE.Mesh(_box, mat(hx(b.signC, '#8a5a33')));
+      aw.scale.set(Math.min(w * 0.78, 200), 3.5, 26);
+      aw.position.set(x + w / 2, glassH + 20, face + 12);
+      aw.rotation.x = -0.34;
+      aw.castShadow = true; g.add(aw);
+      // the two rods that hold it
+      for (const s of [-1, 1]) B(g, 2, 16, 2, '#4a4238', x + w / 2 + s * Math.min(w * 0.36, 92), glassH + 12, face + 3);
+    }
     // the door, offset like the 2D face block when it has one
-    B(g, 26, 44, 3, '#3a2c1c', x + w * (b.doorAt || 0.5), 22, baseZ + depth + 2);
+    const dx0 = x + w * (b.doorAt || 0.5);
+    B(g, 26, 44, 3, '#3a2c1c', dx0, 22, face + 2);
+    B(g, 34, 5, 3, '#6a6058', dx0, 45, face + 3.5);          // lintel
+    B(g, 34, 4, 12, '#8c8880', dx0, 2, face + 7);            // the step you stand on
+    // cornice: a lip and a shadow line at the top, the thing that dates a building
+    if (opts.cornice) {
+      B(g, w + 6, 7, depth + 14, '#4a423a', x + w / 2, h - 4, baseZ + depth / 2 + 4);
+      B(g, w + 2, 3, depth + 8, '#5f564a', x + w / 2, h - 12, baseZ + depth / 2 + 2);
+    }
     // the sign band with the REAL name
     if (b.sign) {
       const tex = signTexture(b.sign, b.signC || '#8a5a33');
@@ -335,17 +393,46 @@ export function buildTown(D) {
 
   const LATE_OPEN = new Set(['qwikstop', 'cashking']);
   for (const b of D.mile || []) facade(b, STRIP_Y.base - 150, 190, 150, { lateOpen: LATE_OPEN.has(b.key) });
-  for (const b of D.downtown || []) facade(b, DT_Y.base - 170, 170 + (b.storeys > 2 ? 120 : b.storeys > 1 ? 60 : 0), 170, { storeys: b.storeys || 2, wallFb: '#6d4436' });
+  (D.downtown || []).forEach((b, i) => facade({ ...b, wall: mainStreetWall(b, i) },
+    DT_Y.base - 170, 170 + (b.storeys > 2 ? 120 : b.storeys > 1 ? 60 : 0), 170,
+    { storeys: b.storeys || 2, wallFb: '#6d4436', cornice: true }));
   for (const v of D.vacants || []) facade({ x: v.x, w: v.w || 120, wall: '#5f544a', boarded: true }, (v.y > 1700 ? DT_Y.base - 170 : STRIP_Y.base - 150), v.y > 1700 ? 200 : 180, v.y > 1700 ? 170 : 150, {});
 
   // courthouse: stone block, four columns, pediment, the half-mast flag
+  // ⚠️ The courthouse was ONE 210-tall box with four columns floating on its face
+  // and the "pediment" stranded halfway up it — the civic centre of Downtown
+  // rendering as a grey shoebox. A classical front is a STACK: plinth, steps,
+  // columns, entablature, then the pediment ON TOP of them. Build it in that
+  // order and it reads at any angle.
   const CH = D.courthouse || COURTHOUSE;
   if (CH && CH.w) {
-    B(g, CH.w, 210, CH.h || 200, '#8c8474', CH.x + CH.w / 2, 105, CH.y + (CH.h || 200) / 2);
+    const cw = CH.w, cd = CH.h || 200, cx = CH.x + cw / 2, cz = CH.y + cd / 2;
+    const bodyH = 150, front = CH.y + cd;
+    B(g, cw + 16, 14, cd + 16, '#7e766a', cx, 7, cz);                 // plinth
+    B(g, cw, bodyH, cd, '#8c8474', cx, 14 + bodyH / 2, cz);           // body
+    // window bays down the long face — a civic building is mostly windows
+    for (let i = 0; i < Math.floor(cw / 52); i++) {
+      const wx = CH.x + 34 + i * 52;
+      B(g, 18, 46, 3, '#2a3038', wx, 96, front + 1);
+      B(g, 22, 4, 4, '#a89f8e', wx, 121, front + 2);                  // window head
+    }
+    // the portico: three steps, four columns, entablature, then the pediment
+    for (let s = 0; s < 3; s++)
+      B(g, cw * 0.52 + s * 14, 6, 12 + s * 7, '#b0a898', cx, 3 + (2 - s) * 6, front + 8 + s * 4);
     for (let i = 0; i < 4; i++)
-      CYL(g, 7, 7, 96, '#b8b0a0', CH.x + CH.w * 0.2 + i * CH.w * 0.2, 48, CH.y + (CH.h || 200) + 12, 8);
-    B(g, CH.w * 0.9, 26, 20, '#a89f8e', CH.x + CH.w / 2, 128, CH.y + (CH.h || 200) + 8);
-    PROPS.flag(g, { x: CH.x + CH.w / 2, y: CH.y + (CH.h || 200) + 46 });
+      CYL(g, 7.5, 7.5, 104, '#c0b8a6', CH.x + cw * 0.28 + i * cw * 0.148, 70, front + 16, 10);
+    B(g, cw * 0.56, 16, 26, '#b8b0a0', cx, 130, front + 16);          // entablature
+    // ⚠️ The pediment was a 3-sided CylinderGeometry rotated (π/2, 0, π/2) and it
+    // rendered as a VERTICAL BLADE stabbing up through the roof — Euler order
+    // XYZ turns two stacked right-angle turns into something you did not ask
+    // for. Five stacked boxes make the same triangle, cannot be rotated wrong,
+    // and match the chunky house style. Reach for a rotation only when a stack
+    // genuinely cannot express the shape.
+    for (let s = 0; s < 5; s++) {
+      B(g, cw * 0.56 * (1 - s * 0.18), 7, 26, '#c0b8a6', cx, 142 + s * 7, front + 16);
+    }
+    B(g, cw + 10, 8, cd + 10, '#6f675c', cx, bodyH + 18, cz);         // cornice
+    PROPS.flag(g, { x: cx + cw * 0.42, y: front + 30 });
   }
 
   // ── the landmark set (from live data, not the transcription) ─────────────
