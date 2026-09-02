@@ -31,6 +31,9 @@ const C = { night: 0x141a2c };
 const PERSON_H = 62;
 const lerp = (a, b, t) => a + (b - a) * t;
 const rr = (a, b) => a + Math.random() * (b - a);
+// half the shoulder width of a built body — props hang off the arm, and the arm
+// position already encodes the archetype's torso width.
+const tw3 = (u) => Math.abs(u.armR.position.x);
 
 // ---------------------------------------------------------------------------
 // MATERIALS — one per colour, shared. Flat + matte is the look AND the perf.
@@ -59,7 +62,7 @@ function cyl(r, h, hex, seg = 8) {
 // sim's own outfit/skin/hat. Swapping views must never change who you're
 // looking at: 23 shirts, 5 skins, 10 hats and 6 body shapes come from the sim.
 // ---------------------------------------------------------------------------
-function makePerson(outfit, skin, hat, archKey) {
+function makePerson(outfit, skin, hat, archKey, isCop) {
   const g = new THREE.Group();
   const o = outfit || {};
   const a = ARCHETYPES[archKey] || ARCHETYPES.average || { tw: 16, belly: 0, sh: 0, h: 54, slouch: 0 };
@@ -102,6 +105,18 @@ function makePerson(outfit, skin, hat, archKey) {
       }
     }
   }
+  // ⚠️ A COP MUST BE READABLE FROM ACROSS THE STREET — the whole heat system is
+  // "can I see him before he sees me", and the sim's `cop` flag was going
+  // unread: they were a navy hat in a crowd of 23 shirt colours. Duty belt,
+  // shoulder flashes and a badge glint, all in the palette's denim.
+  if (isCop) {
+    const belt = box(tw + 2.5, 3.5, 11.5, 0x1c2233); belt.position.set(0, 25, 0); g.add(belt);
+    const badge = box(3, 3, 1, 0xc9a227); badge.position.set(-4, 41, 5.6); g.add(badge);
+    const flashL = box(5.4, 2.4, 6.4, 0xc9a227); flashL.position.set(-(tw / 2 + 3), 43, 0); g.add(flashL);
+    const flashR = box(5.4, 2.4, 6.4, 0xc9a227); flashR.position.set(tw / 2 + 3, 43, 0); g.add(flashR);
+    const radio = box(2.6, 6, 2.6, 0x14181e); radio.position.set(-(tw / 2 + 1.5), 44, -3); g.add(radio);
+  }
+
   // vertical scale = the archetype's height. 46 (short) … 62 (tall) around 54.
   g.scale.y = (a.h || 54) / 54;
   g.userData = { legL, legR, armL, armR, torso, head,
@@ -289,7 +304,7 @@ export class Renderer3D {
     const g = this.g;
     const all = [{ e: g.player, id: '__p', outfit: { shirt: '#5c2f28', pants: '#3d4c63' }, skin: '#c99b72', arch: 'average' }]
       .concat(g.npcs.map(n => ({
-        e: n, id: n.id, outfit: n.outfit, skin: n.skin, arch: n.arch,
+        e: n, id: n.id, outfit: n.outfit, skin: n.skin, arch: n.arch, cop: !!n.cop,
         hat: (n.hat && n.hat !== 'none') ? n.hat : null,
       })));
 
@@ -298,7 +313,7 @@ export class Renderer3D {
     // everyone unconditionally (the POC's behaviour) stood the whole indoor cast
     // on the grass near the world origin at their tiny room coordinates.
     const here = this.g.room || 'ext';
-    for (const { e, id, outfit, skin, hat, arch } of all) {
+    for (const { e, id, outfit, skin, hat, arch, cop } of all) {
       if (!e) continue;
       const eRoom = (id === '__p') ? here : (e.room || 'ext');
       if (eRoom !== here) {
@@ -307,7 +322,7 @@ export class Renderer3D {
         continue;
       }
       let p = this.people.get(id);
-      if (!p) { p = makePerson(outfit, skin, hat, arch); this.scene.add(p); this.people.set(id, p); }
+      if (!p) { p = makePerson(outfit, skin, hat, arch, cop); this.scene.add(p); this.people.set(id, p); }
       p.visible = true;
       // ⚠️ sim y maps to world Z. Never introduce a second convention.
       p.position.set(e.x, 0, e.y);
@@ -322,21 +337,112 @@ export class Renderer3D {
       p.rotation.y = Math.PI / 2 - (e.facing || 0);
       const u = p.userData;
 
+      // ⚠️ INJURY IS A GAIT, not a dot. render.js: hurtF > 0.62 = limping, and it
+      // "reads at any zoom, unlike the 1.8px black-eye dot that was standing in
+      // for injury before". NPC max is hpMax0 (fallback 46); the player has hpMax.
+      const hurtF = id === '__p' ? Math.max(0, 1 - e.hp / (e.hpMax || 100))
+                                 : Math.max(0, 1 - e.hp / (e.hpMax0 || 46));
+      const limping = hurtF > 0.62;
+      // ⚠️ hoisted: the idle/limp block below needs it, and `const` in the old
+      // position made this a TDZ crash on the very first frame.
+      const down = !!e.ko || (e.hp != null && e.hp <= 0);
+      // ⚠️ ONE writer for body lean. limp, idle-lean/rock and drunk-list all
+      // wanted rotation.z; whichever ran last silently won. Accumulate here and
+      // assign once, so a limping drunk leaning on a wall reads as all three.
+      let lean = 0;
+
       // gait straight off the sim's own velocity — no view-side state to drift
       const spd = Math.hypot(e.vx || 0, e.vy || 0);
-      u.phase += dt * (2 + spd * 0.10) * (e.gaitBias || 1);
+      u.phase += dt * (2 + spd * 0.10) * (e.gaitBias || 1) * (limping ? 0.72 : 1);
       const sw = Math.sin(u.phase) * Math.min(1, spd / 60);
       u.legL.rotation.x = sw * 0.85; u.legR.rotation.x = -sw * 0.85;
       u.armL.rotation.x = -sw * 0.6; u.armR.rotation.x = sw * 0.6;
+      // the bad leg carries less and the whole body dips on that side
+      if (limping) {
+        u.legR.rotation.x *= 0.45;
+        lean += 0.10 + Math.abs(Math.sin(u.phase)) * 0.05;
+      }
+      // ⚠️ position.y has TWO writers (limp dip, KO drop) exactly like rotation.z
+      // had three. Measured: the limp dip read 0.0 because the KO line below
+      // stomped it every frame. Same lesson twice in one file — when a transform
+      // channel is written in more than one place, accumulate and assign ONCE.
+
+      // ── IDLE BUSINESS ──────────────────────────────────────────────────────
+      // Ported from render.js: "a standing body that only breathes reads as
+      // furniture." Everyone gets ONE habit, rolled once at spawn by the sim, so
+      // it is a trait and not a flicker — six people waiting look like six
+      // people, not one copy-pasted. Own slow clock, view-only.
+      const idling = spd < 4 && id !== '__p' && e.idleKind && e.idleKind !== 'none' && !down;
+      if (idling) {
+        const ph = performance.now() * 0.0006 + (e.id || 0) * 1.7;
+        const k = e.idleKind;
+        if (k === 'pockets') {                   // hands in, shoulders up
+          u.armL.rotation.x = u.armR.rotation.x = 0.34;
+          u.armL.rotation.z = 0.20; u.armR.rotation.z = -0.20;
+        } else if (k === 'phone') {              // the national pastime
+          const lift = Math.sin(ph * 0.8) * 0.08;
+          u.armR.rotation.x = -1.15 + lift; u.armL.rotation.x = -0.2;
+          if (!u.phone) { u.phone = box(3, 9, 1.6, 0x14161c); p.add(u.phone); }
+          u.phone.visible = true;
+          u.phone.position.set(6, 40, 9);
+          u.phone.rotation.set(-0.5, 0, 0);
+        } else if (k === 'lean') {               // weight on one hip, arms crossed
+          u.armL.rotation.x = u.armR.rotation.x = -0.95;
+          u.armL.rotation.z = -0.75; u.armR.rotation.z = 0.75;
+          lean += 0.07;
+        } else if (k === 'talk') {               // gesturing at nobody in particular
+          u.armL.rotation.x = -0.5 + Math.sin(ph * 1.9) * 0.42;
+          u.armR.rotation.x = -0.5 + Math.cos(ph * 1.4) * 0.38;
+          u.armL.rotation.z = -0.3; u.armR.rotation.z = 0.3;
+        } else {                                 // rock: shifting weight, waiting
+          const r = Math.sin(ph) * 0.05;
+          lean += r;
+          u.armL.rotation.x = r * 1.6; u.armR.rotation.x = -r * 1.6;
+        }
+      } else if (u.idleWasOn) {                  // clear the pose when they move off
+        u.armL.rotation.z = u.armR.rotation.z = 0;
+        if (u.phone && !e.filmer) u.phone.visible = false;
+      }
+      u.idleWasOn = idling;
+
+      // ⚠️ THE EMBER. render.js calls it "the single best night-read detail
+      // available: a moving orange pixel that says a person is standing there."
+      // Same predicate as 2D — every third non-cop, non-KO, non-static NPC from
+      // EVENING on — so both views smoke the same cigarettes.
+      const smoking = id !== '__p' && !cop && !down && !e.static
+        && ((e.id || 0) % 3 === 0) && (this.g.block || 0) >= 2;
+      if (smoking) {
+        if (!u.ember) {
+          u.ember = box(1.8, 1.8, 1.8, 0xff7a2a);
+          u.ember.material = new THREE.MeshBasicMaterial({ color: 0xff8a3a });
+          u.ember.castShadow = false;
+          p.add(u.ember);
+        }
+        u.ember.visible = true;
+        // slow raise-to-mouth, on the person's own clock
+        const drag = (Math.sin(performance.now() * 0.00055 + (e.id || 0)) + 1) * 0.5;
+        u.ember.position.set(tw3(u) + 2, 36 + drag * 13, 7);
+      } else if (u.ember) u.ember.visible = false;
+
+      // ⚠️ NON-STATIC people TURN TO LOOK at you inside 150 units (render.js
+      // 2363). Statics are fixtures — shopkeepers behind counters, porch people —
+      // and a swivelling shopkeeper reads as a security camera, not a person.
+      if (id !== '__p' && !e.static && !down) {
+        const dx = g.player.x - e.x, dz = g.player.y - e.y;
+        const d = Math.hypot(dx, dz);
+        u.head.rotation.y = d < 150
+          ? Math.max(-0.7, Math.min(0.7, (Math.PI / 2 - Math.atan2(dz, dx)) - p.rotation.y))
+          : lerp(u.head.rotation.y || 0, 0, Math.min(1, dt * 4));
+      }
 
       // drunks list while they walk — the sim wobbles x, the body sells it
-      p.rotation.z = (e.drunk && spd > 5) ? Math.sin(u.phase * 0.9) * 0.09 : 0;
+      if (e.drunk && spd > 5) lean += Math.sin(u.phase * 0.9) * 0.09;
+      p.rotation.z = lean;
 
       // KO: fall over. The sim owns `ko`; the view only tips the body (1.45 rad,
       // same angle the 2D prone pose uses).
-      const down = !!e.ko || (e.hp != null && e.hp <= 0);
       p.rotation.x = lerp(p.rotation.x, down ? -1.45 : 0, Math.min(1, dt * 8));
-      p.position.y = down ? 8 : 0;
+      p.position.y = down ? 8 : (limping ? -1.5 : 0);
 
       // ⚠️ THE SWING BEAT LIVES ON windT/strikeT, NOT atkT. windT (0.13s) is the
       // telegraph — the arm goes BACK; strikeT (0.18s) is the arm-out impact
@@ -530,8 +636,15 @@ export class Renderer3D {
       r.visible = true;
       // fog OFF inside — the room sits entirely inside fog.near otherwise
       this.scene.fog.near = 90000; this.scene.fog.far = 100000;
+      // ⚠️ HEIGHT IS THE EVENNESS KNOB, not intensity. Inverse-square makes the
+      // centre-to-corner brightness ratio (d_corner/d_centre)², and MEASURED for
+      // the largest room (foxhole 760×440) that is 7.67× at y=170 — a blown
+      // centre and black corners. y=300 brings it to 3.14×, with intensity
+      // raised to keep the same average. (First draft of this comment guessed
+      // "~4×" — the arithmetic disagreed, so the arithmetic won.)
       const it = INTERIORS[roomKey] || { w: 640, h: 380 };
-      this.roomLight.position.set(it.w / 2, 170, it.h / 2);
+      this.roomLight.position.set(it.w / 2, 300, it.h / 2);
+      this.roomLight.intensity = 180000;
       this.roomLight.visible = true;
     } else {
       this.scene.fog.near = this._fogDefaults.near;
@@ -572,7 +685,7 @@ export class Renderer3D {
       // cold 34000 spill leaked into the NEXT room you walked into — and every
       // room after that. Cleanup must not depend on the state being cleaned up.
       this.roomLight.color.setHex(0xffe2b0);
-      this.roomLight.intensity = 120000;
+      this.roomLight.intensity = 180000;
     }
     this.tickRain(dt);
     this.tickBarks(dt);

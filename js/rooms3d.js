@@ -186,6 +186,67 @@ import { ROOM_LAYOUTS } from './layouts3d.js';
 
 const _warned = new Set();
 
+// ---------------------------------------------------------------------------
+// GRIME — a painted floor. One canvas per room, cached, deterministic.
+// ⚠️ Seeded from the room KEY (an FNV-ish string hash), not Math.random and not
+// the sim rng: the view must never touch the sim's stream, and a room must look
+// the same on every visit. This is the same discipline the burglary tells use.
+// ---------------------------------------------------------------------------
+const _grime = new Map();
+function grimeTexture(key, floorHex, W, H) {
+  // ⚠️ Returns null under node. The headless room validator (all 16 rooms build,
+  // zero unknown kinds, before a browser opens) is worth more than grime in a
+  // test — so painting is optional and buildRoom keeps the plain material.
+  if (typeof document === 'undefined') return null;
+  if (_grime.has(key)) return _grime.get(key);
+  let h = 2166136261;
+  for (let i = 0; i < key.length; i++) { h ^= key.charCodeAt(i); h = Math.imul(h, 16777619); }
+  const rnd = () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 10000) / 10000; };
+
+  const cv = document.createElement('canvas');
+  cv.width = 512; cv.height = Math.max(128, Math.round(512 * H / W));
+  const c = cv.getContext('2d');
+  const base = new THREE.Color(floorHex);
+  c.fillStyle = '#' + base.getHexString();
+  c.fillRect(0, 0, cv.width, cv.height);
+
+  // the worn lane: everybody walks from the door (bottom centre) inward, and
+  // years of that is the most honest mark a floor carries.
+  const g = c.createRadialGradient(cv.width / 2, cv.height, 10, cv.width / 2, cv.height * 0.25, cv.width * 0.55);
+  g.addColorStop(0, 'rgba(0,0,0,0.20)');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  c.fillStyle = g;
+  c.fillRect(0, 0, cv.width, cv.height);
+
+  // scuffs — long thin smears in the traffic direction
+  for (let i = 0; i < 34; i++) {
+    const x = rnd() * cv.width, y = rnd() * cv.height, w = 8 + rnd() * 46;
+    c.fillStyle = 'rgba(0,0,0,' + (0.03 + rnd() * 0.05).toFixed(3) + ')';
+    c.fillRect(x, y, w, 1 + rnd() * 2);
+  }
+  // stains — spills nobody cleaned, warm and cool
+  for (let i = 0; i < 11; i++) {
+    const x = rnd() * cv.width, y = rnd() * cv.height, r = 5 + rnd() * 20;
+    const st = c.createRadialGradient(x, y, 0, x, y, r);
+    const warm = rnd() > 0.45;
+    st.addColorStop(0, warm ? 'rgba(60,40,20,0.20)' : 'rgba(30,36,48,0.18)');
+    st.addColorStop(1, 'rgba(0,0,0,0)');
+    c.fillStyle = st; c.beginPath(); c.arc(x, y, r, 0, 6.284); c.fill();
+  }
+  // grit at the edges, where a mop never quite reaches
+  for (let i = 0; i < 90; i++) {
+    const edge = rnd();
+    const x = edge < 0.5 ? rnd() * cv.width : (rnd() > 0.5 ? rnd() * 22 : cv.width - rnd() * 22);
+    const y = edge < 0.5 ? (rnd() > 0.5 ? rnd() * 20 : cv.height - rnd() * 20) : rnd() * cv.height;
+    c.fillStyle = 'rgba(0,0,0,' + (0.05 + rnd() * 0.10).toFixed(3) + ')';
+    c.fillRect(x, y, 1 + rnd() * 3, 1 + rnd() * 3);
+  }
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;      // same annotation as every other canvas texture
+  _grime.set(key, tex);
+  return tex;
+}
+
 // Build one room: floor, three walls (front omitted — the camera lives there),
 // a void plate so the world's absence doesn't read as sky, then the furniture.
 export function buildRoom(key, it, opts = {}) {
@@ -211,6 +272,17 @@ export function buildRoom(key, it, opts = {}) {
   // the door: bottom-centre of the room, where enterRoom drops you
   B(g, 46, 6, 10, 0x8a6a44, W / 2, 3, H - 4);
 
+  // ── GRIME ────────────────────────────────────────────────────────────────
+  // ⚠️ The rooms were FURNISHED but not DRESSED: right shapes in the right
+  // places, and every floor factory-clean. Hopewell does not have a clean floor
+  // in it. This is a painted floor texture rather than meshes — scuffs, stains
+  // and the worn traffic lane cost nothing and read at every camera height.
+  // ⚠️ DETERMINISTIC per room: a hash of the room key, never Math.random, so a
+  // room looks the same every time you walk into it. A floor that re-stains
+  // itself on each entry is worse than a clean one.
+  const grime = grimeTexture(key, floorC, W, H);
+  if (grime) floor.material = new THREE.MeshLambertMaterial({ map: grime });
+
   for (const item of (L.items || [])) {
     const fn = V[item.kind];
     if (!fn) {
@@ -221,5 +293,28 @@ export function buildRoom(key, it, opts = {}) {
       if (!_warned.has('ERR' + item.kind)) { console.error('rooms3d: builder threw', item.kind, e.message); _warned.add('ERR' + item.kind); }
     }
   }
+  // ── CLUTTER ──────────────────────────────────────────────────────────────
+  // ⚠️ Same deterministic hash as the grime, and deliberately placed at the
+  // ROOM'S EDGES: the middle is where people walk and where the layout's real
+  // furniture lives, so centre clutter would both bury the mined data and put
+  // boxes in the doorway. Small, cheap, and it makes a room look USED.
+  let ch = 2166136261;
+  for (let i = 0; i < key.length; i++) { ch ^= key.charCodeAt(i); ch = Math.imul(ch, 16777619); }
+  const crnd = () => { ch ^= ch << 13; ch ^= ch >>> 17; ch ^= ch << 5; return ((ch >>> 0) % 10000) / 10000; };
+  const JUNK = [
+    (x, z) => B(g, 9, 11, 9, 0x6d5a4a, x, 5.5, z),                       // a box
+    (x, z) => B(g, 13, 3, 9, 0x8a7a5a, x, 1.5, z),                       // flattened carton
+    (x, z) => { CYL(g, 4.5, 13, 0x3a4450, x, 6.5, z, 7); B(g, 8, 2, 8, 0x2c343e, x, 13, z); }, // bin
+    (x, z) => B(g, 5, 6, 5, 0x9c3d2e, x, 3, z),                          // a can nobody binned
+    (x, z) => { B(g, 11, 2, 14, 0x5a5148, x, 1, z); B(g, 9, 1.5, 12, 0xc9b28a, x, 2.4, z); }, // stacked mats
+  ];
+  const margin = 26;
+  for (let i = 0; i < 5; i++) {
+    const onSide = crnd() > 0.42;
+    const x = onSide ? (crnd() > 0.5 ? margin : W - margin) : margin + crnd() * (W - margin * 2);
+    const z = onSide ? margin + crnd() * (H - margin * 2) : margin + crnd() * 40;   // hug the back wall
+    JUNK[Math.floor(crnd() * JUNK.length) % JUNK.length](x, z);
+  }
+
   return g;
 }

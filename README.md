@@ -586,6 +586,47 @@ Uses the portable Node at `C:\Users\kylef\tools\node` (not on PATH).
   Perf: whole town + 38 people ≈ 2.4k triangles, ~160 draw calls; a room ≈ 1k.
   Soak untouched and green at 48 — the sim doesn't know any of this happened.
 
+- **M2.1 — 3D polish: dressed rooms, readable crowd** ✅ (2026-09-01)
+  Finished the sim→view audit the review's dead lens never ran. It named the
+  work: **six fields the 2D view reads that 3D ignored outright** — `static`,
+  `cop`, `idleKind`, `hpMax0`, `name`, `stamina`.
+
+  **Readability.** Five **idle habits** ported from render.js (pockets / phone /
+  lean / talk / rock), rolled once per person *by the sim* so it is a trait and
+  not a flicker — six people waiting now look like six people. **Injury is a
+  gait**: `hurtF > 0.62` limps, slower phase, bad leg carries less, body dips
+  (2D's own note: it "reads at any zoom, unlike the 1.8px black-eye dot").
+  ⚠️ **Cops were completely unread** — Tapp and Brill were a navy hat in a crowd
+  of 23 shirt colours, in a game whose entire heat system is *do I see him before
+  he sees me*. Duty belt, shoulder flashes, badge, radio: 14 mesh parts vs a
+  civilian's 7. **Heads turn** toward you inside 150 units — but `static` people
+  never do; they are fixtures, and a swivelling shopkeeper reads as a security
+  camera. **The ember**: every third non-cop/non-KO/non-static NPC smokes from
+  evening on, the same predicate as 2D, which calls it *"the single best
+  night-read detail available"*. Measured 7 lit of 25 at night, 0 by day.
+
+  **Dressing.** The sixteen rooms were furnished but factory-clean. Each floor is
+  now painted: the worn lane in from the door, scuffs, spills nobody cleaned,
+  grit where a mop never reaches — plus five bits of junk at the **edges** only
+  (the middle is where people walk and where the mined layout lives).
+  ⚠️ **Deterministic from a hash of the room key** — never `Math.random`, never
+  the sim rng. A floor that re-stains itself on every entry is worse than a clean
+  one. ⚠️ `grimeTexture` returns null under node so the **headless room validator
+  still runs** — that harness is worth more than grime in a test.
+
+  ⚠️ **LIGHTING EVENNESS IS THE HEIGHT KNOB, NOT INTENSITY.** Inverse-square
+  makes the centre-to-corner ratio `(d_corner/d_centre)²`, and measured for the
+  largest room that was **7.67× at y=170** — blown centre, black corners. y=300
+  gives 3.14×. My first comment guessed "~4×"; the arithmetic disagreed and the
+  arithmetic won. Don't ship a guessed number in a load-bearing comment.
+
+  ⚠️⚠️ **THE SAME BUG CLASS TWICE IN ONE FILE.** `rotation.z` had THREE writers
+  (limp, idle-lean/rock, drunk-list) and whichever ran last silently won; then
+  `position.y` had TWO (limp dip, KO drop) and the dip measured **0.0** because
+  the KO line stomped it every frame. **When a transform channel is written in
+  more than one place, accumulate and assign ONCE.** Both found by measuring the
+  result rather than trusting the edit.
+
 ## What's deliberately NOT in Phase 1 (per the roadmap — don't "fix" these)
 
 - No Hopeless Tech, classes, GPA, or majors (Phase 2).
