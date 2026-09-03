@@ -206,6 +206,44 @@
   .sch-done span { color: #4c7a4c; }
   .sch-hint { font-size: 11.5px; font-style: italic; color: #8a7d68; margin: 1px 0 0 16px; }
 
+  /* ---------- the job board (lives in the same notebook as the plan) ---- */
+  #scheme-panel { max-height: 78vh; overflow-y: auto; }
+  .bd-head { font-weight: bold; font-size: 12px; letter-spacing: 1.4px; color: #8a7d68;
+    margin: 14px 0 4px; border-bottom: 1px solid rgba(90,110,160,0.35); }
+  .job { font-size: 13px; margin: 8px 0 10px; }
+  .job-t { font-weight: bold; }
+  .job-g { font-size: 11px; font-style: italic; color: #8a7d68; }
+  .job-a { font-size: 11.5px; color: #6a6152; margin: 2px 0 4px; }
+  .job-r { font-size: 11.5px; color: var(--red); font-weight: bold; }
+  .job-btn { font: inherit; font-size: 11px; letter-spacing: 0.6px; cursor: pointer;
+    background: var(--ink); color: var(--paper); border: 0; border-radius: 3px;
+    padding: 3px 9px; margin: 3px 4px 0 0; }
+  .job-btn.dim { background: none; color: #8a7d68; border: 1px solid rgba(0,0,0,0.25); }
+  .job-btn:hover { background: var(--red); color: #fff; }
+  .job-done .job-t { color: #4c7a4c; text-decoration: line-through; }
+  .job-failed .job-t { color: #9a6a6a; text-decoration: line-through; }
+  .job-due { font-size: 11px; color: #8a7d68; }
+  .job-due.soon { color: var(--red); font-weight: bold; }
+
+  /* ---------- the between-run spend ------------------------------------- */
+  #end-shop { margin: 14px 0 4px; text-align: left; }
+  #end-shop-head { font-size: 12px; letter-spacing: 1.6px; color: var(--dim);
+    text-align: center; margin-bottom: 2px; }
+  #end-shop-sub { font-size: 11.5px; font-style: italic; color: var(--dim);
+    text-align: center; margin-bottom: 10px; }
+  .lane { border-top: 1px solid rgba(255,255,255,0.10); padding: 8px 0 2px; }
+  .lane-h { font-size: 12px; letter-spacing: 1.4px; display: flex; justify-content: space-between; }
+  .lane-b { font-size: 11px; font-style: italic; color: var(--dim); margin: 1px 0 5px; }
+  .up { display: flex; gap: 8px; align-items: flex-start; margin: 4px 0; }
+  .up-buy { font: inherit; font-size: 11px; letter-spacing: 0.5px; cursor: pointer; flex: 0 0 74px;
+    background: none; color: var(--paper); border: 1px solid rgba(255,255,255,0.30);
+    border-radius: 3px; padding: 3px 0; }
+  .up-buy:hover:not(:disabled) { background: var(--amber); color: #1a1410; border-color: var(--amber); }
+  .up-buy:disabled { opacity: 0.32; cursor: default; }
+  .up-buy.owned { background: rgba(120,170,120,0.22); border-color: rgba(120,170,120,0.5); opacity: 1; }
+  .up-t { font-size: 12.5px; }
+  .up-d { font-size: 11px; color: var(--dim); }
+
   /* ---------- choice ---------- */
   #choice { z-index: 45; }
   .card { background: #201d18; border: 1px solid #4a4234; border-radius: 8px; padding: 22px 26px;
@@ -355,7 +393,7 @@
     <div class="vrow"><b>WIND</b><div class="vbar"><div id="hud-stam-fill" style="width:100%"></div></div></div>
   </div>
   <div id="hud-inv"></div>
-  <div id="hud-scheme">📓 the plan (TAB)</div>
+  <div id="hud-scheme">📓 the plan &amp; the board (TAB)</div>
   <div id="hud-burg"><div id="hud-burg-label">IN THE HOUSE</div>
     <div id="hud-burg-bar"><div id="hud-burg-fill"></div></div>
     <div id="hud-burg-sub"></div></div>
@@ -421,6 +459,7 @@
   <div id="end-tag"></div>
   <div id="end-stats"></div>
   <div id="end-meta"></div>
+  <div id="end-shop"></div>
   <button class="btn" id="end-next">NEXT SEMESTER — the town remembers</button>
   <div id="end-sub">Charges dropped. Debts restructured. Bones set. Hopewell keeps the receipts.</div>
 </div></div>

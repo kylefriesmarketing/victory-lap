@@ -7,6 +7,7 @@ import {
   DOWNTOWN, DT_Y, RAIL_Y, WATER_TOWER, COURTHOUSE, MAIN_ST, WORKS, BLUFFS, LOOT, SEARCH_SPOTS, HTCC, FLATS,
   WEAPON_SPAWNS, INTERIORS, ARCHETYPES, OUTFITS, NAMED, POPULATION, SPOTS, ERRANDS,
   BARKS, SCHEME, ENDINGS, BLOCK_NAMES, DAY_NAMES, WEATHER_KINDS, MENU, RIP, SKY,
+  CONTRACTS, CONTRACT_RULES, UPGRADES, UPGRADE_LANES,
   DISTRICTS, districtAt, NIGHTS, PLACES,
 } from './data.js';
 
@@ -14,6 +15,7 @@ export { T, WEAPONS, WORLD, BUILDINGS, ALLEY_GAPS, STRIP_Y, EXTERIOR_PROPS, GARA
          DOWNTOWN, DT_Y, RAIL_Y, WATER_TOWER, COURTHOUSE, MAIN_ST, WORKS, BLUFFS, LOOT,
          SEARCH_SPOTS, HTCC, FLATS, INTERIORS, SKY,
          ARCHETYPES, OUTFITS, NAMED, BARKS, SCHEME, ENDINGS, BLOCK_NAMES, DAY_NAMES, MENU, RIP,
+         CONTRACTS, CONTRACT_RULES, UPGRADES, UPGRADE_LANES,
          DISTRICTS, districtAt, NIGHTS, PLACES };
 
 let _eid = 1;
@@ -24,7 +26,7 @@ export class Game {
     this.seed = (opts.seed ?? 1) >>> 0;
     this._rs = (this.seed * 747796405 + 2891336453) >>> 0;
     this.cb = opts.cb || {};
-    this.meta = opts.meta || { runs: 0, cred: 0, scars: 0, lessons: 0, rep: 0, cashBanked: 0,
+    this.meta = opts.meta || { runs: 0, cred: 0, scars: 0, lessons: 0, rep: 0, cashBanked: 0, up: [],
                                knows: { window: false, blind: false, drop: false, dog: false } };
     this.time = 0;               // total sim seconds this run
     this.day = 0; this.block = 0; this.blockT = 0;
@@ -35,7 +37,7 @@ export class Game {
     this.room = 'ext';
     this.player = {
       x: 420, y: 1120, vx: 0, vy: 0, facing: 0, hp: T.hpMax, hpMax: T.hpMax,
-      stamina: T.staminaMax, held: null, carryCrate: false, atkT: 0, hitT: 0, hitDir: 0,
+      stamina: T.staminaMax, staminaMax: T.staminaMax, held: null, carryCrate: false, atkT: 0, hitT: 0, hitDir: 0,
       windT: 0, windDir: 0,
       cash: T.startCash, inv: { rip: 0, jerky: 0, crowbar: false, wings: 0 },
       ripToday: 0, ripUses: 0, shakeAmp: 0, sleptAt: null, fired: false, strikes: 0,
@@ -43,6 +45,12 @@ export class Game {
     };
     this.scheme = { hear: false, case: false, tools: false, window: false, job: false, fence: false,
                     crates: 0, inCar: 0, sold: 0, holding: false, cash: 0, garySawYou: false };
+    // ⚠️ UPGRADES RUN HERE — before knewWindow/knewDrop read meta.knows, because
+    // the SENSE lane writes into exactly those flags. Move this line down and
+    // "You Know the Window" silently stops working with no error anywhere.
+    if (!this.meta.up) this.meta.up = [];
+    this.applyUpgrades();
+
     // THE META-PROGRESSION: the town drops the charges, but you keep the map. A player
     // on run 5 starts the scheme further along because THEY know more, not because a
     // number went up. This is the whole roguelike promise — don't quietly delete it.
@@ -68,6 +76,10 @@ export class Game {
     this.dogCalm = !!this.meta.knows.dog;
     this._spawnWeapons();
     this._populate();
+    // ⚠️ THE BOARD IS DEALT LAST. Every draw advances the seeded stream, so
+    // dealing any earlier would move every NPC, weapon spawn and weather day in
+    // the game. Last means nothing that already worked shifts.
+    this._dealContracts();
   }
 
   // ---- rng ----------------------------------------------------------------
@@ -408,6 +420,7 @@ export class Game {
     this.block++;
     const last = this.blocksToday - 1 + this.bonusBlocks;
     if (this.block > last) return this.endDay();
+    this._contractCheck();
     this.cb.blockEnd && this.cb.blockEnd(reason);
     this._populate();
     this.note(`block -> ${this.blockName} (${reason})`);
@@ -417,11 +430,11 @@ export class Game {
     const p = this.player;
     // heat cools overnight — the Flats cool it double
     const garage = p.sleptAt === 'garage';
-    this.heat = Math.max(0, this.heat - (garage ? T.heatDecayGarage : T.heatDecayNight));
+    this.heat = Math.max(0, this.heat - (garage ? T.heatDecayGarage : T.heatDecayNight) * this.mods.heatNight);
     if (!p.sleptAt) { p.hpMax = Math.max(40, p.hpMax - T.fatigueNoSleepHp); this.alert('You never slept. Everything is loud and slightly to the left.', 'warn'); }
     else { p.hp = Math.min(p.hpMax, p.hp + T.sleepHeal); }
     // rip bill comes due
-    this.blocksToday = T.blocksPerDay - (p.ripToday > 0 ? T.ripCrashBlocks : 0);
+    this.blocksToday = T.blocksPerDay - (p.ripToday > 0 ? Math.max(1, T.ripCrashBlocks - this.mods.ripCrash) : 0);
     p.shakeAmp = p.ripToday > 0 ? T.ripShakeAmp : Math.max(0, p.shakeAmp - 1);
     if (p.ripToday > 0) this.alert('The Rip bill arrives: the day is one block shorter and your hands disagree with each other.', 'warn');
     p.ripToday = 0; this.bonusBlocks = 0; p.sleptAt = null;
@@ -431,6 +444,7 @@ export class Game {
     this.block = 0; this.blockT = 0;
     // ⚠️ WALKING is ONLY earned by catching the 6 a.m. (walkOut). Ending the week with
     // the money and no bus ticket is the game's best story, and it is STUCK.
+    this._contractDay();
     if (this.day >= T.days) return this.endGame('STUCK');
     this.cb.dayEnd && this.cb.dayEnd();
     this._spawnWeapons();
@@ -452,6 +466,7 @@ export class Game {
     const p = this.player;
     if (this.room !== 'garage') return { ok: false, msg: 'Sleep happens at the garage. Everything else is just passing out.' };
     p.sleptAt = 'garage';
+    this.stats.slept = (this.stats.slept || 0) + 1;
     /* ⚠️ THE MORAL LEDGER, and it runs HERE — at the moment you come home, which
      * is the only moment she can see you. She never asks and it never blocks
      * anything; it only changes what she says. That restraint IS the mechanic. */
@@ -864,7 +879,7 @@ export class Game {
       let da = Math.abs(ang - p.windDir); if (da > Math.PI) da = 2 * Math.PI - da;
       if (da > 1.15) continue;
       hitAny = true;
-      this.hitNpc(n, this.ri(w.dmg[0], w.dmg[1]), ang, w.kb);
+      this.hitNpc(n, this.ri(w.dmg[0], w.dmg[1]) + this.mods.punch, ang, w.kb);
       if (p.held && --p.held.dur <= 0) {
         this.fx('break', n.x, n.y, { kind: p.held.kind });
         this.alert(`${WEAPONS[p.held.kind].label[0].toUpperCase() + WEAPONS[p.held.kind].label.slice(1)} gives its life for the cause.`, 'ok');
@@ -1142,7 +1157,7 @@ export class Game {
       packages: !occupied && R('pkg') < 0.5,          // away for DAYS. the best tell.
       car: occupied ? R('car') > 0.12 : R('car') < 0.15,  // …and the tell that lies
       sprinklers: R('spr') < 0.35,
-      cased: this.burg.cased.includes(key + '|' + this.day),
+      cased: this.burg.cased.includes(key + '|' + this.day) || this._preCased(),
     };
   }
 
@@ -1281,6 +1296,7 @@ export class Game {
     }
     p.inv.loot = kept;
     if (!n) return { ok: false, msg: where === 'vern' ? 'Vern flips through the binder once. "I sell things. This is a THING TO KNOW. Not my aisle."' : 'Roxy: "Paper? Sweetheart, I got a whole drawer of paper and none of it spends."' };
+    take = this._fenceTake(take);
     this._earn(take);
     this.stats.lootCash = (this.stats.lootCash || 0) + take;
     const line = where === 'vern'
@@ -1403,6 +1419,7 @@ export class Game {
     if (this.dt.round === this.day) return { ok: false, msg: 'Sal: "Once a day, big spender. This ain\'t the Bluffs and you ain\'t your check."' };
     if (!this._spend(T.slRound)) return { ok: false, msg: 'You offer the room a round you cannot pay for. The room, kindly, pretends it never happened.' };
     this.dt.round = this.day;
+    this.stats.rounds = (this.stats.rounds || 0) + 1;
     this.heat = Math.max(0, this.heat - T.slRoundHeat);
     this.say('Sal', 'ROUND ON THE KID. Act like you\'ve been loved before, you animals.', 200, 90);
     return { ok: true, msg: `−$${T.slRound}. The room roars. For one round of well whiskey these people would carry you out of a fire, feet first, but still.` };
@@ -1443,7 +1460,7 @@ export class Game {
   pawnFence() {
     const s = this.scheme;
     if (this.room !== 'pawn' || s.inCar <= 0) return { ok: false, msg: 'Vern squints at your empty hands. "Come back with a story, kid."' };
-    const n = s.inCar, take = T.pawnCrate * n;
+    const n = s.inCar, take = this._fenceTake(T.pawnCrate * n);
     s.inCar = 0; s.sold += n; s.cash += take; s.holding = false;
     this._earn(take);
     this._schemeCheck('fence');
@@ -1637,9 +1654,194 @@ export class Game {
   }
 
   cuffAuto() { // headless: escape odds shrink with heat
-    const odds = Math.max(0.15, 0.6 - (this.heat - T.heatStage.wanted) * 0.01);
+    const odds = Math.max(0.15, 0.6 - (this.heat - T.heatStage.wanted) * 0.01) + this.mods.cuff;
     this.resolveCuff(this.chance(odds));
   }
+
+  // ==========================================================================
+  // THE LONG GAME — permanent upgrades, bought with the currency of a specific
+  // way you lost. See the UPGRADES block in data.js for why that matters.
+  //
+  // ⚠️ EVERY UPGRADE MUST DO SOMETHING HERE. A lane of numbers that only lights
+  // up a button is the single easiest way to fake progression, and it is the
+  // exact failure this file exists to avoid. If you add a card to UPGRADES,
+  // wire it in this function or delete it.
+  // ⚠️ Runs BEFORE _populate/_spawnWeapons draws so a hpMax change is in place
+  // for the first frame, and it consumes NO rng — an upgrade must never move
+  // the seeded stream, or two players on the same seed diverge by shopping.
+  // ==========================================================================
+  applyUpgrades() {
+    const owned = new Set(this.meta.up || []);
+    this.up = owned;
+    const p = this.player;
+    // multiplicative/additive modifier bag, read at the sites below
+    this.mods = { punch: 0, fence: 1, cuff: 0, contractPay: 1, ripCrash: 0,
+                  staminaRegen: 1, heatNight: 1, dealt: 0 };
+    if (owned.has('b1')) { p.hpMax += 15; p.hp = p.hpMax; }
+    if (owned.has('b2')) this.mods.punch += 3;
+    if (owned.has('b3')) { p.staminaMax = T.staminaMax + 30; p.stamina = p.staminaMax; this.mods.staminaRegen = 1.35; }
+    if (owned.has('n1')) this.mods.heatNight = 1.4;
+    if (owned.has('n2')) this.mods.fence = 1.15;
+    if (owned.has('n3')) this.mods.cuff = 0.2;
+    if (owned.has('s1')) { this.meta.knows.window = true; this.meta.knows.drop = true; }
+    if (owned.has('s2')) this.mods.ripCrash = 1;
+    if (owned.has('c1')) p.cash += 120;
+    if (owned.has('c2')) this.mods.dealt += 1;
+    if (owned.has('c3')) this.mods.contractPay = 1.4;
+  }
+
+  // s3 "You Know the House" — applied where the burglary system builds its
+  // spot list, because that is the only place the cased set is authoritative.
+  _preCased() { return this.up && this.up.has('s3'); }
+
+  // every fence in town runs takings through here, so ONE upgrade covers all of
+  // them instead of four call sites drifting apart
+  _fenceTake(v) { return Math.round(v * (this.mods ? this.mods.fence : 1)); }
+
+  // ==========================================================================
+  // CONTRACTS — the board
+  // ⚠️ Dealt at the very END of the constructor on purpose: every draw here
+  // advances the seeded stream, so dealing earlier would move every NPC, every
+  // weapon spawn and every weather day in the game. Last means nothing existing
+  // shifts.
+  // ==========================================================================
+  _dealContracts() {
+    this.contracts = [];
+    this._cDeck = CONTRACTS.map(c => c.id);
+    // deterministic shuffle off the run seed
+    for (let i = this._cDeck.length - 1; i > 0; i--) {
+      const j = Math.floor(this.rng() * (i + 1));
+      const t = this._cDeck[i]; this._cDeck[i] = this._cDeck[j]; this._cDeck[j] = t;
+    }
+    const want = CONTRACT_RULES.dealt + (this.mods ? this.mods.dealt : 0);
+    for (let i = 0; i < want; i++) this._drawContract();
+  }
+
+  // pull the next deck entry that is legal for today; returns it or null
+  _drawContract() {
+    const live = this.contracts.filter(c => c.state === 'open' || c.state === 'taken').length;
+    const cap = CONTRACT_RULES.dealt + (this.mods ? this.mods.dealt : 0);
+    if (live >= cap) return null;
+    for (let i = 0; i < this._cDeck.length; i++) {
+      const id = this._cDeck[i];
+      const def = CONTRACTS.find(c => c.id === id);
+      if (!def || def.day > this.day) continue;
+      if (this.contracts.some(c => c.id === id)) continue;
+      this._cDeck.splice(i, 1);
+      const inst = { id, state: 'open', snap: null, dueDay: -1 };
+      this.contracts.push(inst);
+      this.cb.contract && this.cb.contract('offered', this.contractView(inst));
+      return inst;
+    }
+    return null;
+  }
+
+  contractDef(id) { return CONTRACTS.find(c => c.id === id); }
+
+  contractView(inst) {
+    const d = this.contractDef(inst.id);
+    if (!d) return null;
+    return { id: inst.id, state: inst.state, giver: d.giver, where: d.where,
+             title: d.title, ask: d.ask, pay: this.contractPay(d), rep: d.rep || 0,
+             cred: d.cred || 0, lessons: d.lessons || 0, heat: d.heat || 0,
+             dueDay: inst.dueDay, due: d.due,
+             daysLeft: inst.state === 'taken' ? inst.dueDay - this.day : d.due };
+  }
+
+  contractPay(d) { return Math.round((d.pay || 0) * (this.mods ? this.mods.contractPay : 1)); }
+
+  // the board as the UI sees it
+  board() { return this.contracts.map(c => this.contractView(c)).filter(Boolean); }
+
+  takeContract(id) {
+    const inst = this.contracts.find(c => c.id === id && c.state === 'open');
+    if (!inst) return { ok: false, msg: 'That one is not on the table.' };
+    const d = this.contractDef(id);
+    inst.state = 'taken';
+    inst.dueDay = this.day + (d.due || 3);
+    // ⚠️ SNAPSHOT AT ACCEPTANCE, always. Every counter contract is a DELTA — a
+    // player who already sold four crates must not complete "sell one" for free
+    // the instant they take it. The snapshot is what makes the job a job.
+    inst.snap = d.snap ? d.snap(this) : {};
+    this.note(`contract taken: ${id}`);
+    this.cb.contract && this.cb.contract('taken', this.contractView(inst));
+    // taking it might already satisfy it (rare, e.g. cash-in-hand asks)
+    this._contractCheck();
+    return { ok: true, msg: `${d.giver}: taken. Due ${this.dayNameOf(inst.dueDay)}.` };
+  }
+
+  dropContract(id) {
+    const inst = this.contracts.find(c => c.id === id && (c.state === 'open' || c.state === 'taken'));
+    if (!inst) return { ok: false };
+    const d = this.contractDef(id);
+    const was = inst.state;
+    inst.state = 'gone';
+    // walking away from a job you TOOK costs standing; declining an offer is free
+    if (was === 'taken') { this.meta.rep = Math.max(0, this.meta.rep - 1); this.alert(d.fail, 'warn'); }
+    this.cb.contract && this.cb.contract('dropped', this.contractView(inst));
+    this._drawContract();
+    return { ok: true };
+  }
+
+  // ⚠️ Called from act() AND endBlock(), because half these conditions are
+  // satisfied by combat and clock, which never pass through act().
+  _contractCheck() {
+    if (this.over || !this.contracts) return;
+    for (const inst of this.contracts) {
+      if (inst.state !== 'taken') continue;
+      const d = this.contractDef(inst.id);
+      if (!d || !d.test) continue;
+      let pass = false;
+      try { pass = !!d.test(this, inst.snap || {}); }
+      catch (e) { this.note(`contract test threw: ${inst.id} ${e.message}`); continue; }
+      if (pass) this._payContract(inst, d);
+    }
+  }
+
+  _payContract(inst, d) {
+    inst.state = 'done';
+    const pay = this.contractPay(d);
+    if (pay) this._earn(pay);
+    const m = this.meta;
+    if (d.rep) m.rep += d.rep;
+    if (d.cred) m.cred += d.cred;
+    if (d.lessons) m.lessons += d.lessons;
+    if (d.heat) this.addHeat(d.heat, 0, 'a job');
+    if (d.heatDrop) this.heat = Math.max(0, this.heat - d.heatDrop);
+    if (d.noticeDrop) this.notice = Math.max(0, this.notice - d.noticeDrop);
+    if (d.gives === 'crowbar') this.player.inv.crowbar = true;
+    this.stats.contracts = (this.stats.contracts || 0) + 1;
+    this.note(`contract done: ${inst.id} (+${pay})`);
+    this.alert(`${d.done}${pay ? `  +${pay}` : ''}`, 'ok');
+    this.cb.contract && this.cb.contract('done', this.contractView(inst));
+    this._drawContract();
+  }
+
+  // deadlines are checked at the day roll, after the day has advanced
+  _contractDay() {
+    if (!this.contracts) return;
+    for (const inst of this.contracts) {
+      if (inst.state !== 'taken') continue;
+      if (this.day <= inst.dueDay) continue;
+      const d = this.contractDef(inst.id);
+      inst.state = 'failed';
+      this.meta.rep = Math.max(0, this.meta.rep - 1);
+      this.stats.contractsFailed = (this.stats.contractsFailed || 0) + 1;
+      this.note(`contract failed: ${inst.id}`);
+      this.alert(d ? d.fail : 'That one is gone.', 'warn');
+      this.cb.contract && this.cb.contract('failed', this.contractView(inst));
+    }
+    // an offer nobody took goes stale after a couple of days — the board moves
+    for (const inst of this.contracts) {
+      if (inst.state === 'open') {
+        const d = this.contractDef(inst.id);
+        if (d && this.day > d.day + 3) { inst.state = 'gone'; }
+      }
+    }
+    for (let i = 0; i < CONTRACT_RULES.refreshEveryDay; i++) this._drawContract();
+  }
+
+  dayNameOf(d) { return DAY_NAMES[Math.min(DAY_NAMES.length - 1, Math.max(0, d))]; }
 
   // ---- endings ------------------------------------------------------------
   endGame(key) {
@@ -1655,7 +1857,9 @@ export class Game {
       key, day: this.day, dayName: this.dayName, cash: Math.round(this.player.cash),
       heat: Math.round(this.heat), crates: this.scheme.sold, schemeCash: this.scheme.cash,
       debtOpen: this.player.debt > 0, grudge: this.grudge || 0,
-      stats: { ...this.stats }, meta: { ...m, knows: { ...m.knows } },
+      stats: { ...this.stats }, meta: { ...m, knows: { ...m.knows }, up: [...(m.up || [])] },
+      jobs: { done: this.stats.contracts || 0, failed: this.stats.contractsFailed || 0,
+              open: (this.contracts || []).filter(c => c.state === 'taken').length },
       roommate: key === 'BODIED' ? this.pick(BARKS.hospital_roommate) : null,
     };
     summary.coda = (ENDINGS[key] && ENDINGS[key].coda) ? ENDINGS[key].coda(summary) : '';
@@ -1698,9 +1902,15 @@ export class Game {
       brawlAuto: () => this.brawlAuto(arg || 2), heistTripAuto: () => this.heistTripAuto(),
       exitShopCheck: () => { this.exitShopCheck(); return { ok: true }; },
       enter: () => { return this.enterRoom(arg); }, leave: () => { return this.leaveRoom(); },
+      takeJob: () => this.takeContract(arg), dropJob: () => this.dropContract(arg),
     };
     if (!A[name]) return { ok: false, msg: `no act ${name}` };
-    return A[name]() || { ok: true };
+    const out = A[name]() || { ok: true };
+    // ⚠️ every act is a chance a contract just completed. This funnel plus the
+    // block-end call covers everything: act() catches the deliberate verbs,
+    // endBlock catches the ones satisfied by combat and the clock.
+    this._contractCheck();
+    return out;
   }
 
   // ⚠️ Hours live HERE, not in the UI. main.js used to compute its own openMap for the
@@ -1804,7 +2014,7 @@ export class Game {
         p.moving = true;
         if (input.sprint) p.stamina = Math.max(0, p.stamina - T.sprintDrainPerS * dt);
       } else p.moving = false;
-      if (!input.sprint || !p.moving) p.stamina = Math.min(T.staminaMax, p.stamina + T.staminaRegenPerS * dt);
+      if (!input.sprint || !p.moving) p.stamina = Math.min(p.staminaMax || T.staminaMax, p.stamina + T.staminaRegenPerS * this.mods.staminaRegen * dt);
     }
     // knockback decay
     p.x += p.vx * dt; p.y += p.vy * dt;
@@ -2095,7 +2305,7 @@ export class Game {
 // ---------------------------------------------------------------------------
 
 export function soakRun(seed, opts = {}) {
-  const meta = opts.meta || { runs: 0, cred: 0, scars: 0, lessons: 0, rep: 0, cashBanked: 0,
+  const meta = opts.meta || { runs: 0, cred: 0, scars: 0, lessons: 0, rep: 0, cashBanked: 0, up: [],
                               knows: { window: false, blind: false, drop: false, dog: false } };
   const g = new Game({ seed, meta });
   const greed = g.rng(), rage = g.rng(), skim = g.rng() * 0.5, ripFan = g.rng();
@@ -2107,6 +2317,11 @@ export function soakRun(seed, opts = {}) {
     const b = g.block, d = g.day;
     const assertClock = g.day * 100 + g.block;
     if (b === 0) { // morning
+      // ⚠️ THE BOT WORKS THE BOARD. A soak that never takes a contract proves
+      // nothing about contracts — it only proves they do not crash while being
+      // ignored. Taking every offer means the deadline, failure and payout
+      // paths are all exercised on every seed.
+      for (const v of g.board()) if (v.state === 'open') step('takeJob', v.id);
       if (g.scheme.fence && greed < 0.85) { step('walkOut'); if (g.over) break; }
       if (ripFan > 0.6 && g.player.cash > 10 && g.player.inv.rip === 0) {
         step('enter', 'qwikstop'); step('buy', 'rip'); step('leave'); step('useRip');
@@ -2167,5 +2382,6 @@ export function soakRun(seed, opts = {}) {
   if (!g.over) errors.push(`run never ended (guard=${guard})`);
   return { seed, ending: g.ending, day: g.day, cash: Math.round(g.player.cash), heat: Math.round(g.heat),
            crates: g.scheme.sold, shifts: g.stats.shifts, skimmed: g.stats.skimmed, rip: g.stats.rip,
-           koGiven: g.stats.koGiven, errors, meta };
+           koGiven: g.stats.koGiven, errors, meta,
+           jobsDone: g.stats.contracts || 0, jobsFailed: g.stats.contractsFailed || 0 };
 }

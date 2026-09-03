@@ -763,10 +763,115 @@ Uses the portable Node at `C:\Users\kylef\tools\node` (not on PATH).
   shadows, once when *night* did. Both times the number that looked broken was
   the system working.
 
+- **M2.5 — the canopy and the skyline** ✅ (2026-09-02)
+  Hopewell had FOUR trees in 3400x3200 units of Illinois and every roof in town
+  was one unbroken slab of near-black — the two largest blank surfaces in the
+  game. 590 instanced trees (broadleaf/conifer/bare, two overlapping blobs each
+  because one ball on a stick is a lollipop) and per-building rooftop plant:
+  stair penthouse, HVAC, vent stacks, a dish somebody put up in 2004, a water
+  tank on the tall ones. Houses got a chimney.
+  - ⚠️ **INSTANCED, not 590 Meshes.** three.js issues one draw call per Mesh,
+    so the obvious build adds ~500 calls of pure scenery to a town that draws
+    in 282. Measured after: 1103 meshes + 7 buckets, 205 calls, 15140 tris.
+  - ⚠️ **An InstancedMesh keeps the unit bounding sphere it was constructed
+    with.** Recompute it after writing the matrices or the whole canopy is
+    frustum-culled away the moment the camera leaves the origin — the same bug
+    the rain had.
+  - ⚠️ **A TREE LINE, NOT A FOREST.** Trees are view-only, so a trunk in open
+    ground is a lie you walk through. Placement is biased hard toward edges
+    (p 0.92 within 95 units of something somebody drew, 0.05 in the open) —
+    which is also exactly what a rust-belt town looks like from above.
+  - ⚠️ **D.patches are NOT obstacles**, they are ground-colour bands and four
+    of them are 3400 wide. Treating them as blockers excludes most of the county.
+  - ⚠️ The parapet is a SOLID box, so its top face IS the roof. That is why
+    every roof was black; the fix is a gravel deck inset inside it.
+
+- **M3 — THE BOARD AND THE LONG GAME: it is actually a roguelike now** ✅ (2026-09-02)
+  Kyle: *"i feel like we need to make it more rogue like with upgrades and
+  missions."* Both were the two structural holes, and both were half-built
+  already — the run had ONE authored scheme, and the meta had four currencies
+  with nothing to spend them on.
+
+  **CONTRACTS (18 jobs, `CONTRACTS` in data.js, engine in game.js).** Three
+  offers on the board at once, one new one each morning, drawn from a
+  seed-shuffled deck gated by day. Take it and you get a deadline; miss it and
+  it costs a rep. Givers are people you already meet: Peanut, Earl, Dale,
+  Yolanda, Madison, Roxy, Gary, Darnell, Dee, Whit, Wanda, Moose, Trevor, Vern,
+  Miss Ruthie, Sal, Bunny — and Bev, whose job pays nothing and is the point.
+  - ⚠️ **THE HONESTY RULE: every contract is expressed in verbs the sim ALREADY
+    HAS.** No quest markers, no fetch arrows, no new minigames. `test` is a
+    PURE READ of state the game was tracking anyway, so a job is a reason to do
+    a thing you could always do — which is what a job from somebody you know
+    is. The 50-verb `act()` dispatcher is what made this possible; the work was
+    almost entirely writing.
+  - ⚠️ **`test`/`snap` MUST NOT touch rng.** They run on every `act()` and
+    every block end. `tests/contracts.mjs` proves it by asserting the rng
+    cursor is unmoved after running all 18.
+  - ⚠️ **SNAPSHOT AT ACCEPTANCE.** Every counter job is a DELTA. Without
+    `snap`, a player who already sold four crates completes "sell one" for free
+    the instant they take it. The snapshot is what makes the job a job.
+  - ⚠️ **THE BOARD IS DEALT LAST in the constructor.** Every draw advances the
+    seeded stream, so dealing any earlier moves every NPC, weapon spawn and
+    weather day in the game.
+  - Checked from **both** `act()` and `endBlock()` — act catches the deliberate
+    verbs, endBlock catches the ones satisfied by combat and the clock.
+
+  **THE LONG GAME (12 upgrades, 4 lanes).** ⚠️ **The best idea here was already
+  half-built and had no sink:** `endGame` has always paid **cred** for BUSTED,
+  **scars** for BODIED, **lessons** for STUCK and **rep** for WALKING — four
+  endings, four currencies, going up forever and buying nothing. Each lane can
+  now be bought ONLY with the currency its own ending pays: BODY costs scars
+  (hospital), NERVE costs cred (arrested), SENSE costs lessons (ran out of
+  week), CONTACTS costs rep (got out). **You cannot grind the good ending into
+  everything — a bad night is the only route to a specific kind of better.**
+  Spent on the ending card; applied by the next `Game` constructor.
+  - ⚠️ `cashBanked` is deliberately NOT spendable. Carrying money between runs
+    deletes the tension of a run that starts at $61, and $61 IS the premise.
+  - ⚠️ **Every upgrade is a real sim modifier** — hpMax, punch damage, stamina
+    + regen, overnight heat decay, a shared `_fenceTake()` every fence in town
+    runs through, cuff-escape odds, the Rip crash length, starting cash, board
+    size, contract rate, and pre-known scheme/house state. A lane of inert
+    numbers is the easiest way to fake progression; `tests/contracts.mjs`
+    measures all 12 against a control run and asserts none of them move the
+    seeded stream.
+
+  **⚠️ THE FIRST FAILING TEST WAS A DESIGN DEFECT, NOT A WIRING BUG.** "Word
+  Gets Around" (+1 contract on the board) measured 3 → 3. The cap was right;
+  the DECK was too thin at the front — only three contracts were legal on day
+  0, so an upgrade the player had just bought did visibly nothing on the
+  morning they went looking for it and only started paying on Tuesday. Fixed
+  with two more Monday givers (Dale, Madison), not by touching the cap.
+
+  **⚠️ A SOUND MUST NEVER TAKE ITS CALLER WITH IT.** `sfx.play()` had no guard
+  for a missing AudioContext, and the buy handler chimed BEFORE repainting — so
+  under `?autostart=1` (where `ensure()` never runs) a purchase deducted the
+  currency, threw in the audio layer, and never repainted: the button still
+  read as buyable for something you already owned. Both fixed — `play()` now
+  returns early when muted-by-absence, and the handler is persist → repaint →
+  *then* make a noise.
+  ⚠️ Honest note: an earlier reading in the same debugging pass showed
+  `localStorage` and the live meta disagreeing, and that discrepancy was never
+  fully explained — the current build was then verified three separate ways
+  (DOM label, live `meta`, `localStorage`) all agreeing, plus the decisive
+  end-to-end. Most likely a stale module from a cache-bust race. Flagged rather
+  than claimed as diagnosed.
+
+  **Verified:** `tests/contracts.mjs` 301 assertions green — deck integrity, no
+  rng in any test, **all 18 contracts driven to completion through the real
+  sim**, the delta rule, deadline expiry costing rep, all 12 upgrades measured
+  against a control, same-seed deals the same hand and a different seed does
+  not. Soak 48 seeds green with the bot now WORKING THE BOARD every morning:
+  **96 jobs done / 46 missed**, all four endings still reachable, determinism
+  holds. Live: full open → taken → worked → paid → board-refills loop, and a
+  purchase carried across a reload into a run starting at **hpMax 115, $181**.
+  ⚠️ NOT INERT: dealing consumes rng, so every fingerprint moves and old runs
+  will not reproduce.
+
 ## What's deliberately NOT in Phase 1 (per the roadmap — don't "fix" these)
 
 - No Hopeless Tech, classes, GPA, or majors (Phase 2).
-- No Beef system, no factions/rep lanes, no Scheme draw-of-three (Phase 2).
+- No Beef system and no factions/rep lanes (Phase 2). ⚠️ The Scheme draw-of-three
+  IS built, as CONTRACTS + the upgrade lanes — see M3.
 - No guns anywhere (full design prices them as a crossed line; Phase 1 omits them).
 - BROKE is not a real ending yet — debt exists only as the payday-loan flavor. STUCK is
   the Phase 1 timeout epilogue.

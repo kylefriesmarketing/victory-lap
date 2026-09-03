@@ -45,6 +45,13 @@ export class Sfx {
   }
 
   play(name) {
+    // ⚠️ A SOUND MUST NEVER TAKE ITS CALLER WITH IT. Without this, any play()
+    // reached before ensure() unlocks audio throws on this.ac — which is
+    // exactly what happened to the upgrade shop: the purchase deducted, then
+    // the chime threw, and the repaint never ran, so the button still read as
+    // buyable for something the player already owned. A muted game is not an
+    // error condition.
+    if (!this.ac) return;
     const S = {
       swing:    () => this.noise(0.09, 0.05, 900, 0.8),
       thud:     () => { this.tone(95, 0.09, 'square', 0.16, -40); this.noise(0.08, 0.10, 300, 1); },

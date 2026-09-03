@@ -5,7 +5,8 @@
 
 import { Game, soakRun, T, BUILDINGS, GARAGE, FOXHOLE, DOWNTOWN, DT_Y, WATER_TOWER, COURTHOUSE,
          WORKS, BLUFFS, LOOT, SEARCH_SPOTS, HTCC, FLATS, INTERIORS, STRIP_Y, BARKS, SCHEME, ENDINGS,
-         BLOCK_NAMES, DAY_NAMES, NAMED, DISTRICTS, districtAt, NIGHTS, PLACES } from './game.js';
+         BLOCK_NAMES, DAY_NAMES, NAMED, DISTRICTS, districtAt, NIGHTS, PLACES,
+         CONTRACTS, UPGRADES, UPGRADE_LANES } from './game.js';
 import { Renderer } from './render.js';
 // ⚠️ The 3D view is a SECOND CONSUMER of the same sim, not a replacement. It is
 // loaded lazily and only on ?3d=1 so the default game keeps its byte-for-byte
@@ -32,9 +33,9 @@ let lastRaf = 0;
 function loadMeta() {
   try {
     const m = JSON.parse(localStorage.getItem(METAKEY));
-    if (m && m.knows) { if (!m.seen) m.seen = {}; return m; }
+    if (m && m.knows) { if (!m.seen) m.seen = {}; if (!m.up) m.up = []; return m; }
   } catch {}
-  return { runs: 0, cred: 0, scars: 0, lessons: 0, rep: 0, cashBanked: 0, seen: {},
+  return { runs: 0, cred: 0, scars: 0, lessons: 0, rep: 0, cashBanked: 0, seen: {}, up: [],
            knows: { window: false, blind: false, drop: false, dog: false } };
 }
 function saveMeta(m) { try { localStorage.setItem(METAKEY, JSON.stringify(m)); } catch {} }
@@ -839,7 +840,55 @@ function updateScheme() {
     if (st.id === 'fence' && s.holding) extra = ' (holding for Sunday)';
     return `<div class="sch ${done ? 'sch-done' : ''}"><span>${done ? '✓' : '•'}</span> ${st.label}${extra}
       ${done ? '' : `<div class="sch-hint">${st.hint}</div>`}</div>`;
-  }).join('');
+  }).join('') + boardHtml();
+  wireBoard();
+}
+
+// ---------------------------------------------------------------------------
+// THE BOARD
+// ⚠️ It lives in the SAME notebook as the scheme, on purpose. A separate quest
+// log would turn jobs into a menu you visit; a page further down the same pad
+// keeps them what they are — things you heard about and wrote down.
+// ⚠️ Rebuilt from innerHTML every tick, which is fine ONLY because the panel is
+// modal-ish and small. If it ever grows, follow the Age of Toys command-card
+// rule and stop rebuilding nodes under the pointer, or clicks get eaten.
+// ---------------------------------------------------------------------------
+function boardHtml() {
+  if (!game || !game.board) return '';
+  const b = game.board().filter(v => v.state !== 'gone');
+  if (!b.length) return '<div class="bd-head">THE BOARD</div><div class="job-a">Nothing going this week. Ask around tomorrow.</div>';
+  const open = b.filter(v => v.state === 'open');
+  const took = b.filter(v => v.state === 'taken');
+  const past = b.filter(v => v.state === 'done' || v.state === 'failed');
+  const row = v => {
+    const soon = v.state === 'taken' && v.daysLeft <= 1;
+    const rew = [v.pay ? `${v.pay}` : '', v.rep ? `+${v.rep} rep` : '', v.cred ? `+${v.cred} cred` : '',
+                 v.lessons ? `+${v.lessons} sense` : ''].filter(Boolean).join(' · ');
+    return `<div class="job job-${v.state}">
+      <div class="job-t">${v.title}</div>
+      <div class="job-g">${v.giver} — ${v.where}</div>
+      ${v.state === 'done' || v.state === 'failed' ? '' : `<div class="job-a">${v.ask}</div>
+      <div class="job-r">${rew}${v.heat ? ` · +${v.heat} heat` : ''}</div>
+      <div class="job-due ${soon ? 'soon' : ''}">${v.state === 'taken'
+        ? (v.daysLeft <= 0 ? 'DUE TODAY' : `${v.daysLeft} day${v.daysLeft === 1 ? '' : 's'} left`)
+        : `${v.due} days once you take it`}</div>
+      ${v.state === 'open'
+        ? `<button class="job-btn" data-take="${v.id}">TAKE IT</button><button class="job-btn dim" data-drop="${v.id}">pass</button>`
+        : `<button class="job-btn dim" data-drop="${v.id}">walk away (−1 rep)</button>`}`}
+    </div>`;
+  };
+  let h = '';
+  if (took.length) h += '<div class="bd-head">WORKING ON</div>' + took.map(row).join('');
+  if (open.length) h += '<div class="bd-head">GOING AROUND</div>' + open.map(row).join('');
+  if (past.length) h += '<div class="bd-head">THIS WEEK</div>' + past.map(row).join('');
+  return h;
+}
+
+function wireBoard() {
+  for (const el of document.querySelectorAll('[data-take]'))
+    el.onclick = () => { result(game.act('takeJob', el.dataset.take)); updateScheme(); };
+  for (const el of document.querySelectorAll('[data-drop]'))
+    el.onclick = () => { game.act('dropJob', el.dataset.drop); updateScheme(); };
 }
 
 function updateHud() {
@@ -931,11 +980,57 @@ function showEnding(key, sum) {
     ['KOs given / taken', `${sum.stats.koGiven} / ${sum.stats.koTaken}`],
     ['Rip consumed', sum.stats.rip],
     ['Final heat', sum.heat],
+    ['Jobs done / dropped', `${sum.jobs ? sum.jobs.done : 0} / ${sum.jobs ? sum.jobs.failed : 0}`],
   ].map(([k, v]) => `<div class="est"><span>${k}</span><b>${v}</b></div>`).join('');
   const m = sum.meta;
   $('end-meta').textContent = `REP ${m.rep} • CRED ${m.cred} • SCARS ${m.scars} • LESSONS ${m.lessons}` +
     (m.cashBanked ? ` • $${m.cashBanked} banked` : '');
+  renderShop();
   $('ending').style.display = 'flex';
+}
+
+// ---------------------------------------------------------------------------
+// THE BETWEEN-RUN SPEND
+// ⚠️ Four currencies, and each lane can ONLY be bought with the one its own
+// ending pays: BODY costs scars (hospital), NERVE costs cred (arrested), SENSE
+// costs lessons (ran out of week), CONTACTS costs rep (got out). That is the
+// whole design — you cannot grind the good ending into every upgrade, so a bad
+// night is the only route to a specific kind of better, and the next run is
+// genuinely different because of how the last one ended.
+// ⚠️ Writes straight to meta + localStorage. The NEXT Game reads meta.up in its
+// constructor, so a purchase applies on the following run and never mid-run.
+// ---------------------------------------------------------------------------
+function renderShop() {
+  const m = game ? game.meta : loadMeta();
+  if (!m.up) m.up = [];
+  const owned = new Set(m.up);
+  const lanes = UPGRADE_LANES.map(L => {
+    const cards = UPGRADES.filter(u => u.lane === L.key).map(u => {
+      const have = owned.has(u.id);
+      const locked = u.needs && !owned.has(u.needs);
+      const poor = (m[L.cur] || 0) < u.cost;
+      const label = have ? 'OWNED' : locked ? 'LOCKED' : `${u.cost} ${L.cur}`;
+      return `<div class="up">
+        <button class="up-buy ${have ? 'owned' : ''}" data-buy="${u.id}"
+          ${have || locked || poor ? 'disabled' : ''}>${label}</button>
+        <div><div class="up-t">${u.name}</div><div class="up-d">${u.desc}</div></div></div>`;
+    }).join('');
+    return `<div class="lane"><div class="lane-h"><span>${L.icon} ${L.label}</span>
+      <span>${m[L.cur] || 0} ${L.cur}</span></div>
+      <div class="lane-b">${L.blurb}</div>${cards}</div>`;
+  }).join('');
+  $('end-shop').innerHTML = '<div id="end-shop-head">WHAT THE WEEK TAUGHT YOU</div>' +
+    '<div id="end-shop-sub">Every way to lose buys a different kind of better. Spend it or carry it.</div>' + lanes;
+  for (const el of document.querySelectorAll('[data-buy]')) el.onclick = () => {
+    const u = UPGRADES.find(x => x.id === el.dataset.buy);
+    const L = UPGRADE_LANES.find(l => l.key === u.lane);
+    if (!u || (m[L.cur] || 0) < u.cost || m.up.includes(u.id)) return;
+    m[L.cur] -= u.cost; m.up.push(u.id);
+    // ⚠️ ORDER IS LOAD-BEARING: persist, then REPAINT, then make a noise. The
+    // first draft chimed before repainting and a throw in the audio layer left
+    // a bought upgrade looking unbought.
+    saveMeta(m); renderShop(); try { sfx.play('doorchime'); } catch {}
+  };
 }
 
 // ---------------------------------------------------------------------------

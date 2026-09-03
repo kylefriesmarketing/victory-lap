@@ -1213,6 +1213,275 @@ export const SCHEME = {
 
 // `coda(sum)` appends a clause that knows what your week actually was. The epilogue
 // should read like YOUR week, not like a screen. sum = {crates, cash, heat, day, stats}.
+// ---------------------------------------------------------------------------
+// CONTRACTS — the week has jobs in it now
+//
+// The run used to be ONE authored scheme (hear → case → tools → window → job →
+// fence), which meant every run was the same heist with different weather. A
+// roguelike needs the week to deal you a hand.
+//
+// ⚠️ THE HONESTY RULE, and it is the whole design: every contract is expressed
+// in verbs the sim ALREADY HAS. Nothing here adds a quest marker, a fetch arrow
+// or a minigame. `test` is a PURE READ of state the game was tracking anyway —
+// so a contract is a reason to do a thing you could always do, which is exactly
+// what a job from somebody you know is.
+// ⚠️ `test` and `snap` MUST NOT touch rng. They run on every act() and every
+// block end; one random draw in here and replays/soak determinism are gone.
+// ⚠️ Nobody is asked to hurt somebody for the joke. Whit's is a BET on a fight
+// you were going to have. Bunny's is paperwork. The one that pays nothing is
+// the one your grandmother asks for, and that is on purpose.
+// ---------------------------------------------------------------------------
+export const CONTRACT_RULES = {
+  dealt: 3,             // live offers on the board at once
+  refreshEveryDay: 1,   // one new offer joins the board each morning if there's room
+  lateGrace: 0,         // due day is due day; the town is not sentimental
+};
+
+const near = (g, x, y, r = 100) => Math.hypot(g.player.x - x, g.player.y - y) < r;
+const st = (g, k) => (g.stats[k] || 0);
+
+export const CONTRACTS = [
+  {
+    id: 'peanut-one', giver: 'Peanut', where: 'the Mile', day: 0, due: 3,
+    title: 'Move one and tell me how it felt',
+    ask: 'Peanut does not want a cut. Peanut wants to know a man who did it. Sell one crate.',
+    pay: 45, rep: 1,
+    snap: g => ({ n: g.scheme.sold }),
+    test: (g, s) => g.scheme.sold - s.n >= 1,
+    done: 'Peanut nods like a man being handed a diploma. "There it is. There he is."',
+    fail: 'Peanut does not bring it up again, which is somehow worse.',
+  },
+  {
+    id: 'earl-honest', giver: 'Earl', where: 'Mile Hardware', day: 0, due: 3,
+    title: 'An honest morning, allegedly',
+    ask: 'Earl will let a crowbar walk out the door for a man who has worked three shifts this week. Any three. He is not particular, he is just tired.',
+    pay: 0, rep: 1, gives: 'crowbar',
+    snap: g => ({ n: st(g, 'shifts') + st(g, 'dockShifts') }),
+    test: (g, s) => st(g, 'shifts') + st(g, 'dockShifts') - s.n >= 3,
+    done: 'Earl slides it across the counter. "This is not a gift. This is me being right about you."',
+    fail: 'Earl puts the crowbar back on the hook, at eye level, where you will see it.',
+  },
+  {
+    id: 'yolanda-wings', giver: 'Yolanda', where: 'the Flats', day: 0, due: 4,
+    title: 'Wings, and a man who will not eat them',
+    ask: 'Her cousin\'s thing is Saturday. Two orders from the Wing Barn, carried to her porch, uneaten. She has specified uneaten twice.',
+    pay: 80, rep: 3,
+    snap: g => ({ n: g.player.inv.wings || 0 }),
+    test: (g) => (g.player.inv.wings || 0) >= 2 && near(g, 1300, 1345, 130),
+    done: 'Yolanda checks the bag, checks your face, checks the bag again. "Huh."',
+    fail: 'The tables go out Saturday anyway. There is a gap on one of them.',
+  },
+  {
+    id: 'dale-shift', giver: 'Dale', where: 'the Wing Barn', day: 0, due: 2,
+    title: 'Cover one and I will forget the other thing',
+    ask: 'Dale is a shift manager vibrating at a frequency only dogs and corporate can hear. One register shift. He will not remember asking and he will absolutely remember if you do not.',
+    pay: 55, rep: 1,
+    snap: g => ({ n: st(g, 'shifts') }),
+    test: (g, s) => st(g, 'shifts') - s.n >= 1,
+    done: 'Dale says "appreciate you" four times in eleven seconds and means all four.',
+    fail: 'Dale covers it himself and tells the story for a year.',
+  },
+  {
+    id: 'madison-tip', giver: 'Madison', where: 'Daybreak', day: 0, due: 3,
+    title: 'Nine dollars, twice, in public',
+    ask: 'Madison moved here for a job that is not going well and would like the locals to be seen buying coffee at it. Two lattes. She knows exactly how this sounds.',
+    pay: 40, rep: 2,
+    snap: g => ({ n: st(g, 'lattes') }),
+    test: (g, s) => st(g, 'lattes') - s.n >= 2,
+    done: 'Madison writes a name on the cup that is not yours and is trying its best.',
+    fail: 'Daybreak keeps the chairs upside down a little longer each night.',
+  },
+  {
+    id: 'roxy-show', giver: 'Roxy', where: 'Ca$h Kingdom', day: 1, due: 3,
+    title: 'Show me you have it',
+    ask: 'Roxy does not want your money. Roxy wants to watch you walk in carrying three hundred dollars, so she can update her file on you.',
+    pay: 100, rep: 2, cred: 1,
+    snap: () => ({}),
+    test: (g) => g.player.cash >= 300 && g.room === 'cashking',
+    done: 'Roxy counts it with her eyes only. "Okay. Different conversation from now on."',
+    fail: 'The file stays where it was. So do the rates.',
+  },
+  {
+    id: 'gary-quiet', giver: 'Gary', where: 'the Game Barn', day: 1, due: 4,
+    title: 'A week nobody looks at my shop',
+    ask: 'Gary would like to reach Thursday with the police thinking about literally anything else. Get there cool.',
+    pay: 160, rep: 2,
+    snap: () => ({}),
+    test: (g) => g.day >= 4 && g.heat < 20,
+    done: 'Gary exhales for what is audibly the first time since Monday.',
+    fail: 'Gary watches a cruiser roll past his window and does not look at you.',
+  },
+  {
+    id: 'darnell-part', giver: 'Darnell', where: 'the Flats', day: 1, due: 4,
+    title: 'A part for the Buick',
+    ask: 'It is on a pallet at the dock. Darnell has been very clear that he is not asking you to do anything, and equally clear about which pallet.',
+    pay: 120, rep: 2, heat: 5,
+    snap: g => ({ n: st(g, 'freight') }),
+    test: (g, s) => st(g, 'freight') - s.n >= 1,
+    done: 'Darnell holds it up to the light like a jeweller. The Buick remains on blocks.',
+    fail: 'The Buick remains on blocks. This was always the most likely outcome.',
+  },
+  {
+    id: 'dee-dry', giver: 'Dee', where: 'the Foxhole', day: 1, due: 4,
+    title: 'Three days, and I will know',
+    ask: 'Dee has watched this exact movie from behind that exact bar. Three days off the Rip. She is not lecturing, she is betting.',
+    pay: 140, rep: 2, lessons: 1,
+    snap: g => ({ n: st(g, 'rip'), d: g.day }),
+    test: (g, s) => g.day - s.d >= 3 && st(g, 'rip') - s.n === 0,
+    done: 'Dee pays out of her own tips. "I hate being right. I love winning."',
+    fail: 'Dee does not say anything. She just puts the water down instead of the other thing.',
+  },
+  {
+    id: 'whit-bet', giver: 'Whit', where: 'the Split Lip', day: 2, due: 3,
+    title: 'I have money on you',
+    ask: 'Whit has taken a position on your Tuesday. Two men on the floor, any two, and she splits it with you.',
+    pay: 110, rep: 1, heat: 8,
+    snap: g => ({ n: st(g, 'koGiven') }),
+    test: (g, s) => st(g, 'koGiven') - s.n >= 2,
+    done: 'Whit collects from three people without breaking eye contact with any of them.',
+    fail: 'Whit pays out. She takes it well, which is the most frightening thing about her.',
+  },
+  {
+    id: 'wanda-rush', giver: 'Wanda', where: 'the buffet', day: 2, due: 3,
+    title: 'The lunch rush and one no-show',
+    ask: 'Three shifts. Anywhere, she does not care, she just needs to tell somebody that you work. And do not get yourself fired doing it.',
+    pay: 130, rep: 2,
+    snap: g => ({ n: st(g, 'shifts') + st(g, 'dockShifts') }),
+    test: (g, s) => st(g, 'shifts') + st(g, 'dockShifts') - s.n >= 3 && !g.player.fired,
+    done: 'Wanda writes your name on the schedule in pen. In this town that is a mortgage.',
+    fail: 'Wanda covers it herself, at sixty-one, and mentions it to nobody.',
+  },
+  {
+    id: 'moose-standing', giver: 'Moose', where: 'the Foxhole', day: 2, due: 3,
+    title: 'Standing is cheaper than a lawyer',
+    ask: 'Tip Dee three times. Moose has done the arithmetic on this over thirty years and would like to show his work.',
+    pay: 0, rep: 3, cred: 1, heatDrop: 18,
+    snap: g => ({ n: g.fox.tips }),
+    test: (g, s) => g.fox.tips - s.n >= 3,
+    done: 'Moose tells the room you are alright. The room adjusts. That is the whole mechanic.',
+    fail: 'Moose keeps pouring. He just stops introducing you.',
+  },
+  {
+    id: 'trevor-friend', giver: 'Trevor', where: 'the campus', day: 2, due: 3,
+    title: 'So it looks like I know somebody',
+    ask: 'Two classes. Sit in the back, do not talk, and let Trevor be seen walking out beside a person.',
+    pay: 60, rep: 2, lessons: 1,
+    snap: g => ({ n: g.htcc.classes }),
+    test: (g, s) => g.htcc.classes - s.n >= 2,
+    done: 'Trevor says "later" in the corridor at a volume calibrated to be overheard.',
+    fail: 'Trevor walks out alone at a normal volume.',
+  },
+  {
+    id: 'vern-three', giver: 'Vern', where: 'the pawn shop', day: 2, due: 3,
+    title: 'Three, and I am not asking',
+    ask: 'Vern would like three things off the Bluffs. Vern would like it noted that he has not asked where they are from, and will not.',
+    pay: 220, rep: 2, cred: 1, heat: 8,
+    snap: g => ({ n: st(g, 'burgled') }),
+    test: (g, s) => st(g, 'burgled') - s.n >= 3,
+    done: 'Vern counts it twice and pays once. The owl watches the whole transaction.',
+    fail: 'Vern taps the counter. "Standing offer. For somebody."',
+  },
+  {
+    id: 'ruthie-home', giver: 'Miss Ruthie', where: 'the Flats', day: 2, due: 4,
+    title: 'Three nights in your own bed',
+    ask: 'Somebody has been in her carport. She does not want a hero, she wants a light on across the street. Sleep at the garage three nights.',
+    pay: 70, rep: 3, noticeDrop: 2,
+    snap: g => ({ n: st(g, 'slept') }),
+    test: (g, s) => st(g, 'slept') - s.n >= 3,
+    done: 'Miss Ruthie waves from the porch chair at an hour no reasonable person is awake.',
+    fail: 'The porch light stays on all week regardless. She can afford it. Barely.',
+  },
+  {
+    id: 'sal-round', giver: 'Sal', where: 'the Split Lip', day: 3, due: 2,
+    title: 'Buy the room a round',
+    ask: 'Sal has a Thursday problem and it is that nobody is happy. Twenty-five dollars solves it for about forty minutes, which is the going rate.',
+    pay: 90, rep: 2, heatDrop: 10,
+    snap: g => ({ n: st(g, 'rounds') }),
+    test: (g, s) => st(g, 'rounds') - s.n >= 1,
+    done: 'Sal squares it out of the register in a way that is technically several crimes.',
+    fail: 'Nobody is happy. Sal absorbs this, as he absorbs everything, into the floor.',
+  },
+  {
+    id: 'bunny-binder', giver: 'Bunny', where: 'the club', day: 3, due: 3,
+    title: 'That binder should exist somewhere else',
+    ask: 'Bunny is a member here and hates it. The DA keeps a binder. Bunny would like the binder to be a public document, and is willing to be very unhelpful about how.',
+    pay: 320, rep: 4, cred: 2, heat: 20,
+    snap: g => ({ n: st(g, 'leaked') }),
+    test: (g, s) => st(g, 'leaked') - s.n >= 1,
+    done: 'Bunny pays in cash from a clutch, at the club, in daylight. "God, that felt good."',
+    fail: 'The binder stays in the house. The house stays on the road. The road stays quiet.',
+  },
+  {
+    id: 'bev-sunday', giver: 'Bev', where: 'the garage', day: 4, due: 3,
+    title: 'Be here Sunday',
+    ask: 'She has not asked you for one thing all week. She would like four hundred dollars on the table Sunday morning and she would like you to be the one who puts it there. There is no fee for this. That is the point.',
+    pay: 0, rep: 5, noticeDrop: 4,
+    snap: () => ({}),
+    test: (g) => g.day >= 6 && g.player.cash >= 400,
+    done: 'Bev counts it, puts it in the coffee tin, and asks if you have eaten.',
+    fail: 'The coffee tin is where it always is. She does not mention it, and she will not.',
+  },
+];
+
+// ---------------------------------------------------------------------------
+// THE LONG GAME — four currencies, and every one of them is a way you LOST
+//
+// ⚠️ THIS IS THE BEST IDEA IN THE FILE AND IT WAS ALREADY HALF-BUILT: endGame
+// has always paid cred for BUSTED, scars for BODIED, lessons for STUCK and rep
+// for WALKING. Four endings, four currencies — it just had no sink, so the
+// numbers went up forever and bought nothing. Now each lane is purchasable ONLY
+// with the currency its own ending pays, which means: getting arrested is the
+// only way to learn nerve, getting hospitalised is the only way to build a
+// body, and running out of week is the only way to get wise. You cannot grind
+// the good ending into everything. Every way to lose teaches one specific
+// thing, and the run after a bad night is genuinely different.
+//
+// ⚠️ cashBanked is deliberately NOT spendable. Carrying money between runs
+// deletes the tension of a run that starts at $61, and $61 IS the premise.
+// ⚠️ Every upgrade below is a REAL sim modifier applied in applyUpgrades().
+// If you add one, wire it there — a tree of inert numbers is worse than none.
+// ---------------------------------------------------------------------------
+export const UPGRADE_LANES = [
+  { key: 'body', cur: 'scars', label: 'BODY', icon: '🩹',
+    blurb: 'Paid for in hospital nights. You do not get this back any other way.' },
+  { key: 'nerve', cur: 'cred', label: 'NERVE', icon: '🚔',
+    blurb: 'Paid for in back seats. You took it and you did not talk, and that is worth something here.' },
+  { key: 'sense', cur: 'lessons', label: 'SENSE', icon: '🧠',
+    blurb: 'Paid for in weeks that ran out. Knowing where the thing is IS the upgrade.' },
+  { key: 'contacts', cur: 'rep', label: 'CONTACTS', icon: '🤝',
+    blurb: 'Paid for by leaving. People remember a man who got out and came back anyway.' },
+];
+
+export const UPGRADES = [
+  { id: 'b1', lane: 'body', cost: 1, name: 'Learned to Fall',
+    desc: '+15 max health. The floor stops being a surprise.' },
+  { id: 'b2', lane: 'body', cost: 2, name: 'Bad Hands', needs: 'b1',
+    desc: '+3 punch damage. Two knuckles set wrong and hit harder for it.' },
+  { id: 'b3', lane: 'body', cost: 3, name: 'Second Wind', needs: 'b2',
+    desc: '+30 stamina and it comes back faster. You have been tired before.' },
+
+  { id: 'n1', lane: 'nerve', cost: 1, name: 'Nothing to Say',
+    desc: 'Heat cools 40% faster overnight. You have already given them your name once.' },
+  { id: 'n2', lane: 'nerve', cost: 2, name: 'Known Quantity', needs: 'n1',
+    desc: 'Every fence in town pays 15% more. They stop pricing in the risk of you.' },
+  { id: 'n3', lane: 'nerve', cost: 3, name: 'Been Here Before', needs: 'n2',
+    desc: '+20 points on getting out of the cuffs. You know which wrist goes slack.' },
+
+  { id: 's1', lane: 'sense', cost: 1, name: 'You Know the Window',
+    desc: 'Start the run already knowing the back window and the drop.' },
+  { id: 's2', lane: 'sense', cost: 2, name: 'Short Sleeper', needs: 's1',
+    desc: 'The Rip crash costs one block instead of two. Not better. Cheaper.' },
+  { id: 's3', lane: 'sense', cost: 3, name: 'You Know the House', needs: 's2',
+    desc: 'Bluffs houses arrive already cased. You have been reading these roads for weeks.' },
+
+  { id: 'c1', lane: 'contacts', cost: 2, name: 'Somebody Owes You',
+    desc: 'Start with $120 more. It is not a gift and they will mention it.' },
+  { id: 'c2', lane: 'contacts', cost: 4, name: 'Word Gets Around', needs: 'c1',
+    desc: 'One more contract on the board, all week.' },
+  { id: 'c3', lane: 'contacts', cost: 6, name: 'The Good Rate', needs: 'c2',
+    desc: 'Contracts pay 40% more. You stopped being a favour and started being a rate.' },
+];
+
 export const ENDINGS = {
   WALKING: {
     title: 'WALKING',

@@ -22,6 +22,12 @@ for (const r of results) byEnding[r.ending || 'NONE'] = (byEnding[r.ending] || 0
 console.log(`\nVICTORY LAP soak — ${N} seeds`);
 console.log('endings:', JSON.stringify(byEnding));
 console.log('avg cash at end:', Math.round(results.reduce((a, r) => a + r.cash, 0) / N));
+// ⚠️ Contracts are only proven by the bot TAKING them (soakRun does, every
+// morning). A zero here means the board is dealing jobs nobody can finish.
+const jd = results.reduce((a, r) => a + (r.jobsDone || 0), 0);
+const jf = results.reduce((a, r) => a + (r.jobsFailed || 0), 0);
+console.log(`jobs: ${jd} done, ${jf} missed across ${N} seeds`);
+if (!jd) { console.error("✗ NO CONTRACT EVER COMPLETED — the board is dealing dead jobs"); process.exit(1); }
 console.log('avg crates sold:', (results.reduce((a, r) => a + r.crates, 0) / N).toFixed(2));
 console.log('runs with rip use:', results.filter(r => r.rip > 0).length);
 console.log('runs with skim:', results.filter(r => r.skimmed > 0).length);
