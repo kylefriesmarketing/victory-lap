@@ -9,7 +9,7 @@
 // textures ARE the game setting its own type, same letters the 2D signs carry.
 
 import * as THREE from '../lib/three.module.js';
-import { WORLD, STRIP_Y, DT_Y, GARAGE, FOXHOLE, WATER_TOWER, WORKS, BLUFFS, HTCC, FLATS, COURTHOUSE } from './game.js';
+import { WORLD, STRIP_Y, DT_Y, RAIL_Y, GARAGE, FOXHOLE, WATER_TOWER, WORKS, BLUFFS, HTCC, FLATS, COURTHOUSE } from './game.js';
 
 const _mats = new Map();
 function mat(hex, opts = {}) {
@@ -242,11 +242,15 @@ const PROPS = {
   barrel(g, p) { CYL(g, 9, 9, 24, hx(p.c, '#6a5a48'), p.x, 12, p.y, 9); },
   bench(g, p) { B(g, 44, 4, 14, '#8a5a33', p.x, 14, p.y); B(g, 44, 14, 3, '#8a5a33', p.x, 24, p.y - 6); },
   tree(g, p) {
+    // the four authored trees, built to the same two-blob recipe as the canopy
     const r = p.r || 26;
-    CYL(g, 4, 6, 34, '#5a4432', p.x, 17, p.y, 7);
+    CYL(g, 4, 6, 34, '#54402f', p.x, 17, p.y, 7);
     const m = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 0), mat(hx(p.c, '#2e4632')));
-    m.position.set(p.x, 34 + r * 0.7, p.y); m.castShadow = true;
+    m.position.set(p.x, 34 + r * 0.62, p.y); m.scale.set(1, 0.86, 1); m.castShadow = true;
     g.add(m);
+    const m2 = new THREE.Mesh(new THREE.IcosahedronGeometry(r * 0.68, 0), mat('#3a573a'));
+    m2.position.set(p.x + r * 0.3, 34 + r * 1.06, p.y - r * 0.22); m2.castShadow = true;
+    g.add(m2);
   },
   flag(g, p) {
     CYL(g, 1.8, 1.8, 110, '#b8b4ac', p.x, 55, p.y, 6);
@@ -268,6 +272,226 @@ const PROPS = {
   pallet(g, p) { B(g, 40, 5, 40, '#8a6a44', p.x, 2.5, p.y); },
   crate(g, p) { B(g, 22, 18, 22, hx(p.c, '#8a6a44'), p.x, 9, p.y); },
 };
+
+
+// ---------------------------------------------------------------------------
+// THE CANOPY
+// Hopewell had FOUR trees in 3400x3200 units of Illinois. That is why every
+// wide shot read as a diorama: no verticals, nothing organic, and nothing at
+// all to break the horizontal of a street.
+//
+// ⚠️ INSTANCED, NOT 170 MESHES. three.js issues one draw call per Mesh, so a
+// canopy built the obvious way would have added ~500 calls of pure scenery to a
+// town that draws in 282. Seven InstancedMeshes cover every tree in the game.
+// ⚠️ Their bounding spheres MUST be recomputed after the matrices are written —
+// an InstancedMesh keeps the stale unit sphere it was constructed with, and the
+// whole canopy pops out of existence the moment the camera leaves the origin.
+// Exactly the bug the rain had.
+//
+// ⚠️ A TREE LINE, NOT A FOREST. Trees are view-only — the sim has never heard of
+// one — so a trunk standing in open ground is a lie you walk straight through.
+// Placement is therefore biased hard toward EDGES: verges, property lines, lot
+// perimeters, the lake shore, the rail. That also happens to be what a
+// rust-belt town looks like from above. Trees follow the lines people drew and
+// the middle of everything stays open.
+// ---------------------------------------------------------------------------
+const CANOPY = {
+  target: 190,          // candidates that survive; the real count lands near this
+  spacing: 34,          // no two trunks closer than this
+  bark: '#54402f',
+  leaf: ['#2e4632', '#3a573a', '#43522c', '#6b5f2c'],   // three greens and one turning
+  pine: '#24402e',
+  dead: '#6b5f4c',
+};
+
+function buildCanopy(D) {
+  const grp = new THREE.Group();
+
+  // ── the no-tree map ──────────────────────────────────────────────────────
+  // ⚠️ D.patches are NOT obstacles. They are ground-colour bands, and four of
+  // them are 3400 wide — treating them as blockers excludes most of the county.
+  // Only surfaces you drive, park or walk on block a tree, plus real footprints.
+  const no = [];
+  const push = (r, pad) => {
+    if (!r || !(r.w > 0) || !(r.h > 0)) return;
+    no.push({ x0: r.x - pad, z0: r.y - pad, x1: r.x + r.w + pad, z1: r.y + r.h + pad });
+  };
+  for (const r of D.roads || []) push(r, 8);
+  for (const r of D.lots || []) push(r, 8);
+  for (const r of D.sidewalks || []) push(r, 5);
+  for (const r of D.crosswalks || []) push(r, 5);
+  push({ x: 0, y: RAIL_Y - 34, w: WORLD.w, h: 68 }, 0);               // the spur
+  push({ x: 0, y: BLUFFS.lakeY - 6, w: WORLD.w, h: WORLD.h }, 0);     // the lake says no
+  // every building footprint, padded generously so nothing grows through a wall
+  for (const b of D.mile || []) push({ x: b.x, y: STRIP_Y.roofTop, w: b.w, h: STRIP_Y.base - STRIP_Y.roofTop }, 30);
+  for (const b of D.downtown || []) push({ x: b.x, y: DT_Y.roofTop, w: b.w, h: DT_Y.base - DT_Y.roofTop }, 30);
+  for (const v of D.vacants || []) push({ x: v.x, y: (v.y > 1700 ? DT_Y.roofTop : STRIP_Y.roofTop), w: v.w || 150, h: 300 }, 30);
+  for (const h of FLATS.houses || []) push(h, 26);
+  for (const h of BLUFFS.houses || []) push({ x: h.x, y: h.y, w: h.w || 210, h: h.h || 150 }, 26);
+  for (const b of HTCC.buildings || []) push({ x: b.x, y: b.y, w: b.w || 260, h: b.h || 120 }, 30);
+  push(HTCC.quad, 0); push(HTCC.lot, 8);
+  push(BLUFFS.club, 26); push(COURTHOUSE, 40); push(GARAGE, 26); push(FOXHOLE, 26);
+  push(WORKS.plant, 40); push(WORKS.hall, 26); push(WORKS.yard, 10); push(WORKS.gate, 20);
+  push({ x: WATER_TOWER.x - 90, y: WATER_TOWER.y - 90, w: 180, h: 180 }, 0);
+
+  // distance from a point to the nearest blocked rect (0 = standing in one)
+  function edgeDist(x, z) {
+    let best = 1e9;
+    for (const r of no) {
+      const dx = Math.max(r.x0 - x, 0, x - r.x1);
+      const dz = Math.max(r.z0 - z, 0, z - r.z1);
+      const d = Math.hypot(dx, dz);
+      if (d < best) best = d;
+      if (best === 0) return 0;
+    }
+    return best;
+  }
+
+  // ── the scatter ──────────────────────────────────────────────────────────
+  let h0 = 0x5eed7a11;
+  const rnd = () => { h0 ^= h0 << 13; h0 ^= h0 >>> 17; h0 ^= h0 << 5; return ((h0 >>> 0) % 100000) / 100000; };
+  const trees = [];
+  const cell = CANOPY.spacing, grid = new Map();
+  const gk = (x, z) => ((x / cell) | 0) + ',' + ((z / cell) | 0);
+  function crowded(x, z) {
+    const gx = (x / cell) | 0, gz = (z / cell) | 0;
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+      const c = grid.get((gx + i) + ',' + (gz + j));
+      if (c) for (const t of c) if (Math.hypot(t.x - x, t.z - z) < CANOPY.spacing) return true;
+    }
+    return false;
+  }
+  for (let tries = 0; tries < 22000 && trees.length < CANOPY.target; tries++) {
+    const x = 20 + rnd() * (WORLD.w - 40), z = 20 + rnd() * (WORLD.h - 40);
+    const d = edgeDist(x, z);
+    if (d < 14) continue;                                  // in or hard against something
+    // ⚠️ THE EDGE BIAS. Close to a line somebody drew: almost always yes. Out in
+    // the open middle of a field: almost never. This one curve is the whole
+    // difference between "a town with trees" and "a town in a forest".
+    const p = d < 95 ? 0.92 : d < 190 ? 0.22 : 0.05;
+    if (rnd() > p) continue;
+    if (crowded(x, z)) continue;
+    let kind = 'broad';
+    if (z > BLUFFS.roadY) kind = rnd() < 0.55 ? 'pine' : 'broad';        // lakeside
+    else if (x > 2200 && z < 1500) kind = rnd() < 0.55 ? 'dead' : 'broad'; // the Works
+    else if (Math.abs(z - RAIL_Y) < 150) kind = rnd() < 0.45 ? 'dead' : 'broad';
+    const t = { x, z, kind, s: 0.75 + rnd() * 0.6, r: rnd(), r2: rnd(), r3: rnd() };
+    trees.push(t);
+    const k = gk(x, z); if (!grid.has(k)) grid.set(k, []); grid.get(k).push(t);
+  }
+
+  // ── build the buckets ────────────────────────────────────────────────────
+  const dummy = new THREE.Object3D();
+  const buckets = [];
+  function bucket(geo, hex, n, shadow = true) {
+    const m = new THREE.InstancedMesh(geo, mat(hex), n);
+    m.castShadow = shadow; m.receiveShadow = false; m.count = 0;
+    buckets.push(m); grp.add(m);
+    return m;
+  }
+  const put = (m, x, y, z, sx, sy, sz, rx = 0, ry = 0, rz = 0) => {
+    dummy.position.set(x, y, z); dummy.rotation.set(rx, ry, rz); dummy.scale.set(sx, sy, sz);
+    dummy.updateMatrix(); m.setMatrixAt(m.count++, dummy.matrix);
+  };
+  const gCyl = new THREE.CylinderGeometry(1, 1, 1, 6);
+  const gBlob = new THREE.IcosahedronGeometry(1, 0);
+  const gCone = new THREE.ConeGeometry(1, 1, 7);
+
+  const nB = trees.filter(t => t.kind === 'broad').length;
+  const nP = trees.filter(t => t.kind === 'pine').length;
+  const nD = trees.filter(t => t.kind === 'dead').length;
+  const trunk = bucket(gCyl, CANOPY.bark, trees.length);
+  const leaves = CANOPY.leaf.map(c => bucket(gBlob, c, nB * 2 + 4));
+  const pine = bucket(gCone, CANOPY.pine, Math.max(1, nP * 2));
+  const branch = bucket(_box, CANOPY.dead, Math.max(1, nD * 5));
+
+  for (const t of trees) {
+    const s = t.s;
+    if (t.kind === 'pine') {
+      put(trunk, t.x, 9 * s, t.z, 3.4 * s, 18 * s, 3.4 * s);
+      put(pine, t.x, (18 + 26) * s, t.z, 20 * s, 52 * s, 20 * s);
+      put(pine, t.x, (18 + 54) * s, t.z, 13 * s, 38 * s, 13 * s);
+    } else if (t.kind === 'dead') {
+      // ⚠️ a dead tree is a SILHOUETTE — the whole read is the branch angles, so
+      // it gets four splayed boxes and no blob at all. The Works and the rail
+      // are the only places in town that get them; a dead tree on a lawn just
+      // looks like a bug.
+      put(trunk, t.x, 24 * s, t.z, 3.2 * s, 48 * s, 3.2 * s);
+      for (let i = 0; i < 4; i++) {
+        const a = t.r * 6.28 + i * 1.57, ln = (16 + t.r2 * 12) * s;
+        put(branch, t.x + Math.cos(a) * ln * 0.4, (40 + i * 5) * s, t.z + Math.sin(a) * ln * 0.4,
+          ln, 2.2 * s, 2.2 * s, 0, -a, 0.5 + t.r3 * 0.3);
+      }
+    } else {
+      put(trunk, t.x, 17 * s, t.z, 3.8 * s, 34 * s, 3.8 * s);
+      // ⚠️ ONE ball on a stick is a lollipop. Two overlapping blobs at different
+      // heights, radii and tints is a tree — the offset is what makes a canopy
+      // read as foliage instead of a sphere.
+      const base = t.r < 0.14 ? 3 : (t.r * 3) | 0;         // ~14% turn in autumn
+      const r0 = (20 + t.r2 * 10) * s;
+      put(leaves[base], t.x, (34 + r0 * 0.62), t.z, r0, r0 * 0.86, r0);
+      const r1 = r0 * (0.62 + t.r3 * 0.22);
+      put(leaves[(base + 1) % 4 === 3 ? base : (base + 1) % 4],
+        t.x + (t.r3 - 0.5) * r0 * 0.9, 34 + r0 * 0.62 + r0 * 0.42, t.z + (t.r - 0.5) * r0 * 0.9,
+        r1, r1 * 0.9, r1);
+    }
+  }
+  // ⚠️ THE LINE THAT KEEPS THE CANOPY ON SCREEN. Without it every bucket keeps
+  // the unit bounding sphere it was born with and frustum culling deletes the
+  // lot the moment the camera is more than a metre from the origin.
+  for (const m of buckets) { m.instanceMatrix.needsUpdate = true; m.computeBoundingSphere(); }
+  grp.userData.treeCount = trees.length;
+  return grp;
+}
+
+// ---------------------------------------------------------------------------
+// THE SKYLINE — rooftop plant
+// ⚠️ ROOFS ARE THE LARGEST SURFACE IN THIS GAME AND THEY WERE BLANK. The camera
+// is a raised three-quarter, so a downtown frame shows more roof than facade,
+// and every one of them was a single unbroken slab of #2a2730. Everything that
+// makes an American roof read is bolted to the top of it: a stair penthouse, a
+// couple of HVAC units, vent stacks, a dish somebody put up in 2004.
+// Deterministic per building key, so a shop's roof is its own roof forever.
+// ---------------------------------------------------------------------------
+function roofDress(g, x, w, zC, depth, top, key, tall) {
+  let h = 2166136261;
+  const k = String(key || x);
+  for (let i = 0; i < k.length; i++) { h ^= k.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  const rnd = () => { h ^= h << 13; h >>>= 0; h ^= h >>> 17; h ^= h << 5; h >>>= 0; return (h % 100000) / 100000; };
+  const x0 = x + 26, x1 = x + w - 26, z0 = zC - depth / 2 + 24, z1 = zC + depth / 2 - 24;
+  if (x1 - x0 < 34 || z1 - z0 < 24) return;
+  const px = () => x0 + rnd() * (x1 - x0), pz = () => z0 + rnd() * (z1 - z0);
+
+  if (rnd() < 0.75) {                                       // the stairwell penthouse
+    const bx = px(), bz = pz(), bw = 34 + rnd() * 22, bd = 26 + rnd() * 14;
+    B(g, bw, 26, bd, '#494339', bx, top + 13, bz);
+    B(g, bw + 6, 4, bd + 6, '#37322b', bx, top + 28, bz);
+    B(g, 13, 19, 3, '#241f1a', bx, top + 9.5, bz + bd / 2 + 1);
+  }
+  for (let i = 0, n = 1 + ((rnd() * 3) | 0); i < n; i++) {   // HVAC
+    const bx = px(), bz = pz();
+    B(g, 26 + rnd() * 16, 13, 20 + rnd() * 10, '#8a867e', bx, top + 6.5, bz);
+    B(g, 15, 3, 15, '#63605a', bx, top + 14.5, bz);
+  }
+  for (let i = 0, n = 2 + ((rnd() * 4) | 0); i < n; i++) {   // vent stacks
+    const bx = px(), bz = pz(), vh = 10 + rnd() * 18;
+    CYL(g, 2.8, 2.8, vh, '#9a958c', bx, top + vh / 2, bz, 6);
+    CYL(g, 5, 5, 3, '#767068', bx, top + vh + 1.5, bz, 6);
+  }
+  if (rnd() < 0.4) {                                         // the dish
+    const bx = px(), bz = pz();
+    CYL(g, 1.8, 1.8, 14, '#63605a', bx, top + 7, bz, 5);
+    const d = new THREE.Mesh(new THREE.CylinderGeometry(11, 11, 2, 10), mat('#c3bdb0'));
+    d.position.set(bx, top + 16, bz); d.rotation.x = 1.02; d.castShadow = true; g.add(d);
+  }
+  if (tall && rnd() < 0.55) {                                // the water tank
+    const bx = px(), bz = pz();
+    for (const [dx, dz] of [[-9, -9], [9, -9], [-9, 9], [9, 9]])
+      B(g, 4, 20, 4, '#5a5148', bx + dx, top + 10, bz + dz);
+    CYL(g, 14, 14, 26, '#7a6a58', bx, top + 33, bz, 9);
+    CYL(g, 14, 6, 9, '#63523f', bx, top + 50.5, bz, 9);
+  }
+}
 
 // ---------------------------------------------------------------------------
 export function buildTown(D) {
@@ -326,6 +550,12 @@ export function buildTown(D) {
     const x = b.x, w = b.w;
     B(g, w - 6, h, depth, wall, x + w / 2, h / 2, baseZ - depth / 2 + depth);   // body
     B(g, w, 16, depth + 8, '#2a2730', x + w / 2, h + 8, baseZ + depth / 2);     // parapet
+    // ⚠️ the parapet is a SOLID box, so its top face IS the roof — which is why
+    // every roof in town was one slab of near-black. A tar-and-gravel deck inset
+    // inside it gives the parapet a lip to cast onto and the roof a colour.
+    const deckY = h + 16;
+    B(g, w - 11, 3, depth - 3, '#4c473f', x + w / 2, deckY + 1.5, baseZ + depth / 2);
+    roofDress(g, x, w, baseZ + depth / 2, depth, deckY + 3, b.key || ('f' + x), h > 200);
     // storefront glass — dead units get plywood instead
     const glassW = w * 0.66, glassH = h * 0.34;
     if (b.boarded) {
@@ -443,6 +673,12 @@ export function buildTown(D) {
     roof.rotation.y = Math.PI / 4;
     roof.position.set(x + w / 2, h + (roofR * 0.42 + 26) / 2, z + d / 2);
     roof.castShadow = true; g.add(roof);
+    // ⚠️ a pyramid roof with nothing on it reads as a TENT. One chimney breaks
+    // the silhouette, and it has to out-reach the slope it stands on — the apex
+    // is h + roofR*0.42 + 26, so a short stub just disappears inside the cone.
+    const chx = x + w * 0.7, chz = z + d * 0.42;
+    B(g, 15, 62, 13, hx(wallHex, '#7a6a58'), chx, h + 31, chz);
+    B(g, 19, 5, 17, '#4a443c', chx, h + 64, chz);
     B(g, 22, 40, 4, hx(trimHex, '#9c5a4a'), x + w / 2, 20, z + d + 1);
     const win = new THREE.Mesh(_box, new THREE.MeshLambertMaterial({ color: 0x1c2836 }));
     win.scale.set(18, 16, 3); win.position.set(x + w * 0.24, 62, z + d + 1);
@@ -454,6 +690,8 @@ export function buildTown(D) {
   for (const b of (HTCC.buildings || [])) {
     const w = b.w || 260, d = b.h || 120;
     B(g, w, 130, d, '#a89778', b.x + w / 2, 65, b.y + d / 2);
+    B(g, w - 10, 3, d - 10, '#4c473f', b.x + w / 2, 131.5, b.y + d / 2);
+    roofDress(g, b.x, w, b.y + d / 2, d, 133, b.key || 'htcc', true);
     for (let i = 0; i < Math.floor(w / 40); i++)
       B(g, 8, 60, 3, '#2c3844', b.x + 24 + i * 40, 60, b.y + d + 1);
   }
@@ -503,6 +741,10 @@ export function buildTown(D) {
       else fn(g, p);
     } catch (e) { console.error('prop failed', p.kind, e.message); }
   }
+
+  // ── the canopy, last, off the same D everything else was built from ──────
+  const canopy = buildCanopy(D);
+  g.add(canopy);
 
   // ── night switching: 0 day · 1 evening (everything glows) · 2 late ──────
   // ⚠️ Exactly TWO window materials exist, both shared: day glass and lit glass.
