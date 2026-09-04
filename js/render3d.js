@@ -39,9 +39,22 @@ const tw3 = (u) => Math.abs(u.armR.position.x);
 // MATERIALS — one per colour, shared. Flat + matte is the look AND the perf.
 // ---------------------------------------------------------------------------
 const _mats = new Map();
+// ⚠️⚠️ STANDARD, NOT LAMBERT. Lambert is 100% matte — it has no specular term
+// AT ALL, so nothing in this game could ever catch a highlight and every surface
+// read as painted cardboard. That is the single biggest reason the town looked
+// flatter than the three.js demos it gets compared to.
+// ⚠️ ROUGHNESS STAYS HIGH (0.88) ON PURPOSE. The art bible's identity is chunky
+// flat-colour low-poly; the goal is a WHISPER of specular that tells you which
+// way a face is turned, not shiny plastic. Gloss is bought back deliberately,
+// per material, for the handful of things that are actually glossy (car paint,
+// glass, metal) — see the roughness overrides at those call sites.
+// ⚠️ envMapIntensity is 0.35, not 1. A full-strength environment washes the flat
+// colours toward the sky tint and the palette stops being the palette.
+const SURF = { roughness: 0.88, metalness: 0.0, envMapIntensity: 0.35 };
+
 function mat(hex) {
   if (_mats.has(hex)) return _mats.get(hex);
-  const m = new THREE.MeshLambertMaterial({ color: hex });
+  const m = new THREE.MeshStandardMaterial({ color: hex, ...SURF });
   _mats.set(hex, m);
   return m;
 }
@@ -213,6 +226,13 @@ export class Renderer3D {
     this.renderer.setClearColor(C.night);
 
     this.scene = new THREE.Scene();
+    // ⚠️ A STANDARD MATERIAL WITH NOTHING TO REFLECT IS JUST AN EXPENSIVE LAMBERT.
+    // The whole point of the swap is specular, and specular needs a source, so
+    // the scene gets a tiny procedural environment: a two-stop sky-over-ground
+    // gradient run through PMREM. 64x32 is plenty — this is never seen directly,
+    // it only has to be BRIGHT ABOVE and DARK BELOW so a face turned skyward
+    // catches something and a face turned down does not. Built once, ~1ms.
+    this._envs = {};                       // day-bucket -> PMREM texture, built once each
     // ⚠️ Fog starts BEYOND max camera distance or the town greys out at your feet.
     this.scene.fog = new THREE.Fog(C.night, 1700, 4200);
     this._fogDefaults = { near: 1700, far: 4200 };
@@ -290,6 +310,41 @@ export class Renderer3D {
 
     this.resize();
     addEventListener('resize', () => this.resize());
+  }
+
+  // ⚠️⚠️ THE ENVIRONMENT MUST DIM WITH THE HOUR. An image-based environment is
+  // LIGHT, not decoration — leaving one daylight sky on all night lifted the LATE
+  // frame's mean luma by 63% (measured) and there is no bright sky to reflect at
+  // 2 a.m. So the gradient is rebuilt per day-bucket: a pale blue sky over warm
+  // ground at noon, a cold near-black moonlit wash at 2 a.m.
+  // ⚠️ scene.environmentIntensity WOULD be the one-line version of this, and the
+  // property is settable on r160 — but it does NOTHING until r163. Measured:
+  // 0.4 and 1.0 both produced luma 53.91 to the hundredth. A property existing is
+  // not proof it is wired; toggle it and read the pixels.
+  // ⚠️ Must run AFTER this.renderer exists — PMREMGenerator needs the GL context.
+  // Cached by bucket (11 max), so the ~1 ms build happens once per bucket ever.
+  _envFor(day) {
+    const k = Math.max(0, Math.min(10, Math.round(day * 10)));
+    if (this._envs[k]) return this._envs[k];
+    const d = k / 10;
+    const mix = (a, b) => new THREE.Color(a).lerp(new THREE.Color(b), d).getStyle();
+    const cv = document.createElement('canvas');
+    cv.width = 64; cv.height = 32;
+    const c = cv.getContext('2d');
+    const g = c.createLinearGradient(0, 0, 0, 32);
+    g.addColorStop(0.00, mix(0x141c30, 0xd2e4f6));   // sky: moonlit → daylight
+    g.addColorStop(0.46, mix(0x101728, 0x9db4c8));
+    g.addColorStop(0.54, mix(0x0d0b10, 0x6b6258));   // horizon, then the ground
+    g.addColorStop(1.00, mix(0x08070a, 0x38332c));
+    c.fillStyle = g; c.fillRect(0, 0, 64, 32);
+    const tex = new THREE.CanvasTexture(cv);
+    tex.mapping = THREE.EquirectangularReflectionMapping;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const pm = new THREE.PMREMGenerator(this.renderer);
+    const env = pm.fromEquirectangular(tex).texture;
+    pm.dispose(); tex.dispose();
+    this._envs[k] = env;
+    return env;
   }
 
   resize(w, h) {
@@ -613,8 +668,24 @@ export class Renderer3D {
     // the sun intensity uses so the two can never drift apart.
     // ⚠️ Interiors are lit rooms and already override sun/hemi above — they get
     // their own fixed stop, or a bright shop reads like a night exterior.
-    const expo = this.curRoom !== 'ext' ? 1.30 : 1.85 - day * 0.55;
+    // ⚠️ RECALIBRATED after the Lambert→Standard swap. Standard carries a real
+    // specular term and the image-based environment is additional LIGHT, so the
+    // identical scene came out 20–27% brighter on every block. That lift was a
+    // SIDE EFFECT of a material change, not a decision, so the whole curve is
+    // scaled by 0.76 — which puts mean luma back within ±5% of the pre-swap frame
+    // on all four (measured +2 / +1 / +5 / −3). Hold brightness constant and the
+    // only thing that changed is quality; that is what a matched pair is FOR.
+    // ⚠️ Interiors get their own stop, and it is DELIBERATELY above the night
+    // street. At 1.00 the QwikStop measured luma 32.14 against a night Mile of
+    // 32.16 — identical, so stepping inside felt like nothing. A lit box in the
+    // dark is the whole point of the shop that never closes; 1.30 puts it at
+    // 39.15, about 22% brighter than the street it opens onto.
+    const expo = this.curRoom !== 'ext' ? 1.30 : 1.41 - day * 0.42;
     this.renderer.toneMappingExposure = expo;
+    // ⚠️ SAME `day`, so the reflections can never disagree with the sun. Interiors
+    // are lit rooms with no sky at all, so they get the darkest bucket and let the
+    // point light do the work.
+    this.scene.environment = this._envFor(this.curRoom !== 'ext' ? 0.15 : day);
 
     this.sun.intensity = sunI;
     this.hemi.intensity = hemiI;

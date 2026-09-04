@@ -13,11 +13,26 @@ import * as THREE from '../lib/three.module.js';
 
 const _box = new THREE.BoxGeometry(1, 1, 1);
 const _mats = new Map();
+// ⚠️⚠️ STANDARD, NOT LAMBERT. Lambert is 100% matte — it has no specular term
+// AT ALL, so nothing in this game could ever catch a highlight and every surface
+// read as painted cardboard. That is the single biggest reason the town looked
+// flatter than the three.js demos it gets compared to.
+// ⚠️ ROUGHNESS STAYS HIGH (0.88) ON PURPOSE. The art bible's identity is chunky
+// flat-colour low-poly; the goal is a WHISPER of specular that tells you which
+// way a face is turned, not shiny plastic. Gloss is bought back deliberately,
+// per material, for the handful of things that are actually glossy (car paint,
+// glass, metal) — see the roughness overrides at those call sites.
+// ⚠️ envMapIntensity is 0.35, not 1. A full-strength environment washes the flat
+// colours toward the sky tint and the palette stops being the palette.
+const SURF = { roughness: 0.88, metalness: 0.0, envMapIntensity: 0.35 };
+
 function mat(hex, emissive) {
   const key = hex + '|' + (emissive || 0);
   if (_mats.has(key)) return _mats.get(key);
-  const m = new THREE.MeshLambertMaterial({ color: hex });
-  if (emissive) { m.emissive = new THREE.Color(emissive); m.emissiveIntensity = 0.85; }
+  const m = new THREE.MeshStandardMaterial({ color: hex, ...SURF });
+  // ⚠️ same reason as the town's lit windows: under ACES an emissive below 1 is
+  // just a pale colour. A room light has to exceed the shoulder to read as lit.
+  if (emissive) { m.emissive = new THREE.Color(emissive); m.emissiveIntensity = 2.1; }
   _mats.set(key, m);
   return m;
 }
@@ -281,7 +296,7 @@ export function buildRoom(key, it, opts = {}) {
   // room looks the same every time you walk into it. A floor that re-stains
   // itself on each entry is worse than a clean one.
   const grime = grimeTexture(key, floorC, W, H);
-  if (grime) floor.material = new THREE.MeshLambertMaterial({ map: grime });
+  if (grime) floor.material = new THREE.MeshStandardMaterial({ map: grime, roughness: 0.92, metalness: 0, envMapIntensity: 0.15 });
 
   for (const item of (L.items || [])) {
     const fn = V[item.kind];

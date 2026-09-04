@@ -12,10 +12,23 @@ import * as THREE from '../lib/three.module.js';
 import { WORLD, STRIP_Y, DT_Y, RAIL_Y, GARAGE, FOXHOLE, WATER_TOWER, WORKS, BLUFFS, HTCC, FLATS, COURTHOUSE } from './game.js';
 
 const _mats = new Map();
+// ⚠️⚠️ STANDARD, NOT LAMBERT. Lambert is 100% matte — it has no specular term
+// AT ALL, so nothing in this game could ever catch a highlight and every surface
+// read as painted cardboard. That is the single biggest reason the town looked
+// flatter than the three.js demos it gets compared to.
+// ⚠️ ROUGHNESS STAYS HIGH (0.88) ON PURPOSE. The art bible's identity is chunky
+// flat-colour low-poly; the goal is a WHISPER of specular that tells you which
+// way a face is turned, not shiny plastic. Gloss is bought back deliberately,
+// per material, for the handful of things that are actually glossy (car paint,
+// glass, metal) — see the roughness overrides at those call sites.
+// ⚠️ envMapIntensity is 0.35, not 1. A full-strength environment washes the flat
+// colours toward the sky tint and the palette stops being the palette.
+const SURF = { roughness: 0.88, metalness: 0.0, envMapIntensity: 0.35 };
+
 function mat(hex, opts = {}) {
   const key = hex + '|' + JSON.stringify(opts);
   if (_mats.has(key)) return _mats.get(key);
-  const m = new THREE.MeshLambertMaterial({ color: hex, ...opts });
+  const m = new THREE.MeshStandardMaterial({ color: hex, ...SURF, ...opts });
   _mats.set(key, m);
   return m;
 }
@@ -221,9 +234,18 @@ const PROPS = {
   car(g, p) {
     const c = hx(p.c, '#5b7291');
     const grp = new THREE.Group();
-    B(grp, 74, 18, 34, c, 0, 14, 0);
-    B(grp, 44, 14, 30, c, -4, 28, 0);
-    B(grp, 40, 10, 27, '#22303c', -4, 30, 0);                  // glasshouse
+    // ⚠️ the ONE thing on this street anybody waxes. Car paint is a clearcoat
+    // over a non-metal base, so metalness stays 0 and the gloss comes from
+    // roughness — 0.35 catches the sun down the length of the body, which is
+    // what makes a row of parked cars read as cars and not as coloured boxes.
+    const paint = mat(c, { roughness: 0.35, envMapIntensity: 0.8 });
+    const body = new THREE.Mesh(_box, paint); body.scale.set(74, 18, 34); body.position.set(0, 14, 0);
+    body.castShadow = true; body.receiveShadow = true; grp.add(body);
+    const cab = new THREE.Mesh(_box, paint); cab.scale.set(44, 14, 30); cab.position.set(-4, 28, 0);
+    cab.castShadow = true; cab.receiveShadow = true; grp.add(cab);
+    const gh = new THREE.Mesh(_box, mat('#22303c', { roughness: 0.1, metalness: 0.1, envMapIntensity: 1.2 }));
+    gh.scale.set(40, 10, 27); gh.position.set(-4, 30, 0);
+    gh.castShadow = true; grp.add(gh);                         // glasshouse
     for (const [dx, dz] of [[-24, -17], [24, -17], [-24, 17], [24, 17]]) {
       const w = CYL(grp, 7, 7, 5, '#1c1c20', dx, 7, dz, 10);
       w.rotation.x = Math.PI / 2;
@@ -261,7 +283,7 @@ const PROPS = {
     CYL(g, 2.5, 2.5, 90, '#6a6560', p.x, 45, p.y, 6);
     if (p.sign) {
       const tex = signTexture(p.sign, p.signC || '#8a5a33');
-      const m = new THREE.Mesh(_box, new THREE.MeshLambertMaterial({ map: tex }));
+      const m = new THREE.Mesh(_box, new THREE.MeshStandardMaterial({ map: tex, ...SURF }));
       m.scale.set(54, 16, 3); m.position.set(p.x, 84, p.y); m.castShadow = true;
       g.add(m);
     } else B(g, 44, 20, 3, hx(p.signC, '#8a5a33'), p.x, 82, p.y);
@@ -502,7 +524,7 @@ export function buildTown(D) {
   // ground: the painted world plane + a plain oversized surround under it
   const groundTex = paintGround(D);
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(WORLD.w, WORLD.h),
-    new THREE.MeshLambertMaterial({ map: groundTex }));
+    new THREE.MeshStandardMaterial({ map: groundTex, roughness: 0.96, metalness: 0, envMapIntensity: 0.18 }));
   ground.rotation.x = -Math.PI / 2;
   ground.position.set(WORLD.w / 2, 0.5, WORLD.h / 2);
   ground.receiveShadow = true;
@@ -562,7 +584,7 @@ export function buildTown(D) {
       B(g, glassW, glassH, 4, '#6d5a4a', x + w / 2, glassH / 2 + 8, baseZ + depth + 1);
       for (let i = 0; i < 3; i++) B(g, glassW, 5, 5, '#5a4a3a', x + w / 2, 14 + i * glassH * 0.36, baseZ + depth + 3);
     } else {
-      const glass = new THREE.Mesh(_box, new THREE.MeshLambertMaterial({ color: 0x22303c }));
+      const glass = new THREE.Mesh(_box, new THREE.MeshStandardMaterial({ color: 0x22303c, roughness: 0.12, metalness: 0.1, envMapIntensity: 1.1 }));
       glass.scale.set(glassW, glassH, 4);
       glass.position.set(x + w / 2, glassH / 2 + 8, baseZ + depth + 1);
       g.add(glass);
@@ -600,7 +622,7 @@ export function buildTown(D) {
     // the sign band with the REAL name
     if (b.sign) {
       const tex = signTexture(b.sign, b.signC || '#8a5a33');
-      const sm = new THREE.Mesh(_box, new THREE.MeshLambertMaterial({ map: tex }));
+      const sm = new THREE.Mesh(_box, new THREE.MeshStandardMaterial({ map: tex, ...SURF }));
       sm.scale.set(Math.min(w * 0.8, 190), 24, 5);
       sm.position.set(x + w / 2, h * 0.72, baseZ + depth + 2.5);
       sm.castShadow = true;
@@ -612,7 +634,7 @@ export function buildTown(D) {
     for (let s = 1; s < storeys; s++) {
       const wy = h * 0.42 + s * (h * 0.5 / storeys);
       for (let i = 0; i < Math.max(2, Math.floor(w / 60)); i++) {
-        const wm = new THREE.Mesh(_box, new THREE.MeshLambertMaterial({ color: 0x1c2836 }));
+        const wm = new THREE.Mesh(_box, new THREE.MeshStandardMaterial({ color: 0x1c2836, roughness: 0.14, metalness: 0.1, envMapIntensity: 1.0 }));
         wm.scale.set(20, 26, 2);
         wm.position.set(x + 34 + i * (w - 60) / Math.max(1, Math.floor(w / 60) - 1), wy, baseZ + depth + 1);
         g.add(wm);
@@ -680,7 +702,7 @@ export function buildTown(D) {
     B(g, 15, 62, 13, hx(wallHex, '#7a6a58'), chx, h + 31, chz);
     B(g, 19, 5, 17, '#4a443c', chx, h + 64, chz);
     B(g, 22, 40, 4, hx(trimHex, '#9c5a4a'), x + w / 2, 20, z + d + 1);
-    const win = new THREE.Mesh(_box, new THREE.MeshLambertMaterial({ color: 0x1c2836 }));
+    const win = new THREE.Mesh(_box, new THREE.MeshStandardMaterial({ color: 0x1c2836, roughness: 0.14, metalness: 0.1, envMapIntensity: 1.0 }));
     win.scale.set(18, 16, 3); win.position.set(x + w * 0.24, 62, z + d + 1);
     g.add(win);
     nightWindows.push({ mesh: win, lateOpen: false, warm: true });
@@ -708,7 +730,7 @@ export function buildTown(D) {
     // perimeter chain-link: thin translucent panels on posts
     const f = { x0: p.x - 60, x1: p.x + p.w + 40, z0: p.y - 50, z1: p.y + p.h + 90 };
     for (let x = f.x0; x <= f.x1; x += 90) CYL(g, 1.6, 1.6, 40, '#6a6560', x, 20, f.z1, 5);
-    const fence = new THREE.Mesh(_box, new THREE.MeshLambertMaterial({ color: 0x8c9498, transparent: true, opacity: 0.28 }));
+    const fence = new THREE.Mesh(_box, new THREE.MeshStandardMaterial({ color: 0x8c9498, transparent: true, opacity: 0.28, roughness: 0.4, metalness: 0.7, envMapIntensity: 0.6 }));
     fence.scale.set(f.x1 - f.x0, 36, 1.5); fence.position.set((f.x0 + f.x1) / 2, 20, f.z1);
     g.add(fence);
   }
@@ -725,7 +747,7 @@ export function buildTown(D) {
   if (GARAGE) house(GARAGE.x, GARAGE.y, GARAGE.w || 220, GARAGE.h || 180, '#7a6a58', '#9c5a4a');
   if (FOXHOLE && FOXHOLE.w) {
     B(g, FOXHOLE.w, 150, FOXHOLE.h, '#3d3640', (FOXHOLE.x || 0) + FOXHOLE.w / 2, 75, (FOXHOLE.y || 0) + FOXHOLE.h / 2);
-    const sm = new THREE.Mesh(_box, new THREE.MeshLambertMaterial({ map: signTexture('THE FOXHOLE', '#1c1620', '#d98fb0') }));
+    const sm = new THREE.Mesh(_box, new THREE.MeshStandardMaterial({ map: signTexture('THE FOXHOLE', '#1c1620', '#d98fb0'), ...SURF }));
     sm.scale.set(120, 22, 4);
     sm.position.set((FOXHOLE.x || 0) + FOXHOLE.w / 2, 120, (FOXHOLE.y || 0) + FOXHOLE.h + 2);
     g.add(sm); signMeshes.push(sm);
@@ -754,11 +776,15 @@ export function buildTown(D) {
   // meshes might share is exactly the destructive-probe trap from the toybox.
   // Shared + never disposed = no churn, no risk. Dim homes reuse the lit
   // material; the intensity difference wasn't worth a third texture bind.
-  const glassDay = mat(0x22303c);
-  const glassLit = new THREE.MeshLambertMaterial({
-    color: 0xffcf8e, emissive: 0xff9f4e, emissiveIntensity: 0.9 });
-  const glassDim = new THREE.MeshLambertMaterial({
-    color: 0x8a7a5e, emissive: 0xc97a3e, emissiveIntensity: 0.4 });
+  const glassDay = mat(0x22303c, { roughness: 0.12, metalness: 0.1, envMapIntensity: 1.1 });
+  // ⚠️ emissiveIntensity is pushed WELL past 1 now. Under ACES a value of 0.9
+  // maps to a dull cream rectangle; the tone map's shoulder is what makes an
+  // emissive read as a LIGHT rather than a light-coloured card, and it only
+  // engages above 1. These are also the surfaces the bloom pass will key off.
+  const glassLit = new THREE.MeshStandardMaterial({
+    color: 0xffcf8e, emissive: 0xff9f4e, emissiveIntensity: 2.4, roughness: 0.3, metalness: 0 });
+  const glassDim = new THREE.MeshStandardMaterial({
+    color: 0x8a7a5e, emissive: 0xc97a3e, emissiveIntensity: 1.15, roughness: 0.4, metalness: 0 });
   function setNight(stage) {
     for (const w of nightWindows) {
       const on = stage === 1 || (stage === 2 && w.lateOpen);
