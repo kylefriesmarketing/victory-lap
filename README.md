@@ -867,6 +867,101 @@ Uses the portable Node at `C:\Users\kylef\tools\node` (not on PATH).
   ⚠️ NOT INERT: dealing consumes rng, so every fingerprint moves and old runs
   will not reproduce.
 
+- **M4 — THE RENDER PIPELINE: tone mapping, PBR, bloom** ✅ (2026-09-04)
+  Kyle sent an Instagram carousel of Fable-5.1 one-shot demos and asked why this
+  game does not look as good. Four gaps were named; three were real and cheap,
+  one was measured and rejected.
+
+  **1. There was NO TONE MAP.** three.js was dumping raw linear→sRGB straight at
+  the canvas: no shoulder, no toe, no highlight roll-off. Everything sat in the
+  middle of the range, which is why the town read flat and slightly chalky no
+  matter what the lights did — M2.4's key-to-fill pass chased that symptom and
+  could only half-fix it, because the cause was never the lighting ratio.
+  ⚠️ **EXPOSURE FOLLOWS THE HOUR**, and the measurement is why. Matched pair,
+  same frames, tone map the ONLY variable: ACES at a fixed exposure of 1.0 costs
+  the NIGHT frame 42% of its mean luma but noon only 9%. The filmic toe crushes
+  darks far harder than the shoulder compresses highlights, so one compromise
+  number either blows out noon or makes the Mile at midnight unreadable — and
+  the Mile at midnight is when this game is played. Driven by the SAME `su.day`
+  as the sun intensity so the two cannot drift apart.
+
+  **2. Every material was `MeshLambertMaterial`** — 100% matte, no specular term
+  AT ALL, so nothing in the game could ever catch a highlight. All 14 material
+  constructions are `MeshStandardMaterial` now. **Roughness stays HIGH (0.88) on
+  purpose**: the art bible's identity is chunky flat-colour low-poly and the goal
+  is a whisper of specular, not shiny plastic. Gloss is bought back deliberately
+  — car paint 0.35, glass 0.10–0.14, chain-link as real metal (86 of 1306).
+  ⚠️ **A STANDARD MATERIAL WITH NOTHING TO REFLECT IS JUST AN EXPENSIVE LAMBERT**,
+  so the scene gets a 64×32 procedural sky-over-ground gradient through PMREM.
+  ⚠️ **THE ENVIRONMENT MUST DIM WITH THE HOUR.** An IBL environment is LIGHT, not
+  decoration: one fixed daylight sky lifted the LATE frame 63% while noon moved
+  20%. There is no bright sky to reflect at 2 a.m. Rebuilt per day-bucket from
+  the same `day`; after, the lift is uniform (+26/+20/+27/+21%).
+  ⚠️ **`scene.environmentIntensity` is settable on r160 and does NOTHING** until
+  r163 — 0.4 and 1.0 both produced luma 53.91 to the hundredth. *A property
+  existing is not proof it is wired.* Toggle it and read the pixels.
+  ⚠️ **Exposure recalibrated ×0.76.** Standard's specular plus IBL made the
+  identical scene 20–27% brighter on every block — a side effect of a material
+  change, not a decision. Scaling the curve puts mean luma back within ±5% of the
+  pre-swap frame (+2/+1/+5/−3), so the only thing that changed is quality. That
+  is what a matched pair is FOR.
+  ⚠️ Interiors get their own stop, deliberately ABOVE the night street: at 1.00
+  the QwikStop measured 32.14 against a night Mile of 32.16, so stepping into the
+  shop that never closes felt like nothing.
+
+  **3. `js/post.js` — a hand-written bloom chain** (~200 lines). three.js ships
+  bloom as EIGHT files in `examples/jsm`, every one importing bare `'three'`
+  which does not resolve against our vendored `lib/three.module.js`. This is a
+  third of the code, has no import surface, and owns the tone-map ORDER.
+  ⚠️ **THE COLOUR TRAP**: three.js applies `toneMapping` only when the target is
+  the canvas. Render the scene into an RT and it lands linear and ungraded — so
+  if the composite does not re-apply ACES, the game silently loses tone mapping
+  the day post is switched on, and it looks like the ACES commit was reverted.
+  ⚠️ **THE GATE, and its threshold is the lesson.** With strength 0, post-ON must
+  match post-OFF. My first version asserted `maxDiff <= 4` and **failed a correct
+  pipeline**: max was 183 while the MEAN was 0.173. Reading the distribution
+  instead: 93% bit-identical, 99.4% within 8, every large difference on
+  consecutive pixels along single scanlines — silhouettes, i.e. the MSAA resolve,
+  which is genuinely not bit-equal to the canvas'. A wrong grade does not look
+  like that; it moves EVERY pixel. **A FAIL from a probe is a claim about the
+  probe** until the distribution says otherwise. Shipped as `__vlPostCheck()`.
+  ⚠️ Threshold 1.0 is LINEAR light, not display units. Lowering it to "get more
+  bloom" makes the ROAD glow — brighten the source instead.
+  ⚠️ `sceneRT.samples = 4` or post silently costs the canvas MSAA, with no error.
+  ⚠️ `Post` takes ONLY the renderer; scene and camera arrive per frame. The first
+  draft captured them next to `this.scene`, which is built BEFORE `this.camera`,
+  so it captured an undefined camera and threw inside `WebGLRenderer.render` with
+  a message naming neither the camera nor the file.
+  ⚠️ **Sign emissive 0.5 → 1.2 is a LEGIBILITY constraint.** At 0.5 the Mile at
+  midnight was flat coloured cards with exactly one halo on it. But `emissiveMap`
+  IS the sign texture, so the light background emits and past ~1.4 blooms over
+  its own lettering — at 1.9 the whole row was unreadable white bars. These signs
+  carry the town's jokes. **Raise it and check the WORDS, not the glow.**
+  Cost: 0.14 ms/frame (3%). Player toggle in the pause menu, hidden rather than
+  inert where there is no post chain.
+
+  **4. Pitch shallowed 0.30–0.72 → 0.15–0.66** at the close end only; the far end
+  stays high because a chase has to stay legible.
+  ⚠️⚠️ **THE SKY DOME WAS BUILT, MEASURED AND REJECTED.** A gradient dome with its
+  horizon pinned to the fog colour (so the seam is invisible) was built and
+  wired, then measured by toggling `.visible` and counting changed pixels at the
+  most open spot in the game — the Bluffs at the shallowest zoom, over the lake:
+  **6 pixels out of 921,600. 0.00% of frame.** Structural, not a tuning miss:
+  this camera looks DOWN at a player it orbits, and even shallow the buildings
+  fill the top of frame. There is no horizon on screen to put a sky on. It was my
+  own proposal; the measurement says it was wrong, so it is deleted rather than
+  shipped as a draw call that renders nothing.
+
+  Totals: 171–277 draw calls, ~15k tris, 3.14 ms/frame, 0 console errors, soak 48
+  green, contracts 301 green.
+  ⚠️ NOT addressed, and still the honest gap: the demos being compared against are
+  30-second clips of ONE closed scene with a chase cam and no HUD. This is a
+  3400×3200 open town, six districts, sixteen interiors, day/night, weather and a
+  HUD, from a camera that has to keep a street readable for 25 minutes. That is
+  an explanation, not an excuse — 1–3 above were real and should have shipped
+  months ago — but it is why some of the gap is not closable without becoming a
+  different game.
+
 ## What's deliberately NOT in Phase 1 (per the roadmap — don't "fix" these)
 
 - No Hopeless Tech, classes, GPA, or majors (Phase 2).
