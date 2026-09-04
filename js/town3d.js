@@ -794,7 +794,20 @@ export function buildTown(D) {
     for (const s of signMeshes) {
       s.material.emissive = s.material.emissive || new THREE.Color();
       s.material.emissive.setHex(stage > 0 ? 0xffffff : 0x000000);
-      s.material.emissiveIntensity = stage > 0 ? 0.5 : 0;
+      // ⚠️ 1.2, and the exact value is a LEGIBILITY constraint, not a taste one.
+      // Two thresholds sit above the old 0.5 and a lit sign must clear both:
+      // ACES' shoulder (under 1.0 an emissive maps to a merely pale rectangle
+      // instead of a light) and the bloom pass' linear gate, parked at 1.0 so
+      // ordinary lit surfaces cannot glow. At 0.5 the Mile at midnight was a row
+      // of flat coloured cards with exactly one halo on it — the QwikStop, whose
+      // WINDOW is emissive at 2.4 and was doing all the glowing by itself.
+      // ⚠️ But emissiveMap IS the sign texture, so the sign's light BACKGROUND
+      // emits too, and past ~1.4 it blooms over its own lettering: photographed
+      // at 1.9 the whole row was unreadable white bars. These signs carry the
+      // town's jokes and the art bible says the game sets its own type, so
+      // legibility wins the tie. 1.2 sits just over the gate: lit, gently haloed,
+      // still readable. Raise it and check the WORDS, not the glow.
+      s.material.emissiveIntensity = stage > 0 ? 1.2 : 0;
       s.material.emissiveMap = stage > 0 ? s.material.map : null;
       s.material.needsUpdate = true;
     }

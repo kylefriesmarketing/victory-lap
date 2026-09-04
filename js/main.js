@@ -96,6 +96,58 @@ function startRun() {
     catch (e) { console.error('3D unavailable, using classic view:', e.message); renderer = null; }
   }
   window.__vl3d = renderer;
+
+// ---------------------------------------------------------------------------
+// ⚠️ THE POST COLOUR GATE. The one test that matters when a post chain exists:
+// with bloom STRENGTH AT ZERO, the composited frame must match the direct one.
+// If they differ, ACES is being applied twice, zero times, or in the wrong space
+// — and none of those look broken, they look like the tone-mapping commit got
+// reverted. Run it after ANY change to post.js, the tone map, or the exposure.
+//
+// ⚠️ THE PASS BAR IS NOT "IDENTICAL", AND THAT MATTERS. The scene renders through
+// a multisampled RT and resolves, while the direct path uses the canvas' own
+// MSAA; those two are genuinely not bit-equal on geometry edges. Measured on the
+// night Mile: 93.0% of pixels bit-identical, 99.4% within 8, and every large
+// difference sat on consecutive pixels along single scanlines — silhouettes. A
+// wrong grade does not look like that; it moves EVERY pixel, and pctIdentical
+// collapses toward zero. So the gate reads the DISTRIBUTION, not the max.
+// ⚠️ My first version asserted maxDiff <= 4 and failed a correct pipeline. A
+// FAIL from a probe is a claim about the probe until the distribution says
+// otherwise.
+// ---------------------------------------------------------------------------
+window.__vlPostCheck = () => {
+  const r = renderer;
+  if (!r || !r.post || !r.post.available) return { skipped: 'no post chain' };
+  const grab = () => {
+    const c = r.renderer.domElement, gl = r.renderer.getContext();
+    const px = new Uint8Array(c.width * c.height * 4);
+    gl.readPixels(0, 0, c.width, c.height, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    return px;
+  };
+  const keepS = r.post.p.strength, keepB = r.bloom;
+  r.post.p.strength = 0;
+  r.bloom = true;  r.render(0.016); const on = grab();
+  r.bloom = false; r.render(0.016); const off = grab();
+  r.post.p.strength = keepS; r.bloom = keepB;
+
+  let same = 0, within8 = 0, total = 0, sum = 0;
+  for (let i = 0; i < on.length; i += 4) {
+    const d = Math.max(Math.abs(on[i] - off[i]), Math.abs(on[i + 1] - off[i + 1]),
+                       Math.abs(on[i + 2] - off[i + 2]));
+    total++; sum += d;
+    if (d === 0) same++;
+    if (d <= 8) within8++;
+  }
+  const pctSame = +(same / total * 100).toFixed(2);
+  const pct8 = +(within8 / total * 100).toFixed(2);
+  const mean = +(sum / total).toFixed(3);
+  return { pctIdentical: pctSame, pctWithin8: pct8, meanDiff: mean,
+           pass: pctSame > 85 && pct8 > 98 && mean < 1,
+           note: 'edge differences are the MSAA resolve, not the grade' };
+};
+
+// live tuning without a reload: __vlPost().threshold = 1.2; then look.
+window.__vlPost = () => renderer && renderer.post && renderer.post.p;
   if (!renderer) renderer = new Renderer($('cv'), game);
   try {                                       // the preference outlives the run
     if (localStorage.getItem('vl-camfx') === '0') {
@@ -1075,6 +1127,7 @@ function togglePause() {
   // players guessing whether clicking confirms 3D or leaves it, and the longer
   // string wrapped to two lines in the button.
   if (paused) $('p-view').textContent = window.__vl3d ? '🕹️ Switch to classic 2D' : '🕹️ Switch to 3D';
+  if (paused) syncBloomBtn();
 }
 
 // ---------------------------------------------------------------------------
@@ -1139,6 +1192,21 @@ addEventListener('keydown', (e) => {
 }, true);
 $('p-resume').onclick = togglePause;
 $('p-mute').onclick = () => { sfx.setMute(!sfx.muted); $('p-mute').textContent = sfx.muted ? '🔇 Unmute' : '🔊 Mute'; };
+// ⚠️ Hidden entirely in the 2D view rather than shown-and-inert: the classic
+// painter has no post chain, and a settings button that silently does nothing is
+// worse than an absent one. Also hidden when WebGL2 is missing, which is the same
+// condition that leaves post.available false.
+function syncBloomBtn() {
+  const b = $('p-bloom'), r = window.__vl3d;
+  if (!b) return;
+  const can = !!(r && r.post && r.post.available);
+  b.style.display = can ? '' : 'none';
+  if (can) b.textContent = r.bloom ? '✨ Neon glow: on' : '✨ Neon glow: off';
+}
+$('p-bloom').onclick = () => {
+  const r = window.__vl3d;
+  if (r && r.setBloom) { r.setBloom(!r.bloom); syncBloomBtn(); }
+};
 // The art bible asks for camera effects to be "restrained and configurable" — this
 // is the configurable half. Off = a plain locked follow, no lead, punch, or drift.
 // ⚠️ The view toggle RELOADS — a canvas can hold exactly one context type, so

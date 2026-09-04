@@ -18,6 +18,7 @@
 import * as THREE from '../lib/three.module.js';
 import { WORLD, INTERIORS, ARCHETYPES } from './game.js';
 import { buildTown } from './town3d.js';
+import { Post } from './post.js';
 import { buildRoom } from './rooms3d.js';
 import { TOWN_DRESSING } from './layouts3d.js';
 
@@ -233,6 +234,15 @@ export class Renderer3D {
     // it only has to be BRIGHT ABOVE and DARK BELOW so a face turned skyward
     // catches something and a face turned down does not. Built once, ~1ms.
     this._envs = {};                       // day-bucket -> PMREM texture, built once each
+
+    // ⚠️ THE BLOOM CHAIN. Emissives in this game (lit signs 2.4, shop windows,
+    // room lights 2.1) sit above ACES' shoulder specifically so this pass has
+    // something to key off. Falls back to a plain render when WebGL2 is missing —
+    // `post.available` is the only gate, and render() checks it every frame so a
+    // failed construction can never take the game down with it.
+    this.post = new Post(this.renderer);
+    // persisted toggle, same shape as the other view settings
+    try { this.bloom = localStorage.getItem('vl-bloom') !== '0'; } catch { this.bloom = true; }
     // ⚠️ Fog starts BEYOND max camera distance or the town greys out at your feet.
     this.scene.fog = new THREE.Fog(C.night, 1700, 4200);
     this._fogDefaults = { near: 1700, far: 4200 };
@@ -347,6 +357,11 @@ export class Renderer3D {
     return env;
   }
 
+  setBloom(on) {
+    this.bloom = !!on;
+    try { localStorage.setItem('vl-bloom', on ? '1' : '0'); } catch {}
+  }
+
   resize(w, h) {
     // ⚠️ main.js resize() PASSES the clamped size and sets the canvas CSS only
     // AFTERWARD — an argless read of clientWidth here sees the stale style and
@@ -358,6 +373,10 @@ export class Renderer3D {
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    // ⚠️ the render targets are sized in DEVICE pixels (setSize multiplies by
+    // the pixel ratio); miss this and the composite samples a stale-sized RT and
+    // the bloom drifts off-register as soon as the window changes.
+    if (this.post) this.post.setSize(w, h);
   }
 
   buildTown() {
@@ -799,7 +818,12 @@ export class Renderer3D {
     this.tickRain(dt);
     this.tickBarks(dt);
     this.tickParts(dt);
-    this.renderer.render(this.scene, this.camera);
+    // ⚠️ ONE render call site. When post is on, the composite is what touches the
+    // canvas and it re-applies ACES + sRGB itself; when it is off, three.js grades
+    // on the way to the canvas as usual. Either way the grade lands exactly once —
+    // `__vlPostCheck()` asserts the two paths agree at strength 0.
+    if (this.post && this.post.available && this.bloom) this.post.render(this.scene, this.camera);
+    else { this.renderer.setRenderTarget(null); this.renderer.render(this.scene, this.camera); }
   }
 
   bark(who, text, x, y) {
