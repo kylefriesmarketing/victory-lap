@@ -234,6 +234,18 @@ export class Renderer3D {
     // it only has to be BRIGHT ABOVE and DARK BELOW so a face turned skyward
     // catches something and a face turned down does not. Built once, ~1ms.
     this._envs = {};                       // day-bucket -> PMREM texture, built once each
+    // ⚠️⚠️ A SKY DOME WAS BUILT HERE AND REMOVED. Do not add one back without
+    // first measuring whether it would be VISIBLE. A gradient dome (horizon
+    // colour pinned to the fog colour, following the camera, behind everything)
+    // was built, wired to the same `day` as the sun, and then measured by
+    // toggling .visible and counting changed pixels: at the most open location
+    // in the game — the Bluffs at the shallowest zoom, looking out over the lake
+    // — it contributed SIX PIXELS out of 921,600. 0.00% of frame.
+    // The reason is structural, not a tuning miss: this camera looks DOWN at a
+    // player it is orbiting, and even at the shallow end of the zoom range the
+    // buildings and trees fill the top of frame. There is no horizon on screen
+    // to put a sky on. Making one appear means a true chase cam, which is a
+    // different game from the open-town readability this one is built around.
 
     // ⚠️ THE BLOOM CHAIN. Emissives in this game (lit signs 2.4, shop windows,
     // room lights 2.1) sit above ACES' shoulder specifically so this pass has
@@ -631,7 +643,14 @@ export class Renderer3D {
       dist = Math.max(room.w, room.h) * 1.3;
       pitch = 0.42;
     } else {
-      pitch = lerp(0.30, 0.72, (dist - 480) / (1400 - 480));
+      // ⚠️ SHALLOWED from 0.30–0.72 to 0.15–0.66. At the close end the old
+      // minimum still looked down at ~39°, so a storefront was a stripe along
+      // the top of frame and you mostly played on tarmac; at ~30° the facades
+      // stand up, the signs are readable at a glance and parked cars have a
+      // side. That close end is where this view is meant to feel like a place
+      // you are standing in — the far end stays high because a chase across the
+      // Mile has to stay legible, which is what the zoom/pitch coupling is FOR.
+      pitch = lerp(0.15, 0.66, (dist - 480) / (1400 - 480));
     }
 
     // Rip shakes: the sim sets shakeAmp the morning after; the lens wobbles.
