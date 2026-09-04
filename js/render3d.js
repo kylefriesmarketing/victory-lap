@@ -194,6 +194,20 @@ export class Renderer3D {
 
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1));
+    // ⚠️⚠️ ACES FILMIC, and this is the single highest-value line in the file.
+    // Without a tone map three.js dumps raw linear→sRGB straight at the canvas:
+    // no highlight roll-off, no shoulder, no toe. Everything sits in the middle
+    // of the range and the whole town reads FLAT and slightly chalky no matter
+    // what the lights do — which is exactly the symptom the M2.4 key-to-fill
+    // pass chased and could only half-fix, because the problem was never the
+    // lighting ratio, it was that nothing was mapping HDR into display range.
+    // ⚠️ ACES compresses, so it darkens by default; exposure buys that back.
+    // ⚠️ Only applies when rendering to the CANVAS (three.js checks
+    // currentRenderTarget === null). If a post chain ever lands here, the tone
+    // map has to move into the final composite pass or the scene renders twice
+    // graded — see the toybox post.js notes.
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.0;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.setClearColor(C.night);
@@ -587,6 +601,20 @@ export class Renderer3D {
     // the doorway. Flat indoor light + a gentler sun for shadow shape, and the
     // point light (switchRoom) does the rest.
     if (this.curRoom !== 'ext') { hemiI = 2.3; sunI = 1.1; }
+
+    // ⚠️ EXPOSURE FOLLOWS THE HOUR, because a fixed one cannot serve both ends.
+    // MEASURED across a matched pair (same frame, tone map the only variable):
+    // ACES at exposure 1.0 costs the NIGHT frame 42% of its mean luma but noon
+    // only 9% — the filmic toe crushes darks far harder than the shoulder
+    // compresses highlights. One compromise number therefore either blows out
+    // noon or makes the Mile at midnight unreadable, and the Mile at midnight is
+    // when this game is played. So the camera opens up after dark, exactly like
+    // a real one: 1.85 at night down to 1.30 at noon, driven by the SAME su.day
+    // the sun intensity uses so the two can never drift apart.
+    // ⚠️ Interiors are lit rooms and already override sun/hemi above — they get
+    // their own fixed stop, or a bright shop reads like a night exterior.
+    const expo = this.curRoom !== 'ext' ? 1.30 : 1.85 - day * 0.55;
+    this.renderer.toneMappingExposure = expo;
 
     this.sun.intensity = sunI;
     this.hemi.intensity = hemiI;
